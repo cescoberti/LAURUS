@@ -1,0 +1,22 @@
+{
+  "name": "laurus",
+  "private": true,
+  "version": "0.0.0",
+  "description": "LAURUS — EP Plenary Companion. Less paperwork. More wins.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "ingest": "npm run start --workspace @laurus/ingest",
+    "typecheck": "tsc -b packages/ingest packages/parser",
+    "db:reset": "supabase db reset",
+    "web:dev": "npm run dev --workspace @laurus/web"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

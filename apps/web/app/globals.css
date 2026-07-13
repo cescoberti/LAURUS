@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f9f8;
+  --card: #ffffff;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background:
+    radial-gradient(1200px 400px at 100% -10%, rgba(45, 106, 79, 0.06), transparent 60%),
+    var(--bg);
+  color: #0f1b16;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Thin, refined scrollbars inside scrollable tables. */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}

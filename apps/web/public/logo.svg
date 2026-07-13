@@ -1,0 +1,7 @@
+<svg viewBox="0 0 300 72" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LAURUS">
+  <!-- (b) horizontal lockup: mark + wordmark -->
+  <path fill="#1B4332" transform="translate(4,4)" d="M12 33 Q21.5 35.5 25 45 Q16.5 42 12 33 Z
+    M25 45 Q45 35 52 15 Q33 25 25 45 Z"/>
+  <text x="82" y="48" font-family="'Helvetica Neue', Arial, sans-serif"
+        font-size="34" font-weight="700" letter-spacing="6" fill="#1B4332">LAURUS</text>
+</svg>

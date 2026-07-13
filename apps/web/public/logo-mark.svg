@@ -1,0 +1,6 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LAURUS mark">
+  <!-- Symbol only (favicon / avatar). Deep laurel green; swap fill to #000 for
+       monochrome or #F7F4EC for negative on a dark ground. -->
+  <path fill="#1B4332" d="M12 33 Q21.5 35.5 25 45 Q16.5 42 12 33 Z
+    M25 45 Q45 35 52 15 Q33 25 25 45 Z"/>
+</svg>

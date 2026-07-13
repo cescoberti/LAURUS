@@ -1,0 +1,14 @@
+/**
+ * LAURUS brand tokens — deep laurel green primary, warm gold accent.
+ * Mirrored in apps/web/tailwind.config.ts (laurel.*, gold.*, ink.*).
+ * Every mark/wordmark path uses currentColor so these tokens (or plain
+ * black / white) can drive monochrome and negative variants without
+ * touching the SVGs.
+ */
+:root {
+  --laurus-primary: #1f5138;      /* laurel-700 — deep laurel green */
+  --laurus-primary-dark: #0f2c1e; /* laurel-900 */
+  --laurus-accent: #d4af37;       /* gold-400 — warm accent, used sparingly */
+  --laurus-ink: #0f1b16;          /* body text on light backgrounds */
+  --laurus-on-dark: #f7f9f8;      /* mark/wordmark colour on dark backgrounds */
+}

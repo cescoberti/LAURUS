@@ -1,0 +1,5 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LAURUS">
+  <!-- Laurel leaf whose profile also reads as a check mark: one shape, two meanings. -->
+  <path fill="currentColor" d="M12 33 Q21.5 35.5 25 45 Q16.5 42 12 33 Z
+    M25 45 Q45 35 52 15 Q33 25 25 45 Z"/>
+</svg>

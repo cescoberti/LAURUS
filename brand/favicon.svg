@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="LAURUS">
+  <!--
+    Favicon cut: bolder stroke, two leaves instead of three, tuned to stay
+    legible at 16px where the logo-mark's finest leaf would clot into a blob.
+  -->
+  <g fill="none" stroke="var(--laurus-primary, #1f5138)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 17.5 L13 24.5 L26 7.5" />
+  </g>
+  <path
+    d="M17 19.5 q-4 -0.3 -5.3 -4 q4 -0.7 5.3 4 Z
+       M21.5 13.5 q-4 0 -5.5 -3.6 q4 -0.9 5.5 3.6 Z"
+    fill="var(--laurus-primary, #1f5138)"
+  />
+</svg>

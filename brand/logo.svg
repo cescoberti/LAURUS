@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" width="720" height="360" role="img" aria-label="LAURUS brand sheet">
+  <defs>
+    <style>
+      :root {
+        --laurus-primary: #1f5138;
+        --laurus-dark: #0f2c1e;
+        --laurus-accent: #d4af37;
+        --laurus-on-dark: #f7f9f8;
+      }
+      .wordmark {
+        font-family: "Futura", "Century Gothic", "Avenir Next", "Segoe UI", sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .caption {
+        font-family: "Segoe UI", sans-serif;
+        font-size: 10px;
+        fill: #5c6b64;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </defs>
+
+  <rect width="720" height="360" fill="#ffffff" />
+
+  <!-- (a) symbol only, square, favicon/avatar guide -->
+  <g transform="translate(40,40)">
+    <rect x="0" y="0" width="120" height="120" rx="16" fill="#f7f9f8" stroke="#e2e8e4" />
+    <g transform="translate(28,28) scale(2)">
+      <path d="M7 17.5 L13 24 L25.5 8" fill="none" stroke="var(--laurus-primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="M16 20 q-3.6 -0.4 -4.8 -3.6 q3.6 -0.6 4.8 3.6 Z
+           M19 16.5 q-3.7 -0.2 -5 -3.5 q3.7 -0.7 5 3.5 Z
+           M22 13 q-3.7 0 -5.1 -3.3 q3.7 -0.8 5.1 3.3 Z"
+        fill="var(--laurus-primary)"
+      />
+    </g>
+    <text x="60" y="150" text-anchor="middle" class="caption">(a) SYMBOL</text>
+  </g>
+
+  <!-- (b) symbol + horizontal wordmark -->
+  <g transform="translate(220,70)">
+    <g transform="scale(2.2)">
+      <path d="M7 17.5 L13 24 L25.5 8" fill="none" stroke="var(--laurus-primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="M16 20 q-3.6 -0.4 -4.8 -3.6 q3.6 -0.6 4.8 3.6 Z
+           M19 16.5 q-3.7 -0.2 -5 -3.5 q3.7 -0.7 5 3.5 Z
+           M22 13 q-3.7 0 -5.1 -3.3 q3.7 -0.8 5.1 3.3 Z"
+        fill="var(--laurus-primary)"
+      />
+    </g>
+    <text x="82" y="42" class="wordmark" font-size="30" fill="var(--laurus-dark)">LAURUS</text>
+    <text x="40" y="90" class="caption">(b) SYMBOL + WORDMARK</text>
+  </g>
+
+  <!-- (c) wordmark alone -->
+  <g transform="translate(220,180)">
+    <text x="0" y="30" class="wordmark" font-size="30" fill="var(--laurus-dark)">LAURUS</text>
+    <text x="0" y="60" class="caption">(c) WORDMARK ONLY</text>
+  </g>
+
+  <!-- monochrome black check -->
+  <g transform="translate(500,40)">
+    <rect x="0" y="0" width="80" height="80" rx="12" fill="#ffffff" stroke="#e2e8e4" />
+    <g transform="translate(18,18) scale(1.3)">
+      <path d="M7 17.5 L13 24 L25.5 8" fill="none" stroke="#000000" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="M16 20 q-3.6 -0.4 -4.8 -3.6 q3.6 -0.6 4.8 3.6 Z
+           M19 16.5 q-3.7 -0.2 -5 -3.5 q3.7 -0.7 5 3.5 Z
+           M22 13 q-3.7 0 -5.1 -3.3 q3.7 -0.8 5.1 3.3 Z"
+        fill="#000000"
+      />
+    </g>
+    <text x="40" y="100" text-anchor="middle" class="caption">MONOCHROME</text>
+  </g>
+
+  <!-- negative on dark -->
+  <g transform="translate(610,40)">
+    <rect x="0" y="0" width="80" height="80" rx="12" fill="var(--laurus-dark)" />
+    <g transform="translate(18,18) scale(1.3)">
+      <path d="M7 17.5 L13 24 L25.5 8" fill="none" stroke="var(--laurus-on-dark)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="M16 20 q-3.6 -0.4 -4.8 -3.6 q3.6 -0.6 4.8 3.6 Z
+           M19 16.5 q-3.7 -0.2 -5 -3.5 q3.7 -0.7 5 3.5 Z
+           M22 13 q-3.7 0 -5.1 -3.3 q3.7 -0.8 5.1 3.3 Z"
+        fill="var(--laurus-on-dark)"
+      />
+    </g>
+    <text x="40" y="100" text-anchor="middle" class="caption">NEGATIVE</text>
+  </g>
+
+  <text x="40" y="330" class="caption" font-size="11">LAURUS — Meno scartoffie, più voti vinti. / Less paperwork. More wins.</text>
+</svg>

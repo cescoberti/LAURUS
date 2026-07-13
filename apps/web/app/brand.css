@@ -1,0 +1,9 @@
+/* LAURUS design tokens — reused across the UI and mirrored in tailwind.config. */
+:root {
+  --laurus-green: #1B4332;   /* primary — deep laurel green */
+  --laurus-green-600: #2D6A4F;
+  --laurus-gold: #C9A227;    /* single warm accent */
+  --laurus-ink: #10231B;     /* near-black text on light */
+  --laurus-paper: #F7F4EC;   /* negative / light ground */
+  --laurus-line: #E4E7E4;    /* hairline borders */
+}
