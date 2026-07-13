@@ -1,4 +1,4 @@
-import type { Item, VlStatus } from "@/lib/types";
+import type { DisplayItem, VlStatus } from "@/lib/types";
 
 // Subtle per-committee tint so the eye can group rows at a glance.
 const COMMITTEE_TINT: Record<string, string> = {
@@ -39,51 +39,32 @@ export function VlBadge({ status }: { status: VlStatus }) {
   return <span className="text-sm text-ink-300">–</span>;
 }
 
-export function AmDeadline({ item }: { item: Item }) {
-  if (!item.amDeadline) return <span className="text-sm text-ink-300">–</span>;
-  const { label, state } = item.amDeadline;
-  const style =
-    state === "closed"
-      ? "bg-slate-100 text-ink-700 ring-slate-200"
-      : state === "split"
-        ? "bg-[#eef1fb] text-[#3b4a8a] ring-[#d3daf3]"
-        : "bg-emerald-50 text-emerald-700 ring-emerald-200";
+/** Muted chip for features that ship with a later milestone. */
+function ComingSoon({ label, milestone }: { label: string; milestone: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}>
-        {label}
-      </span>
-      {item.amr != null && (
-        <span className="inline-flex rounded-md bg-laurel-50 px-1.5 py-0.5 text-[11px] font-semibold text-laurel-700 ring-1 ring-inset ring-laurel-100">
-          AMR {item.amr}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function DocLink({ label, muted }: { label: string; muted?: boolean }) {
-  return (
-    <button
-      className={`text-xs font-medium transition-colors ${
-        muted ? "text-ink-300 cursor-default" : "text-laurel-600 hover:text-laurel-800 hover:underline"
-      }`}
-      disabled={muted}
-    >
+    <span title={`Disponibile con ${milestone}`} className="cursor-default text-xs font-medium text-ink-300">
       {label}
-    </button>
+    </span>
   );
 }
 
-export function DocLinks({ item }: { item: Item }) {
-  const d = item.docs;
+export function DocLinks({ item }: { item: DisplayItem }) {
   return (
     <div className="flex items-center gap-2">
-      <span title="Notifications" className="text-ink-300 hover:text-gold-500 cursor-pointer">🔔</span>
-      {d.file && <DocLink label="File" />}
-      {d.vl && <DocLink label="VL" />}
-      <DocLink label="AMs" muted={!d.ams} />
-      {d.split && <DocLink label="Split" />}
+      {item.fileUrl ? (
+        <a
+          href={item.fileUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-medium text-laurel-600 transition-colors hover:text-laurel-800 hover:underline"
+        >
+          File
+        </a>
+      ) : (
+        <span className="cursor-default text-xs font-medium text-ink-300">File</span>
+      )}
+      <ComingSoon label="AMs" milestone="M2" />
+      <ComingSoon label="VL" milestone="M3" />
     </div>
   );
 }

@@ -7,6 +7,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "start": "node --experimental-strip-types src/cli.ts"
+    "start": "node --experimental-strip-types src/cli.ts",
+    "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0"
   }
 }

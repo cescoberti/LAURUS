@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { DayGroup } from "@/lib/types";
-import { AmDeadline, CommitteeChip, DocLinks, StaffAvatar, VlBadge } from "./badges";
+import { CommitteeChip, DocLinks, StaffAvatar, VlBadge } from "./badges";
 
-const HEAD = ["Code", "Title", "Cmte", "AM Deadline", "VL", "Docs", "Staff"];
+const HEAD = ["Code", "Title", "Cmte", "VL", "Docs", "Staff"];
 
 export function ItemTable({ group }: { group: DayGroup }) {
   return (
@@ -13,7 +13,7 @@ export function ItemTable({ group }: { group: DayGroup }) {
       </div>
 
       <div className="scroll-x overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
-        <table className="w-full min-w-[860px] border-collapse text-left">
+        <table className="w-full min-w-[760px] border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
               {HEAD.map((h) => (
@@ -39,7 +39,7 @@ export function ItemTable({ group }: { group: DayGroup }) {
                     {item.code}
                   </Link>
                 </td>
-                <td className="max-w-[320px] px-4 py-3 align-top">
+                <td className="max-w-[420px] px-4 py-3 align-top">
                   <Link href={`/items/${item.code}`} className="text-sm leading-snug text-ink-900 hover:text-laurel-800">
                     {item.title}
                   </Link>
@@ -48,7 +48,6 @@ export function ItemTable({ group }: { group: DayGroup }) {
                   )}
                 </td>
                 <td className="px-4 py-3 align-top"><CommitteeChip code={item.committee} /></td>
-                <td className="px-4 py-3 align-top"><AmDeadline item={item} /></td>
                 <td className="px-4 py-3 align-top"><VlBadge status={item.vl} /></td>
                 <td className="px-4 py-3 align-top"><DocLinks item={item} /></td>
                 <td className="px-4 py-3 align-top"><StaffAvatar initials={item.staff} /></td>

@@ -21,19 +21,29 @@ export async function TopNav({ active }: { active?: "All Votes" | "admin" }) {
           <Wordmark />
         </Link>
         <nav className="flex items-center gap-1 text-sm">
-          {NAV_ITEMS.map((t) => (
-            <Link
-              key={t}
-              href={t === "All Votes" ? "/" : "#"}
-              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                active === t
-                  ? "bg-laurel-50 text-laurel-800"
-                  : "text-ink-500 hover:bg-slate-50 hover:text-ink-900"
-              }`}
-            >
-              {t}
-            </Link>
-          ))}
+          {NAV_ITEMS.map((t) =>
+            t === "All Votes" ? (
+              <Link
+                key={t}
+                href="/"
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                  active === t
+                    ? "bg-laurel-50 text-laurel-800"
+                    : "text-ink-500 hover:bg-slate-50 hover:text-ink-900"
+                }`}
+              >
+                {t}
+              </Link>
+            ) : (
+              <span
+                key={t}
+                title="In arrivo con le prossime milestone"
+                className="cursor-default rounded-md px-3 py-1.5 font-medium text-ink-300"
+              >
+                {t}
+              </span>
+            ),
+          )}
           {profile?.role === "admin" && (
             <Link
               href="/admin/users"
