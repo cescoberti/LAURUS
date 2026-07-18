@@ -146,8 +146,9 @@ function AmendmentsView({
     <div>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-ink-500">
-          <span className="font-semibold text-ink-900">{amendments.length}</span> emendamenti
-          consolidati — testo estratto dal DOCX della relazione, colonne verbatim.
+          <span className="font-semibold text-ink-900">{amendments.length}</span> emendamenti —{" "}
+          <strong className="font-semibold">aggiunte in grassetto</strong>,{" "}
+          <s className="text-red-700/80">soppressioni barrate</s>.
         </p>
         {languages.length > 1 && (
           <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
@@ -191,24 +192,7 @@ function AmendmentsView({
                   <CopyButton value={remarks} label="Copia remarks" />
                 </span>
               </div>
-              <div className="grid grid-cols-1 gap-px bg-slate-100 md:grid-cols-2">
-                <div className="bg-white p-4">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-300">Testo attuale</p>
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">
-                    {original || <span className="text-ink-300">— (nuovo)</span>}
-                  </p>
-                </div>
-                <div className="bg-white p-4">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-laurel-700">Emendamento</p>
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-ink-900">
-                    {amended || <span className="text-ink-300">— (soppressione)</span>}
-                  </p>
-                </div>
-              </div>
-              <div className="border-t border-slate-100 bg-laurel-50/30 p-4">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-laurel-700">
-                  Remarks (aggiunte in grassetto, soppressioni barrate)
-                </p>
+              <div className="p-4">
                 <p className="text-sm italic leading-relaxed text-ink-900">
                   <RichText value={remarks} />
                 </p>

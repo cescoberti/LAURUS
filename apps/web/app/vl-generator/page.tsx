@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
-import { CommitteeChip } from "@/components/badges";
+import { CoveredReportsList, type CoveredReport } from "@/components/CoveredReportsList";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +12,9 @@ export default async function VlGeneratorPage() {
   const supabase = await createClient();
   const { data: covered } = await supabase
     .from("items")
-    .select("code, title, committee, vote_date, am_count")
+    .select("code, title, rapporteur, committee, vote_date, am_count")
     .gt("am_count", 0)
-    .order("vote_date", { ascending: false })
-    .limit(40);
+    .order("vote_date", { ascending: false });
 
   return (
     <div className="min-h-screen">
@@ -65,26 +63,11 @@ export default async function VlGeneratorPage() {
         </form>
 
         <section className="mt-10">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">
             Relazioni con emendamenti già scaricati ({covered?.length ?? 0})
           </h2>
           {covered && covered.length > 0 ? (
-            <ul className="mt-3 grid gap-2 md:grid-cols-2">
-              {covered.map((it) => (
-                <li key={it.code}>
-                  <Link
-                    href={`/items/${it.code}`}
-                    className="flex items-center gap-3 rounded-lg border border-slate-200/70 bg-white px-3 py-2 text-sm hover:border-laurel-200 hover:bg-laurel-50/40"
-                  >
-                    <span className="font-mono text-xs text-laurel-700">{it.code}</span>
-                    {it.committee && <CommitteeChip code={it.committee} />}
-                    <span className="ml-auto rounded-full bg-laurel-100 px-2 text-xs font-semibold text-laurel-800">
-                      {it.am_count} em.
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <CoveredReportsList reports={covered as CoveredReport[]} />
           ) : (
             <p className="mt-3 text-sm text-ink-300">
               Nessun emendamento ancora ingerito — lancia{" "}
