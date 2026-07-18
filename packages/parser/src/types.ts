@@ -4,6 +4,13 @@ export interface ParsedAmendment {
   target?: string;         // 'Recital C', 'Article 4', '§ 15'
   originalText?: string;
   amendedText?: string;
+  /**
+   * Same columns with inline formatting kept as light HTML (<b>/<i>/<s> only).
+   * The EP template marks every change in bold italic, so these preserve which
+   * words the amendment actually touches.
+   */
+  originalRich?: string;
+  amendedRich?: string;
   language: string;
   kind: "standard" | "oral" | "compromise_cam" | "withdrawn";
 }

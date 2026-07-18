@@ -10,3 +10,8 @@ out/
 supabase/.branches/
 supabase/.temp/
 apps/web/data/
+
+# Internal Tabling Service document with group vote indications — never
+# publish (repo is public). Kept locally for parser tests, which skip when
+# it's absent.
+packages/parser/fixtures/annotated-vl-streit-A10-0170-2026-it.docx

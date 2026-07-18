@@ -1,7 +1,8 @@
 import { TopNav } from "@/components/TopNav";
-import { AnnotatedVlTab } from "@/components/AnnotatedVlTab";
+import { ItemTabs } from "@/components/ItemTabs";
 import { CommitteeChip } from "@/components/badges";
-import { getItemByCode } from "@/lib/data";
+import { getItemByCode, getItemAmendments } from "@/lib/data";
+import { hasAnnotatedVl } from "@/lib/annotatedVl";
 
 export const dynamic = "force-dynamic";
 
@@ -9,16 +10,22 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
   const { code: codeSegments } = await params;
   const code = decodeURIComponent(codeSegments.join("/"));
   const item = await getItemByCode(code);
+  const { amendments, languages } = item
+    ? await getItemAmendments(item.id)
+    : { amendments: [], languages: [] };
 
   const reportEn = item?.documents.find((d) => d.type === "report" && d.language === "en");
   const reportIt = item?.documents.find((d) => d.type === "report" && d.language === "it");
+  // Real amendments in DB → VL generated from EP data; else static registry.
+  const annotatedVlAvailable = amendments.length > 0 || hasAnnotatedVl(code);
 
   return (
     <div className="min-h-screen">
       <TopNav />
 
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
           <p className="font-mono text-sm text-laurel-700">{code}</p>
           <h1 className="mt-1 text-2xl font-bold text-ink-900">
             {item?.title.en || item?.title.it || "Item not found"}
@@ -47,12 +54,24 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
               </a>
             )}
           </div>
+          </div>
+
+          {annotatedVlAvailable && (
+            <a
+              href={`/api/annotated-vl?code=${encodeURIComponent(code)}`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-laurel-900"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download annotated VL
+            </a>
+          )}
         </div>
 
-        <p className="mb-4 rounded-lg bg-gold-500/10 px-3 py-2 text-xs text-ink-500 ring-1 ring-inset ring-gold-500/20">
-          Anteprima della VL annotata su dati d&apos;esempio — il collegamento alla voting list reale arriva con M2/M3.
-        </p>
-        <AnnotatedVlTab />
+        <ItemTabs amendments={amendments} languages={languages} />
       </main>
     </div>
   );

@@ -1,11 +1,10 @@
+// Client- and server-safe barrel: pure functions only, no heavy Node deps.
+// The DOCX parser (which pulls in `mammoth`) is intentionally NOT re-exported
+// here — import it from "@laurus/parser/amendments-docx" in server/ingest code
+// only, so it never lands in the browser bundle.
 export * from "./types.ts";
 export * from "./matchAmendmentRef.ts";
 export * from "./votingList.ts";
-
-// Document parsers (DOCX two-column amendments, voting-list tables, split/separate
-// extraction) land here in M2, once real fixtures are committed under
-// packages/parser/fixtures/. They will use `mammoth`/`unpdf` and expose:
-//   parseAmendmentsDocx(buf, language): ParsedAmendment[]
-//   parseVotingList(buf, language): ParsedVotingListRow[]
-// Kept out of this scaffold on purpose — no parser is written before a real
-// fixture validates the table layout it targets.
+export * from "./consolidate.ts";
+export * from "./splitSeparate.ts";
+export * from "./remarksDiff.ts";

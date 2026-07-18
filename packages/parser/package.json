@@ -5,7 +5,16 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./amendments-docx": "./src/amendmentsDocx.ts",
+    "./voting-list-docx": "./src/indicativeVotingList.ts"
+  },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "dependencies": {
+    "mammoth": "^1.12.0"
   }
 }

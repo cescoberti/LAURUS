@@ -8,9 +8,11 @@
   "scripts": {
     "build": "tsc -b",
     "start": "node --experimental-strip-types src/cli.ts",
-    "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts"
+    "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts",
+    "sync-amendments": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAmendments.ts"
   },
   "dependencies": {
+    "@laurus/parser": "*",
     "@supabase/supabase-js": "^2.58.0"
   }
 }

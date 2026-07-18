@@ -4,8 +4,12 @@ import { logoutAction } from "@/app/login/actions";
 import { Wordmark } from "./Logo";
 
 const NAV_ITEMS = ["All Votes", "My Votes", "Allocate", "VL Generator"] as const;
+const NAV_LINKS: Partial<Record<(typeof NAV_ITEMS)[number], string>> = {
+  "All Votes": "/",
+  "VL Generator": "/vl-generator",
+};
 
-export async function TopNav({ active }: { active?: "All Votes" | "admin" }) {
+export async function TopNav({ active }: { active?: "All Votes" | "VL Generator" | "admin" }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,10 +26,10 @@ export async function TopNav({ active }: { active?: "All Votes" | "admin" }) {
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {NAV_ITEMS.map((t) =>
-            t === "All Votes" ? (
+            NAV_LINKS[t] ? (
               <Link
                 key={t}
-                href="/"
+                href={NAV_LINKS[t]!}
                 className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
                   active === t
                     ? "bg-laurel-50 text-laurel-800"
