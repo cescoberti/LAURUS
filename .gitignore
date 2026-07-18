@@ -15,3 +15,4 @@ apps/web/data/
 # publish (repo is public). Kept locally for parser tests, which skip when
 # it's absent.
 packages/parser/fixtures/annotated-vl-streit-A10-0170-2026-it.docx
+packages/parser/fixtures/ecr-vl-vanovertveldt-A10-0002-2026.docx

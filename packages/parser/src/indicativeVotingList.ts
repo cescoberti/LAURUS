@@ -81,14 +81,32 @@ export async function parseIndicativeVotingList(
 
   const version = /FINAL VERSION/i.test(pre) ? "FINAL VERSION" : /DRAFT/i.test(pre) ? "DRAFT" : null;
 
-  // "Report: STREIT (A10-0170/2026) [init.]  <title>"
+  // Header, Tabling Service variant: "Report: STREIT (A10-0170/2026) [init.]".
   const reportLine = metaField(pre, "Report") ?? "";
-  const codeMatch = reportLine.match(/\(([A-Z0-9-]+\/\d{4})\)/);
-  const rapporteur = reportLine.split("(")[0]?.trim() || null;
+  let codeMatch = reportLine.match(/\(([A-Z0-9-]+\/\d{4})\)/);
+  let rapporteur = reportLine.split("(")[0]?.trim() || null;
   const procMatch = reportLine.match(/\[([^\]]+)\]/);
   const committee = metaField(pre, "Committee");
   // The report title is the paragraph between the code line and "Committee:".
-  const titleMatch = preText.match(/\[[^\]]+\]\s*\|?\s*([^|]+?)\s*\|\s*Committee:/i);
+  let titleMatch = preText.match(/\[[^\]]+\]\s*\|?\s*([^|]+?)\s*\|\s*Committee:/i);
+
+  // Header, group-internal variant ("ECR VOTING LIST"): no "Report:" line.
+  // The rapporteur is the short all-caps paragraph after the title, the code
+  // sits on a "Doc n° …" line, and the first long paragraph is the EN title.
+  if (!codeMatch) {
+    codeMatch = preText.match(/\b([A-Z]+\d+-\d+\/\d{4})\b/);
+    const paras = preText.split("|").map((s) => s.trim()).filter(Boolean);
+    const titleIdx = paras.findIndex((p) => /VOTING LIST/i.test(p));
+    if (!rapporteur) {
+      rapporteur =
+        paras.find((p, i) => i > titleIdx && p.length >= 2 && p.length <= 40 && p === p.toUpperCase() && /[A-Z]{2}/.test(p)) ??
+        null;
+    }
+    if (!titleMatch) {
+      const title = paras.find((p, i) => i > titleIdx && p.length > 40 && !/^Doc n|Rapporteur|Coordinator|Advisor/i.test(p));
+      if (title) titleMatch = [title, title] as unknown as RegExpMatchArray;
+    }
+  }
 
   const table = tableStart >= 0 ? /<table[\s\S]*?<\/table>/i.exec(html)?.[0] ?? "" : "";
   const rows: AnnotatedVlRow[] = [];
@@ -144,7 +162,9 @@ export async function parseIndicativeVotingList(
   }
 
   return {
-    documentTitle: /INDICATIVE VOTING LIST/i.test(pre) ? "INDICATIVE VOTING LIST" : "VOTING LIST",
+    documentTitle: /INDICATIVE VOTING LIST/i.test(preText)
+      ? "INDICATIVE VOTING LIST"
+      : preText.match(/\b([A-Z]+ VOTING LIST)\b/)?.[1] ?? "VOTING LIST", // 'ECR VOTING LIST'
     version,
     rapporteur,
     reportCode: codeMatch?.[1] ?? null,
