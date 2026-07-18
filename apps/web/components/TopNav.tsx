@@ -49,20 +49,32 @@ export async function TopNav({ active }: { active?: "All Votes" | "VL Generator"
             ),
           )}
           {profile?.role === "admin" && (
-            <Link
-              href="/admin/users"
-              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                active === "admin"
-                  ? "bg-laurel-50 text-laurel-800"
-                  : "text-ink-500 hover:bg-slate-50 hover:text-ink-900"
-              }`}
-            >
-              Admin
-            </Link>
+            <>
+              <Link
+                href="/admin/users"
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                  active === "admin"
+                    ? "bg-laurel-50 text-laurel-800"
+                    : "text-ink-500 hover:bg-slate-50 hover:text-ink-900"
+                }`}
+              >
+                Admin
+              </Link>
+              <Link
+                href="/admin/tracker"
+                className="rounded-md px-3 py-1.5 font-medium text-ink-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
+              >
+                Tracker
+              </Link>
+            </>
           )}
         </nav>
         <div className="ml-auto flex items-center gap-4 text-sm">
-          {user && <span className="text-ink-300">{user.email}</span>}
+          {user && (
+            <Link href="/settings" className="text-ink-300 transition-colors hover:text-laurel-700" title="Impostazioni notifiche">
+              {user.email}
+            </Link>
+          )}
           <form action={logoutAction}>
             <button type="submit" className="text-ink-500 hover:text-ink-900">
               Logout

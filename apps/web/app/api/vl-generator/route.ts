@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
 import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
+import { logEvent } from "@/lib/track";
 
 export const runtime = "nodejs"; // mammoth + docx need Node, not edge
 
@@ -67,6 +68,11 @@ export async function POST(request: Request) {
 
   const { vl: filledVl, report } = fillRemarks(vl, amendments);
   const buffer = await renderAnnotatedVlDocx(filledVl);
+  void logEvent("vl_generate", {
+    userId: user.id,
+    itemCode: vl.reportCode,
+    meta: { filled: report.filled, candidates: report.candidates },
+  });
   const filename = `annotated-vl-${(vl.rapporteur ?? vl.reportCode).replace(/[^A-Za-z0-9]+/g, "-")}.docx`;
 
   return new NextResponse(new Uint8Array(buffer), {

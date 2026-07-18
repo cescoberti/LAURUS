@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAnnotatedVl } from "@/lib/annotatedVl";
 import { buildVlFromAmendments, type DbAmendment } from "@/lib/annotatedVl/fromDb";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
+import { logEvent } from "@/lib/track";
 
 /**
  * Download the annotated voting list for an item as a .docx.
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
 
   const buffer = await renderAnnotatedVlDocx(vl);
   const filename = `annotated-vl-${(vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}.docx`;
+  void logEvent("vl_download", { userId: user.id, itemCode: code });
 
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,

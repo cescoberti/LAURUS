@@ -10,7 +10,12 @@ export async function proxy(req: NextRequest) {
     PUBLIC_PATHS.has(pathname) ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/icon") ||
-    pathname.startsWith("/_next")
+    pathname.startsWith("/_next") ||
+    // Twilio posts inbound WhatsApp messages here — no browser session. The
+    // route itself validates/limits what it exposes (public catalogue data).
+    pathname === "/api/whatsapp/webhook" ||
+    // Vercel Cron calls this; the route checks CRON_SECRET itself.
+    pathname === "/api/cron/notify"
   ) {
     return NextResponse.next();
   }
