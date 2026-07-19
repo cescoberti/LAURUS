@@ -1,5 +1,6 @@
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/server";
+import { EU_LANGUAGES, DEFAULT_LANGUAGES } from "@/lib/languages";
 import { saveSettingsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +12,10 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("users")
-    .select("email, full_name, whatsapp_phone, wants_email, wants_whatsapp, wants_clean_final")
+    .select("email, full_name, whatsapp_phone, wants_email, wants_whatsapp, wants_clean_final, languages")
     .eq("id", user!.id)
     .single();
+  const selected = new Set<string>(profile?.languages ?? DEFAULT_LANGUAGES);
 
   return (
     <div className="min-h-screen">
@@ -67,6 +69,27 @@ export default async function SettingsPage() {
               </span>
             </span>
           </label>
+
+          <div>
+            <p className="text-sm font-semibold text-ink-900">Lingue di lavoro</p>
+            <p className="mb-2 text-xs text-ink-500">
+              Le VL annotate vengono preparate solo nelle lingue selezionate (standard: IT + EN).
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {EU_LANGUAGES.map((l) => (
+                <label key={l.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    name="languages"
+                    value={l.code}
+                    defaultChecked={selected.has(l.code)}
+                    className="accent-laurel-700"
+                  />
+                  <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}
+                </label>
+              ))}
+            </div>
+          </div>
 
           <button type="submit" className="rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900">
             Salva

@@ -51,11 +51,16 @@ const COMMITTEE_LABEL: Record<string, string> = {
   PETI: "Committee on Petitions",
 };
 
-export function buildVlFromAmendments(item: DbItem, amendments: DbAmendment[]): AnnotatedVotingList {
-  // Prefer Italian rows, fall back to English, one entry per number.
+export function buildVlFromAmendments(
+  item: DbItem,
+  amendments: DbAmendment[],
+  lang = "it",
+): AnnotatedVotingList {
+  // One entry per number in the requested language; EN then IT as fallbacks
+  // (later assignments win, so the requested language is applied last).
   const byNumber = new Map<number, DbAmendment>();
-  for (const lang of ["en", "it"]) {
-    for (const a of amendments) if (a.language === lang) byNumber.set(a.number, a);
+  for (const l of ["en", "it", lang]) {
+    for (const a of amendments) if (a.language === l) byNumber.set(a.number, a);
   }
 
   const rows: AnnotatedVlRow[] = [...byNumber.values()]

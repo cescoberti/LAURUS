@@ -24,7 +24,7 @@ import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { fetchBytes } from "./httpFetch.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
-const LANGS = (process.argv[3] ?? "it,en").split(",").map((s) => s.trim()).filter(Boolean);
+const LANGS_ARG = (process.argv[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const BASE = "https://data.europarl.europa.eu";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -116,6 +116,16 @@ async function main() {
     .single();
 
   try {
+    // Languages: explicit CLI arg, else the union of the members' selected
+    // working languages (laurus.users.languages) — no wasted downloads for
+    // languages nobody asked for. Default IT+EN.
+    let LANGS = LANGS_ARG;
+    if (LANGS.length === 0) {
+      const { data: userLangs } = await supabase.from("users").select("languages");
+      LANGS = [...new Set((userLangs ?? []).flatMap((u) => (u.languages as string[]) ?? []))];
+      if (LANGS.length === 0) LANGS = ["it", "en"];
+    }
+
     const docs = await listAmendmentDocs(YEAR);
     console.log(`AMENDMENT_LIST docs ${YEAR}: ${docs.length}, languages: ${LANGS.join("+")}`);
 
