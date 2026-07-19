@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "rate_limited",
-        message: `Hai raggiunto il limite di ${limit.limit} liste di voto per oggi. Riprendi domani, o scrivi a ${CONTACT_EMAIL} se hai un'esigenza particolare.`,
+        message: `You've reached the limit of ${limit.limit} voting lists for today. Come back tomorrow, or email ${CONTACT_EMAIL} if you have a specific need.`,
       },
       { status: 429 },
     );

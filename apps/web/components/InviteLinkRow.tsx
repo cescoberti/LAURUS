@@ -16,9 +16,9 @@ export function InviteLinkRow({
 }) {
   const [copied, setCopied] = useState(false);
   const badge = {
-    active: { label: "Attivo", cls: "bg-laurel-100 text-laurel-800" },
-    used: { label: "Usato", cls: "bg-slate-100 text-ink-500" },
-    expired: { label: "Scaduto", cls: "bg-gold-500/15 text-gold-600" },
+    active: { label: "Active", cls: "bg-laurel-100 text-laurel-800" },
+    used: { label: "Used", cls: "bg-slate-100 text-ink-500" },
+    expired: { label: "Expired", cls: "bg-gold-500/15 text-gold-600" },
   }[status];
 
   return (
@@ -28,7 +28,7 @@ export function InviteLinkRow({
           <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.cls}`}>{badge.label}</span>
           {email && <span className="truncate text-sm text-ink-700">{email}</span>}
           <span className="text-xs text-ink-300">
-            {new Date(createdAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}
+            {new Date(createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           </span>
         </div>
         <p className="mt-1 truncate font-mono text-xs text-ink-400">{url}</p>
@@ -42,7 +42,7 @@ export function InviteLinkRow({
           }}
           className="shrink-0 rounded-lg bg-laurel-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-laurel-900"
         >
-          {copied ? "Copiato ✓" : "Copia link"}
+          {copied ? "Copied ✓" : "Copy link"}
         </button>
       )}
     </div>

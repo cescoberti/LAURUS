@@ -49,23 +49,23 @@ export default async function UtilizzoPage() {
     <div className="min-h-screen">
       <TopNav />
       <main className="mx-auto max-w-4xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">Utilizzo</h1>
+        <h1 className="text-2xl font-bold text-ink-900">Usage</h1>
         <p className="mt-1 text-sm text-ink-500">
-          Liste di voto prodotte per utente (generazioni e download). Solo lettura — serve a individuare
-          consumi anomali. La generazione è deterministica: nessun costo in token.
+          Voting lists produced per user (generations and downloads). Read-only — meant to spot unusual
+          consumption. Generation is deterministic: no token cost.
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat label="VL negli ultimi 30 gg" value={totalMonth} />
-          <Stat label="Utenti attivi (30 gg)" value={activeUsers} />
-          <Stat label="Limite giornaliero" value={`${DAILY_VL_LIMIT}/utente`} />
+          <Stat label="VLs in the last 30 days" value={totalMonth} />
+          <Stat label="Active users (30 days)" value={activeUsers} />
+          <Stat label="Daily limit" value={`${DAILY_VL_LIMIT}/user`} />
         </div>
 
         <div className="mt-6 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/60">
-                {["Utente", "Oggi", "7 gg", "30 gg"].map((h) => (
+                {["User", "Today", "7 days", "30 days"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     {h}
                   </th>
@@ -76,7 +76,7 @@ export default async function UtilizzoPage() {
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-10 text-center text-sm text-ink-300">
-                    Nessuna VL prodotta negli ultimi 30 giorni.
+                    No voting lists produced in the last 30 days.
                   </td>
                 </tr>
               ) : (

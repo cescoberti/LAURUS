@@ -22,7 +22,7 @@ export function NewUserForm() {
         />
         <input
           name="fullName"
-          placeholder="Nome completo"
+          placeholder="Full name"
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
         />
         <select
@@ -38,7 +38,7 @@ export function NewUserForm() {
           disabled={pending}
           className="rounded-lg bg-laurel-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-laurel-700 disabled:opacity-60"
         >
-          {pending ? "Creazione…" : "Invita"}
+          {pending ? "Creating…" : "Invite"}
         </button>
       </form>
 
@@ -51,10 +51,10 @@ export function NewUserForm() {
       {state?.success && (
         <div className="mt-3 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2.5 text-sm">
           <p className="text-ink-900">
-            Utente <code className="font-mono">{state.success.email}</code> invitato.
+            User <code className="font-mono">{state.success.email}</code> invited.
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Riceverà un&apos;email da Supabase con un link per impostare la propria password.
+            They&apos;ll get an email from Supabase with a link to set their password.
           </p>
         </div>
       )}

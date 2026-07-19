@@ -29,10 +29,10 @@ export async function GET(request: Request) {
     // This route is opened via a plain link, so render a readable page.
     const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <div style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.5rem;color:#1a2b22">
-<h1 style="color:#1f5138;font-size:1.25rem">Limite giornaliero raggiunto</h1>
-<p>Hai raggiunto il limite di ${limit.limit} liste di voto per oggi. Riprendi domani, oppure scrivi a
-<a href="mailto:${CONTACT_EMAIL}" style="color:#1f5138">${CONTACT_EMAIL}</a> se hai un'esigenza particolare.</p>
-<p><a href="javascript:history.back()" style="color:#6b7a72">← Torna indietro</a></p></div>`;
+<h1 style="color:#1f5138;font-size:1.25rem">Daily limit reached</h1>
+<p>You've reached the limit of ${limit.limit} voting lists for today. Come back tomorrow, or email
+<a href="mailto:${CONTACT_EMAIL}" style="color:#1f5138">${CONTACT_EMAIL}</a> if you have a specific need.</p>
+<p><a href="javascript:history.back()" style="color:#6b7a72">← Go back</a></p></div>`;
     return new NextResponse(html, { status: 429, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 

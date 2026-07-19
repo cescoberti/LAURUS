@@ -42,7 +42,7 @@ export function LoginForm({ next }: { next: string }) {
         disabled={pending}
         className="w-full rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-laurel-700 disabled:opacity-60"
       >
-        {pending ? "Accesso in corso…" : "Accedi"}
+        {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
   );

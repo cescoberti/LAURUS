@@ -32,12 +32,12 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Cerca per relatore, codice, commissione o titolo…"
+        placeholder="Search by rapporteur, code, committee or title…"
         className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
       />
       {filtered.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-ink-300">
-          Nessuna relazione trovata per “{q}”.
+          No reports found for “{q}”.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -60,7 +60,7 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
                   <span className="flex items-center gap-2">
                     {r.committee && <CommitteeChip code={r.committee} />}
                     <span className="rounded-full bg-laurel-100 px-2 text-xs font-semibold text-laurel-800">
-                      {r.am_count} em.
+                      {r.am_count} am.
                     </span>
                   </span>
                 </div>

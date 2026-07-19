@@ -55,7 +55,7 @@ async function copyRich(lightHtml: string) {
   }
 }
 
-function CopyButton({ value, label = "Copia" }: { value: string; label?: string }) {
+function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -65,9 +65,9 @@ function CopyButton({ value, label = "Copia" }: { value: string; label?: string 
         setTimeout(() => setCopied(false), 1500);
       }}
       className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-ink-500 transition-colors hover:bg-laurel-50 hover:text-laurel-800"
-      title="Copia (formattazione inclusa) per incollare nella VL"
+      title="Copy (formatting included) to paste into the VL"
     >
-      {copied ? "Copiato ✓" : label}
+      {copied ? "Copied ✓" : label}
     </button>
   );
 }
@@ -133,9 +133,9 @@ function AmendmentsView({
   if (amendments.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center text-sm text-ink-300">
-        Nessun emendamento su due colonne in questa relazione — oppure non ancora estratto.
+        No two-column amendments for this report — or not ingested yet.
         <br />
-        Gli emendamenti vengono estratti dal DOCX della relazione via{" "}
+        Amendments are extracted from the report DOCX via{" "}
         <code className="font-mono">npm run sync-amendments</code>.
       </div>
     );
@@ -145,9 +145,9 @@ function AmendmentsView({
     <div>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-ink-500">
-          <span className="font-semibold text-ink-900">{amendments.length}</span> emendamenti —{" "}
-          <strong className="font-semibold">aggiunte in grassetto</strong>,{" "}
-          <s className="text-red-700/80">soppressioni barrate</s>.
+          <span className="font-semibold text-ink-900">{amendments.length}</span> amendments —{" "}
+          <strong className="font-semibold">additions in bold</strong>,{" "}
+          <s className="text-red-700/80">deletions struck through</s>.
         </p>
         {languages.length > 1 && (
           <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
@@ -185,10 +185,10 @@ function AmendmentsView({
                   </span>
                 )}
                 {!a.languages.includes(lang) && (
-                  <span className="text-[11px] text-ink-300">(testo non disponibile in {LANG_LABEL[lang] ?? lang})</span>
+                  <span className="text-[11px] text-ink-300">(text not available in {LANG_LABEL[lang] ?? lang})</span>
                 )}
                 <span className="ml-auto">
-                  <CopyButton value={remarks} label="Copia remarks" />
+                  <CopyButton value={remarks} label="Copy remarks" />
                 </span>
               </div>
               <div className="p-4">
@@ -219,8 +219,8 @@ interface FlatVotRow {
 
 const TYPE_LABEL: Record<string, string> = {
   split: "Split",
-  separate: "Voto distinto",
-  rcv: "Appello nominale",
+  separate: "Separate",
+  rcv: "Roll-call",
 };
 
 function flattenVot(p: VotPayload): FlatVotRow[] {
@@ -241,7 +241,7 @@ function votCsv(rows: FlatVotRow[]): string {
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [
-    "Tipo,Oggetto,Gruppo,Parte,Testo",
+    "Type,Subject,Group,Part,Text",
     ...rows.map((r) => [TYPE_LABEL[r.type], r.subject, r.group, r.part, r.text].map(esc).join(",")),
   ].join("\n");
 }
@@ -256,8 +256,8 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
   if (!payload || rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center text-sm text-ink-300">
-        Nessuna richiesta di voto registrata per questa relazione — compaiono dopo la
-        pubblicazione della VOT ufficiale del giorno di voto.
+        No vote requests recorded for this report — they appear once the official VOT for the
+        voting day is published.
       </div>
     );
   }
@@ -282,8 +282,8 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
     <div>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm text-ink-500">
-          <span className="font-semibold text-ink-900">{rows.length}</span> richieste di voto —
-          dalla VOT ufficiale, testo integrale per ogni parte.
+          <span className="font-semibold text-ink-900">{rows.length}</span> vote requests —
+          from the official VOT, full text for every part.
         </p>
         <div className="flex items-center gap-2">
           {langs.length > 1 && (
@@ -305,13 +305,13 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
             onClick={copy}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-slate-50"
           >
-            {copied ? "Copiato ✓" : "Copia CSV"}
+            {copied ? "Copied ✓" : "Copy CSV"}
           </button>
           <button
             onClick={download}
             className="rounded-lg bg-laurel-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-laurel-900"
           >
-            Scarica CSV
+            Download CSV
           </button>
         </div>
       </div>
@@ -320,7 +320,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
-              {["Tipo", "Oggetto", "Gruppo", "Parte", "Testo"].map((h) => (
+              {["Type", "Subject", "Group", "Part", "Text"].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                   {h}
                 </th>

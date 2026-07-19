@@ -17,7 +17,7 @@ export default async function LoginPage({
 
         {error === "invite-link-invalid" && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Il link di invito non è valido o è scaduto. Chiedi a un admin di reinvitarti.
+            This invite link is not valid or has expired. Ask an admin to re-invite you.
           </div>
         )}
 

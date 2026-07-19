@@ -12,7 +12,7 @@ export function SetPasswordForm() {
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-500">Nuova password</label>
+        <label className="mb-1 block text-xs font-medium text-ink-500">New password</label>
         <input
           name="password"
           type="password"
@@ -24,7 +24,7 @@ export function SetPasswordForm() {
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-500">Conferma password</label>
+        <label className="mb-1 block text-xs font-medium text-ink-500">Confirm password</label>
         <input
           name="confirm"
           type="password"
@@ -45,7 +45,7 @@ export function SetPasswordForm() {
         disabled={pending}
         className="w-full rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-laurel-700 disabled:opacity-60"
       >
-        {pending ? "Salvataggio…" : "Imposta password"}
+        {pending ? "Saving…" : "Set password"}
       </button>
     </form>
   );

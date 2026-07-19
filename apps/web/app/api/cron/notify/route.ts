@@ -61,23 +61,23 @@ export async function GET(request: Request) {
   const sent = { email: 0, whatsapp: 0, cleanFinal: 0 };
   const skipped: string[] = [];
   if (!emailConfigured()) skipped.push("email: RESEND_API_KEY mancante");
-  if (!whatsappConfigured()) skipped.push("whatsapp: credenziali Twilio mancanti");
+  if (!whatsappConfigured()) skipped.push("whatsapp: Twilio credentials missing");
 
   // --- New-VL reminders ---------------------------------------------------
   if (newVlItems.length) {
-    const list = newVlItems.map((i) => `• ${i.code} (${i.am_count} em.)`).join("\n");
+    const list = newVlItems.map((i) => `• ${i.code} (${i.am_count} am.)`).join("\n");
     const html =
-      `<p>Nuove voting list annotate disponibili su <a href="${SITE}">LAURUS</a>:</p><ul>` +
-      newVlItems.map((i) => `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${i.am_count} emendamenti</li>`).join("") +
-      `</ul><p>Scarica le VL con i Remarks già compilati dalla pagina di ogni relazione.</p>`;
+      `<p>New annotated voting lists available on <a href="${SITE}">LAURUS</a>:</p><ul>` +
+      newVlItems.map((i) => `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${i.am_count} amendments</li>`).join("") +
+      `</ul><p>Download the VLs with the Remarks already filled from each report's page.</p>`;
 
     for (const m of members ?? []) {
       if (m.wants_email && emailConfigured()) {
-        const r = await sendEmail({ to: m.email, subject: `LAURUS — ${newVlItems.length} nuove VL annotate`, html });
+        const r = await sendEmail({ to: m.email, subject: `LAURUS — ${newVlItems.length} new annotated VLs`, html });
         if (r.ok) sent.email++;
       }
       if (m.wants_whatsapp && m.whatsapp_phone && whatsappConfigured()) {
-        const r = await sendWhatsApp(m.whatsapp_phone, `🌿 LAURUS — nuove VL annotate:\n${list}\n\nScrivi *vl <codice>* per il link diretto.`);
+        const r = await sendWhatsApp(m.whatsapp_phone, `🌿 LAURUS — new annotated VLs:\n${list}\n\nSend *vl <code>* for the direct link.`);
         if (r.ok) sent.whatsapp++;
       }
     }
@@ -88,15 +88,15 @@ export async function GET(request: Request) {
     for (const m of members ?? []) {
       if (!m.wants_clean_final) continue;
       const html =
-        `<p>Testi votati in plenaria — versione definitiva:</p><ul>` +
+        `<p>Texts voted in plenary — final version:</p><ul>` +
         votedItems
           .map(
             (i) =>
-              `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${(i.title as { en?: string }).en ?? ""} (votato ${i.vote_date})</li>`,
+              `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${(i.title as { en?: string }).en ?? ""} (voted ${i.vote_date})</li>`,
           )
           .join("") +
-        `</ul><p>I testi adottati ufficiali sono pubblicati dall'EP alla voce "Texts adopted".</p>`;
-      const r = await sendEmail({ to: m.email, subject: `LAURUS — testi definitivi post-voto (${votedItems.length})`, html });
+        `</ul><p>The official adopted texts are published by the EP under "Texts adopted".</p>`;
+      const r = await sendEmail({ to: m.email, subject: `LAURUS — final post-vote texts (${votedItems.length})`, html });
       if (r.ok) sent.cleanFinal++;
     }
   }

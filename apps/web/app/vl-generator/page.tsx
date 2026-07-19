@@ -23,9 +23,9 @@ export default async function VlGeneratorPage() {
       <main className="mx-auto max-w-5xl px-6 py-8">
         <h1 className="text-2xl font-bold text-ink-900">VL Generator</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-500">
-          Carica la <em>indicative voting list</em> del Tabling Service: LAURUS compila la colonna{" "}
-          <strong>Remarks</strong> con il testo pubblicato degli emendamenti (IT, fallback EN) e ti
-          restituisce il DOCX pronto. I Remarks già scritti a mano non vengono mai toccati.
+          Upload the Tabling Service <em>indicative voting list</em>: LAURUS fills the{" "}
+          <strong>Remarks</strong> column with the published amendment text (your default language, EN
+          fallback) and hands the DOCX back ready to use. Remarks you already wrote by hand are never touched.
         </p>
 
         <form
@@ -54,23 +54,23 @@ export default async function VlGeneratorPage() {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Genera annotated VL
+            Generate annotated VL
           </button>
           <p className="text-xs text-ink-300">
-            Il file scaricato è <code className="font-mono">annotated-vl-&lt;rapporteur&gt;.docx</code>{" "}
-            nello stesso formato B/N del Tabling Service.
+            The downloaded file is <code className="font-mono">annotated-vl-&lt;rapporteur&gt;.docx</code>{" "}
+            in the same black-and-white Tabling Service format.
           </p>
         </form>
 
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">
-            Relazioni con emendamenti già scaricati ({covered?.length ?? 0})
+            Reports with amendments available ({covered?.length ?? 0})
           </h2>
           {covered && covered.length > 0 ? (
             <CoveredReportsList reports={covered as CoveredReport[]} />
           ) : (
             <p className="mt-3 text-sm text-ink-300">
-              Nessun emendamento ancora ingerito — lancia{" "}
+              No amendments ingested yet — run{" "}
               <code className="font-mono">npm run sync-amendments</code>.
             </p>
           )}

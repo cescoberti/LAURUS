@@ -30,10 +30,10 @@ function twiml(message: string): NextResponse {
 }
 
 const HELP = [
-  "🌿 *LAURUS* — comandi:",
-  "• *lista* — relazioni con emendamenti pronti",
-  "• *vl <codice>* — link alla VL annotata (es. vl A10-0002/2026)",
-  "• *aiuto* — questo messaggio",
+  "🌿 *LAURUS* — commands:",
+  "• *list* — reports with amendments ready",
+  "• *vl <code>* — link to the annotated VL (e.g. vl A10-0002/2026)",
+  "• *help* — this message",
 ].join("\n");
 
 export async function POST(request: Request) {
@@ -62,9 +62,9 @@ export async function POST(request: Request) {
       .gt("am_count", 0)
       .order("vote_date", { ascending: false })
       .limit(10);
-    if (!items?.length) return twiml("Nessuna relazione con emendamenti al momento.");
-    const lines = items.map((i) => `• ${i.code} (${i.am_count} em.) — ${(i.title as { en?: string }).en?.slice(0, 45) ?? ""}`);
-    return twiml(`🌿 Relazioni pronte:\n${lines.join("\n")}\n\nScrivi *vl <codice>* per la VL annotata.`);
+    if (!items?.length) return twiml("No reports with amendments at the moment.");
+    const lines = items.map((i) => `• ${i.code} (${i.am_count} am.) — ${(i.title as { en?: string }).en?.slice(0, 45) ?? ""}`);
+    return twiml(`🌿 Reports ready:\n${lines.join("\n")}\n\nSend *vl <code>* for the annotated VL.`);
   }
 
   const vlMatch = lower.match(/^vl\s+([a-z]+\d+-\d+\/\d{4})/i);
@@ -75,13 +75,13 @@ export async function POST(request: Request) {
       .select("code, am_count, title")
       .eq("code", code)
       .maybeSingle();
-    if (!item) return twiml(`Non trovo ${code}. Scrivi *lista* per vedere le relazioni disponibili.`);
-    if (!item.am_count) return twiml(`${code} è in archivio ma non ha emendamenti d'aula ingeriti.`);
+    if (!item) return twiml(`Can't find ${code}. Send *list* to see the available reports.`);
+    if (!item.am_count) return twiml(`${code} is in the archive but has no plenary amendments ingested.`);
     void logEvent("wa_vl_request", { userId: member?.id ?? null, itemCode: code });
     return twiml(
-      `🌿 *${code}* — ${item.am_count} emendamenti.\nScarica la VL annotata (login richiesto):\n${SITE}/api/annotated-vl?code=${encodeURIComponent(code)}\n\nPagina relazione:\n${SITE}/items/${code}`,
+      `🌿 *${code}* — ${item.am_count} amendments.\nDownload the annotated VL (login required):\n${SITE}/api/annotated-vl?code=${encodeURIComponent(code)}\n\nReport page:\n${SITE}/items/${code}`,
     );
   }
 
-  return twiml(member ? HELP : `${HELP}\n\n(Numero non riconosciuto: aggiungi il tuo numero WhatsApp nelle impostazioni del profilo su ${SITE}/settings)`);
+  return twiml(member ? HELP : `${HELP}\n\n(Number not recognised: add your WhatsApp number in your profile settings at ${SITE}/settings)`);
 }

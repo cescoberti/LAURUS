@@ -24,15 +24,15 @@ export default async function SettingsPage() {
     <div className="min-h-screen">
       <TopNav />
       <main className="mx-auto max-w-2xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">Impostazioni</h1>
+        <h1 className="text-2xl font-bold text-ink-900">Settings</h1>
         <p className="mt-1 text-sm text-ink-500">
-          Preferenze di lavoro e come vuoi essere avvisato quando LAURUS ha novità sulle tue relazioni.
+          Your working preferences and how you want to be notified when LAURUS has news on your reports.
         </p>
 
         <form action={saveSettingsAction} className="mt-6 space-y-5 rounded-xl border border-slate-200/80 bg-white p-6 shadow-card">
           <div>
-            <p className="text-sm font-semibold text-ink-900">Commissioni seguite</p>
-            <p className="mb-2 text-xs text-ink-500">Usate per filtrare le relazioni che ti interessano.</p>
+            <p className="text-sm font-semibold text-ink-900">Committees you follow</p>
+            <p className="mb-2 text-xs text-ink-500">Used to surface the reports that matter to you.</p>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {COMMITTEES.map((c) => (
                 <label key={c.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
@@ -46,7 +46,7 @@ export default async function SettingsPage() {
 
           <div>
             <label className="text-sm font-semibold text-ink-900" htmlFor="vl_language">
-              Lingua predefinita delle VL
+              Default voting-list language
             </label>
             <select
               id="vl_language"
@@ -65,7 +65,7 @@ export default async function SettingsPage() {
           <hr className="border-slate-100" />
           <div>
             <label className="text-sm font-semibold text-ink-900" htmlFor="whatsapp_phone">
-              Numero WhatsApp
+              WhatsApp number
             </label>
             <input
               id="whatsapp_phone"
@@ -76,40 +76,40 @@ export default async function SettingsPage() {
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
             />
             <p className="mt-1 text-xs text-ink-300">
-              Con prefisso internazionale. Serve per i reminder e per usare il bot WhatsApp.
+              With international prefix. Used for reminders and for the WhatsApp bot.
             </p>
           </div>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
             <input type="checkbox" name="wants_email" defaultChecked={profile?.wants_email ?? true} className="mt-0.5 accent-laurel-700" />
             <span>
-              <span className="font-semibold">Reminder via email</span>
-              <span className="block text-xs text-ink-500">Nuove VL disponibili, nuovi emendamenti sulle relazioni seguite.</span>
+              <span className="font-semibold">Email reminders</span>
+              <span className="block text-xs text-ink-500">New voting lists available, new amendments on the reports you follow.</span>
             </span>
           </label>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
             <input type="checkbox" name="wants_whatsapp" defaultChecked={profile?.wants_whatsapp ?? false} className="mt-0.5 accent-laurel-700" />
             <span>
-              <span className="font-semibold">Reminder via WhatsApp</span>
-              <span className="block text-xs text-ink-500">Stessi avvisi, sul numero qui sopra.</span>
+              <span className="font-semibold">WhatsApp reminders</span>
+              <span className="block text-xs text-ink-500">The same alerts, on the number above.</span>
             </span>
           </label>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
             <input type="checkbox" name="wants_clean_final" defaultChecked={profile?.wants_clean_final ?? false} className="mt-0.5 accent-laurel-700" />
             <span>
-              <span className="font-semibold">Testo definitivo post-voto via email</span>
+              <span className="font-semibold">Final post-vote text by email</span>
               <span className="block text-xs text-ink-500">
-                Appena l&apos;EP pubblica il testo adottato, ricevi il file pulito in allegato.
+                As soon as the EP publishes the adopted text, you get the clean file as an attachment.
               </span>
             </span>
           </label>
 
           <div>
-            <p className="text-sm font-semibold text-ink-900">Lingue di lavoro</p>
+            <p className="text-sm font-semibold text-ink-900">Working languages</p>
             <p className="mb-2 text-xs text-ink-500">
-              Le VL annotate vengono preparate solo nelle lingue selezionate (standard: IT + EN).
+              Annotated VLs are prepared only in the selected languages (default: IT + EN).
             </p>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {EU_LANGUAGES.map((l) => (
@@ -128,7 +128,7 @@ export default async function SettingsPage() {
           </div>
 
           <button type="submit" className="rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900">
-            Salva
+            Save
           </button>
         </form>
       </main>
