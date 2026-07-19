@@ -1,7 +1,7 @@
 import { TopNav } from "@/components/TopNav";
 import { ItemTabs } from "@/components/ItemTabs";
 import { CommitteeChip } from "@/components/badges";
-import { getItemByCode, getItemAmendments } from "@/lib/data";
+import { getItemByCode, getItemAmendments, getItemVotRequests } from "@/lib/data";
 import { hasAnnotatedVl } from "@/lib/annotatedVl";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_LANGUAGES } from "@/lib/languages";
@@ -15,6 +15,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
   const { amendments, languages } = item
     ? await getItemAmendments(item.id)
     : { amendments: [], languages: [] };
+  const votRequests = item ? await getItemVotRequests(item.id) : {};
 
   // The member's working languages drive which VL downloads are offered.
   const supabase = await createClient();
@@ -99,7 +100,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           )}
         </div>
 
-        <ItemTabs amendments={amendments} languages={languages} />
+        <ItemTabs amendments={amendments} languages={languages} votRequests={votRequests} />
       </main>
     </div>
   );

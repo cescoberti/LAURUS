@@ -2,8 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { remarksFor } from "@laurus/parser";
-import type { ConsolidatedAmendment } from "@/lib/data";
-import { sampleSplitSeparateRows, sampleSplitSeparateCsv } from "@/lib/sampleSplitSeparate";
+import type { ConsolidatedAmendment, VotPayload } from "@/lib/data";
 
 /** Render light HTML (<b>/<i>/<s> from the remarks diff) as React nodes. */
 function RichText({ value }: { value: string }) {
@@ -81,9 +80,11 @@ const LANG_LABEL: Record<string, string> = { en: "EN", it: "IT", fr: "FR", de: "
 export function ItemTabs({
   amendments,
   languages,
+  votRequests,
 }: {
   amendments: ConsolidatedAmendment[];
   languages: string[];
+  votRequests: Record<string, VotPayload>;
 }) {
   const [tab, setTab] = useState<Tab>(amendments.length ? "Amendments" : "Split & Separate");
 
@@ -111,7 +112,7 @@ export function ItemTabs({
       </div>
 
       {tab === "Amendments" && <AmendmentsView amendments={amendments} languages={languages} />}
-      {tab === "Split & Separate" && <SplitSeparateView />}
+      {tab === "Split & Separate" && <SplitSeparateView votRequests={votRequests} />}
     </div>
   );
 }
@@ -203,50 +204,103 @@ function AmendmentsView({
   );
 }
 
+
 // ---------------------------------------------------------------------------
-// Split & Separate — real parser output over a captured VOT, with export
+// Split & Separate — real per-item data from the official VOT XML
 // ---------------------------------------------------------------------------
+
+interface FlatVotRow {
+  type: "split" | "separate" | "rcv";
+  subject: string;
+  group: string;
+  part: string | null;
+  text: string | null;
+}
 
 const TYPE_LABEL: Record<string, string> = {
   split: "Split",
-  separate: "Separata",
+  separate: "Voto distinto",
   rcv: "Appello nominale",
 };
 
-function SplitSeparateView() {
-  const rows = sampleSplitSeparateRows;
-  const [copied, setCopied] = useState(false);
+function flattenVot(p: VotPayload): FlatVotRow[] {
+  const rows: FlatVotRow[] = [];
+  for (const sv of p.splitVotes) {
+    for (const part of sv.parts) {
+      rows.push({ type: "split", subject: sv.subject, group: sv.group, part: part.section, text: part.text });
+    }
+  }
+  for (const s of p.separateVotes) rows.push({ type: "separate", subject: s.targets, group: s.group, part: null, text: null });
+  for (const r of p.rollCalls) rows.push({ type: "rcv", subject: r.targets, group: r.group, part: null, text: null });
+  return rows;
+}
 
+function votCsv(rows: FlatVotRow[]): string {
+  const esc = (v: string | null) => {
+    const s = v ?? "";
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [
+    "Tipo,Oggetto,Gruppo,Parte,Testo",
+    ...rows.map((r) => [TYPE_LABEL[r.type], r.subject, r.group, r.part, r.text].map(esc).join(",")),
+  ].join("\n");
+}
+
+function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPayload> }) {
+  const langs = Object.keys(votRequests).sort();
+  const [lang, setLang] = useState<string>(langs.includes("it") ? "it" : langs[0] ?? "it");
+  const [copied, setCopied] = useState(false);
+  const payload = votRequests[lang];
+  const rows = payload ? flattenVot(payload) : [];
+
+  if (!payload || rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center text-sm text-ink-300">
+        Nessuna richiesta di voto registrata per questa relazione — compaiono dopo la
+        pubblicazione della VOT ufficiale del giorno di voto.
+      </div>
+    );
+  }
+
+  const csv = votCsv(rows);
   const download = () => {
-    const blob = new Blob([sampleSplitSeparateCsv], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "split-separate.csv";
+    a.download = `split-separate-${lang}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
-
   const copy = async () => {
-    await navigator.clipboard.writeText(sampleSplitSeparateCsv);
+    await navigator.clipboard.writeText(csv);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
   return (
     <div>
-      <p className="mb-4 rounded-lg bg-gold-500/10 px-3 py-2 text-xs text-ink-500 ring-1 ring-inset ring-gold-500/20">
-        Estratto reale da una VOT catturata (item 6.1 Uganda) tramite{" "}
-        <code className="font-mono">@laurus/parser</code> — l&apos;aggancio alla VOT live arriva con M3.
-        L&apos;estrazione e l&apos;export qui sotto sono già il codice di produzione.
-      </p>
-
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm text-ink-500">
-          <span className="font-semibold text-ink-900">{rows.length}</span> richieste di voto (split /
-          separato / appello nominale)
+          <span className="font-semibold text-ink-900">{rows.length}</span> richieste di voto —
+          dalla VOT ufficiale, testo integrale per ogni parte.
         </p>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {langs.length > 1 && (
+            <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
+              {langs.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase transition-colors ${
+                    lang === l ? "bg-white text-laurel-800 shadow-sm" : "text-ink-500 hover:text-ink-900"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={copy}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-slate-50"
@@ -266,7 +320,7 @@ function SplitSeparateView() {
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
-              {["Tipo", "Oggetto", "Gruppo", "Parte", "Confine (verbatim)"].map((h) => (
+              {["Tipo", "Oggetto", "Gruppo", "Parte", "Testo"].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                   {h}
                 </th>
@@ -278,7 +332,7 @@ function SplitSeparateView() {
               <tr key={i} className="border-b border-slate-50">
                 <td className="px-4 py-3 align-top">
                   <span
-                    className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                    className={`inline-flex whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold ${
                       r.type === "split"
                         ? "bg-laurel-100 text-laurel-800"
                         : r.type === "separate"
@@ -286,13 +340,15 @@ function SplitSeparateView() {
                           : "bg-slate-100 text-ink-500"
                     }`}
                   >
-                    {TYPE_LABEL[r.type] ?? r.type}
+                    {TYPE_LABEL[r.type]}
                   </span>
                 </td>
-                <td className="px-4 py-3 align-top text-sm text-ink-900">{r.subject}</td>
+                <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-ink-900">{r.subject}</td>
                 <td className="px-4 py-3 align-top text-sm text-ink-700">{r.group}</td>
-                <td className="px-4 py-3 align-top text-xs text-ink-500">{r.partLabel ?? "–"}</td>
-                <td className="max-w-[360px] px-4 py-3 align-top text-xs text-ink-700">{r.boundary ?? "–"}</td>
+                <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-ink-500">{r.part ?? "–"}</td>
+                <td className="px-4 py-3 align-top text-sm leading-relaxed text-ink-700">
+                  {r.text ?? <span className="text-ink-300">–</span>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -301,4 +357,3 @@ function SplitSeparateView() {
     </div>
   );
 }
-

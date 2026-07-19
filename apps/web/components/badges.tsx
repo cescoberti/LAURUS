@@ -63,7 +63,6 @@ export function DocLinks({ item }: { item: DisplayItem }) {
       ) : (
         <span className="cursor-default text-xs font-medium text-ink-300">File</span>
       )}
-      <ComingSoon label="AMs" milestone="M2" />
       <ComingSoon label="VL" milestone="M3" />
     </div>
   );

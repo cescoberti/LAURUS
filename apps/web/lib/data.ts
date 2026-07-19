@@ -93,6 +93,27 @@ export async function getItemAmendments(
   return { amendments, languages };
 }
 
+export interface VotPayload {
+  itemTitle?: string;
+  splitVotes: Array<{ group: string; subject: string; parts: Array<{ section: string; text: string }> }>;
+  separateVotes: Array<{ group: string; targets: string }>;
+  rollCalls: Array<{ group: string; targets: string }>;
+}
+
+/** Vote-request data (splits with full part text, separate votes, RCVs) per language. */
+export async function getItemVotRequests(itemId: string): Promise<Record<string, VotPayload>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("vot_requests")
+    .select("language, payload")
+    .eq("item_id", itemId);
+  const out: Record<string, VotPayload> = {};
+  for (const r of (data as Array<{ language: string; payload: VotPayload }> | null) ?? []) {
+    out[r.language] = r.payload;
+  }
+  return out;
+}
+
 export async function getItemByCode(code: string): Promise<ItemRow | null> {
   const supabase = await createClient();
   const { data } = await supabase

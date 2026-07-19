@@ -9,10 +9,12 @@
     "build": "tsc -b",
     "start": "node --experimental-strip-types src/cli.ts",
     "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts",
-    "sync-amendments": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAmendments.ts"
+    "sync-amendments": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAmendments.ts",
+    "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
-    "@supabase/supabase-js": "^2.58.0"
+    "@supabase/supabase-js": "^2.58.0",
+    "fast-xml-parser": "^5.10.1"
   }
 }
