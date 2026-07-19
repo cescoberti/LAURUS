@@ -12,8 +12,8 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-8">
-      <h1 className="text-xl font-bold text-ink-900">Benvenuto in LAURUS</h1>
-      <p className="mt-1 text-sm text-ink-500">Crea il tuo account per iniziare.</p>
+      <h1 className="text-xl font-bold text-ink-900">Welcome to LAURUS 👋</h1>
+      <p className="mt-1 text-sm text-ink-500">Create your account to get started.</p>
 
       <form action={action} className="mt-6 space-y-4">
         <input type="hidden" name="token" value={token} />
@@ -35,7 +35,7 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
             name="password"
             required
             minLength={8}
-            placeholder="almeno 8 caratteri"
+            placeholder="at least 8 characters"
             className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
           />
         </div>
@@ -45,7 +45,7 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
           disabled={pending}
           className="w-full rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-60"
         >
-          {pending ? "Creazione…" : "Crea account e continua"}
+          {pending ? "Creating…" : "Create account & continue"}
         </button>
       </form>
     </div>

@@ -35,12 +35,12 @@ export async function signupWithTokenAction(_prev: SignupState | undefined, form
   const password = String(formData.get("password") ?? "");
 
   const invite = await validInvite(token);
-  if (!invite) return { error: "Invito non valido o scaduto." };
+  if (!invite) return { error: "This invite is not valid or has expired." };
   if (invite.email && invite.email.toLowerCase() !== email) {
-    return { error: "Questo invito è associato a un altro indirizzo email." };
+    return { error: "This invite is tied to a different email address." };
   }
-  if (!email.includes("@")) return { error: "Email non valida." };
-  if (password.length < 8) return { error: "La password deve avere almeno 8 caratteri." };
+  if (!email.includes("@")) return { error: "Please enter a valid email." };
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
 
   const admin = createAdminClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -50,7 +50,7 @@ export async function signupWithTokenAction(_prev: SignupState | undefined, form
   });
   if (createErr || !created.user) {
     const already = /registered|exists/i.test(createErr?.message ?? "");
-    return { error: already ? "Esiste già un account con questa email. Effettua il login." : createErr?.message ?? "Errore." };
+    return { error: already ? "An account with this email already exists. Please sign in instead." : createErr?.message ?? "Something went wrong." };
   }
 
   const { error: profileErr } = await admin
@@ -78,7 +78,7 @@ export async function completeOnboardingAction(_prev: OnboardingState | undefine
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Sessione scaduta. Ricarica la pagina." };
+  if (!user) return { error: "Your session expired. Please reload the page." };
 
   const committees = formData.getAll("committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
   const rawLang = String(formData.get("vl_language") ?? "it");

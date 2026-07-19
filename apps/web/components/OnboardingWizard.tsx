@@ -12,7 +12,7 @@ const LANG_ORDER = (() => {
   return [...EU_LANGUAGES.filter((l) => top.includes(l.code)).sort((a, b) => top.indexOf(a.code) - top.indexOf(b.code)), ...rest];
 })();
 
-const STEPS = ["Benvenuto", "Commissioni", "Lingua", "Uso responsabile", "Contatti"];
+const STEPS = ["Welcome", "Committees", "Language", "Fair use", "Contact"];
 
 export function OnboardingWizard({ token }: { token: string }) {
   const router = useRouter();
@@ -52,7 +52,7 @@ export function OnboardingWizard({ token }: { token: string }) {
       <div className="mb-6">
         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-ink-300">
           <span>
-            Passo {step + 1} di {STEPS.length}
+            Step {step + 1} of {STEPS.length}
           </span>
           <span className="text-laurel-700">{STEPS[step]}</span>
         </div>
@@ -67,18 +67,18 @@ export function OnboardingWizard({ token }: { token: string }) {
       <div className="min-h-[18rem]">
         {step === 0 && (
           <div>
-            <h1 className="text-xl font-bold text-ink-900">Benvenuto in LAURUS</h1>
+            <h1 className="text-xl font-bold text-ink-900">Welcome to LAURUS 👋</h1>
             <p className="mt-3 text-sm leading-relaxed text-ink-700">
-              LAURUS raccoglie emendamenti e liste di voto delle plenarie del Parlamento europeo e ti
-              restituisce voting list già annotate, pronte all&apos;uso. Poche domande e sei operativo.
+              LAURUS gathers amendments and voting lists from European Parliament plenaries and hands them
+              back to you already annotated and ready to use. Just a few quick questions and you&apos;re set.
             </p>
           </div>
         )}
 
         {step === 1 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Che commissioni segui?</h2>
-            <p className="mt-1 text-sm text-ink-500">Puoi sceglierne più di una. Le userai per filtrare ciò che ti interessa.</p>
+            <h2 className="text-lg font-bold text-ink-900">Which committees do you follow?</h2>
+            <p className="mt-1 text-sm text-ink-500">Feel free to pick as many as you like — they help us surface what&apos;s relevant to you.</p>
             <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {COMMITTEES.map((c) => {
                 const on = committees.includes(c.code);
@@ -102,8 +102,8 @@ export function OnboardingWizard({ token }: { token: string }) {
 
         {step === 2 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">In che lingua vuoi di solito le VL?</h2>
-            <p className="mt-1 text-sm text-ink-500">Diventa la lingua predefinita per le liste di voto. Potrai cambiarla dopo.</p>
+            <h2 className="text-lg font-bold text-ink-900">Which language would you like your voting lists in?</h2>
+            <p className="mt-1 text-sm text-ink-500">This becomes your default for voting lists — you can change it anytime.</p>
             <div className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {LANG_ORDER.map((l) => (
                 <button
@@ -123,38 +123,38 @@ export function OnboardingWizard({ token }: { token: string }) {
 
         {step === 3 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Prima di iniziare: usa LAURUS con criterio</h2>
+            <h2 className="text-lg font-bold text-ink-900">A quick note before you start 🌱</h2>
             <div className="mt-3 space-y-3 text-sm leading-relaxed text-ink-700">
               <p>
-                LAURUS genera le liste di voto in automatico a partire dai documenti ufficiali del Parlamento
-                europeo. La generazione è gratuita, ma ogni richiesta scarica documenti dai server del
-                Parlamento e occupa risorse del servizio.
+                LAURUS builds voting lists automatically from the Parliament&apos;s official documents. It&apos;s
+                free to use — each request simply pulls documents from the Parliament&apos;s servers and uses a
+                little of the service&apos;s resources.
               </p>
               <p>
-                Perciò: genera una VL quando ti serve davvero, non &laquo;per provare&raquo;. Se devi solo
-                rileggerne una, riaprila invece di rigenerarla.
+                So a small favour: generate a voting list when you actually need it, rather than just to try
+                it out. If you only want to re-read one, reopening it is lighter than regenerating it.
               </p>
               <p>
-                Per mantenere il servizio veloce e sostenibile per tutti, ogni utente può generare al massimo{" "}
-                <strong>10 liste di voto al giorno</strong>.
+                To keep things fast and sustainable for everyone, each user can generate up to{" "}
+                <strong>10 voting lists per day</strong>.
               </p>
             </div>
             <label className="mt-4 flex items-center gap-2 text-sm font-medium text-ink-900">
               <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="accent-laurel-700" />
-              Ho capito
+              Got it
             </label>
           </div>
         )}
 
         {step === 4 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Un errore o un&apos;idea?</h2>
+            <h2 className="text-lg font-bold text-ink-900">Found a bug or have an idea? 💡</h2>
             <p className="mt-3 text-sm leading-relaxed text-ink-700">
-              Hai trovato un errore o hai un&apos;idea per migliorare LAURUS? Scrivi a{" "}
+              Spotted something off, or have an idea to make LAURUS better? Feel free to drop a line to{" "}
               <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-laurel-700 hover:underline">
                 {CONTACT_EMAIL}
               </a>
-              . Il servizio migliora grazie ai tuoi feedback.
+              . The service gets better thanks to your feedback.
             </p>
           </div>
         )}
@@ -169,7 +169,7 @@ export function OnboardingWizard({ token }: { token: string }) {
           disabled={step === 0}
           className="rounded-lg px-3 py-2 text-sm font-medium text-ink-500 hover:text-ink-900 disabled:invisible"
         >
-          ← Indietro
+          ← Back
         </button>
         {isLast ? (
           <button
@@ -178,7 +178,7 @@ export function OnboardingWizard({ token }: { token: string }) {
             disabled={saving}
             className="rounded-lg bg-laurel-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-60"
           >
-            {saving ? "Salvataggio…" : "Inizia a usare LAURUS"}
+            {saving ? "Saving…" : "Start using LAURUS"}
           </button>
         ) : (
           <button
@@ -187,7 +187,7 @@ export function OnboardingWizard({ token }: { token: string }) {
             disabled={!canNext}
             className="rounded-lg bg-laurel-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-40"
           >
-            Avanti →
+            Next →
           </button>
         )}
       </div>

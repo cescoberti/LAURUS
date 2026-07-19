@@ -50,14 +50,14 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   return (
     <Shell>
       <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-        <h1 className="text-lg font-bold text-ink-900">Invito non valido</h1>
+        <h1 className="text-lg font-bold text-ink-900">Invite not valid</h1>
         <p className="mt-2 text-sm text-ink-500">
-          Questo link di invito non è valido, è scaduto o è già stato usato. Chiedi all&apos;amministratore
-          un nuovo invito, oppure{" "}
+          This invite link isn&apos;t valid, has expired, or has already been used. Ask your administrator
+          for a new one, or{" "}
           <a href="/login" className="font-medium text-laurel-700 hover:underline">
-            accedi
+            sign in
           </a>{" "}
-          se hai già un account.
+          if you already have an account.
         </p>
       </div>
     </Shell>
