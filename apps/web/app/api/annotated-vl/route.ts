@@ -5,6 +5,8 @@ import { buildVlFromAmendments, type DbAmendment } from "@/lib/annotatedVl/fromD
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { EU_LANGUAGE_CODES } from "@/lib/languages";
+import { checkVlRateLimit } from "@/lib/rateLimit";
+import { CONTACT_EMAIL } from "@/lib/committees";
 
 /**
  * Download the annotated voting list for an item as a .docx.
@@ -21,6 +23,18 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const limit = await checkVlRateLimit(user.id);
+  if (!limit.allowed) {
+    // This route is opened via a plain link, so render a readable page.
+    const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<div style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.5rem;color:#1a2b22">
+<h1 style="color:#1f5138;font-size:1.25rem">Limite giornaliero raggiunto</h1>
+<p>Hai raggiunto il limite di ${limit.limit} liste di voto per oggi. Riprendi domani, oppure scrivi a
+<a href="mailto:${CONTACT_EMAIL}" style="color:#1f5138">${CONTACT_EMAIL}</a> se hai un'esigenza particolare.</p>
+<p><a href="javascript:history.back()" style="color:#6b7a72">← Torna indietro</a></p></div>`;
+    return new NextResponse(html, { status: 429, headers: { "Content-Type": "text/html; charset=utf-8" } });
+  }
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

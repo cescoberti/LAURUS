@@ -8,6 +8,8 @@ export async function proxy(req: NextRequest) {
 
   if (
     PUBLIC_PATHS.has(pathname) ||
+    // Invite links are opened by not-yet-registered members.
+    pathname === "/onboarding" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/_next") ||
@@ -29,11 +31,26 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
-    if (profile?.role !== "admin") {
+  // Gate admin pages and enforce mandatory onboarding in one profile read.
+  const needsProfile = pathname.startsWith("/admin") || !pathname.startsWith("/api/");
+  if (needsProfile) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role, onboarded_at")
+      .eq("id", user.id)
+      .single();
+
+    if (pathname.startsWith("/admin") && profile?.role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+
+    // First access: send the member through onboarding before anything else.
+    if (profile && !profile.onboarded_at && pathname !== "/onboarding") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/onboarding";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

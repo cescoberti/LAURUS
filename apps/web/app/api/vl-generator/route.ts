@@ -4,6 +4,8 @@ import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
 import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
+import { checkVlRateLimit } from "@/lib/rateLimit";
+import { CONTACT_EMAIL } from "@/lib/committees";
 
 export const runtime = "nodejs"; // mammoth + docx need Node, not edge
 
@@ -18,6 +20,17 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const limit = await checkVlRateLimit(user.id);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        message: `Hai raggiunto il limite di ${limit.limit} liste di voto per oggi. Riprendi domani, o scrivi a ${CONTACT_EMAIL} se hai un'esigenza particolare.`,
+      },
+      { status: 429 },
+    );
+  }
 
   const form = await request.formData();
   const file = form.get("vl");
