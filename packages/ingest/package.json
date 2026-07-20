@@ -10,7 +10,8 @@
     "start": "node --experimental-strip-types src/cli.ts",
     "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts",
     "sync-amendments": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAmendments.ts",
-    "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts"
+    "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",
+    "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
