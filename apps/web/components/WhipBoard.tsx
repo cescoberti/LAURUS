@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { reassignAdvisorAction, setNoteStatusAction } from "@/app/whip/actions";
 
+export interface WhipItemCommittee {
+  committee: string;
+  advisor: string | null;
+  isOverride: boolean;
+}
 export interface WhipItem {
   id: string;
   code: string;
   rapporteur: string | null;
   title: string;
-  committee: string | null;
-  advisor: string | null;
-  isOverride: boolean;
+  committees: WhipItemCommittee[];
   noteStatus: "pending" | "submitted" | "na";
   submittedAt: string | null;
   deadline: string;
@@ -30,10 +33,12 @@ export function WhipBoard({
   sessions,
   advisorOptions,
   committees,
+  committeeCandidates,
 }: {
   sessions: WhipSession[];
   advisorOptions: string[];
   committees: Array<{ code: string; name: string }>;
+  committeeCandidates: Record<string, string[]>;
 }) {
   const committeeName = new Map(committees.map((c) => [c.code, c.name]));
 
@@ -76,18 +81,34 @@ export function WhipBoard({
                   {s.items.map((it) => (
                     <tr key={it.id} className="border-b border-slate-50 align-top">
                       <td className="max-w-[360px] px-4 py-3">
-                        <p className="text-sm font-semibold text-ink-900">
-                          {it.rapporteur ?? <span className="font-normal text-ink-300">No rapporteur</span>}
+                        <p className="text-sm font-semibold uppercase tracking-wide text-ink-900">
+                          {it.rapporteur ? it.rapporteur.toUpperCase() : <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
                         </p>
-                        <p className="text-xs text-ink-500">
-                          <span className="font-mono text-laurel-700">{it.code}</span> · {it.title}
-                        </p>
+                        <p className="text-xs text-ink-500">{it.title}</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-laurel-700">{it.code}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs text-ink-500" title={it.committee ? committeeName.get(it.committee) : ""}>
-                        {it.committee ?? "—"}
+                      <td
+                        className="px-4 py-3 text-xs text-ink-500"
+                        title={it.committees.map((c) => committeeName.get(c.committee) ?? c.committee).join(", ")}
+                      >
+                        {it.committees.length ? it.committees.map((c) => c.committee).join(" / ") : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <AdvisorSelect item={it} options={advisorOptions} />
+                        {it.committees.length === 0 ? (
+                          <span className="text-xs text-ink-300">—</span>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {it.committees.map((c) => (
+                              <AdvisorSelect
+                                key={c.committee}
+                                itemId={it.id}
+                                cmte={c}
+                                showLabel={it.committees.length > 1}
+                                options={committeeCandidates[c.committee] || advisorOptions}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <NoteControl item={it} />
@@ -104,18 +125,30 @@ export function WhipBoard({
   );
 }
 
-function AdvisorSelect({ item, options }: { item: WhipItem; options: string[] }) {
+function AdvisorSelect({
+  itemId,
+  cmte,
+  options,
+  showLabel,
+}: {
+  itemId: string;
+  cmte: WhipItemCommittee;
+  options: string[];
+  showLabel: boolean;
+}) {
   const [saving, setSaving] = useState(false);
-  const all = [...new Set([...(item.advisor ? [item.advisor] : []), ...options])].sort();
+  const all = [...new Set([...(cmte.advisor ? [cmte.advisor] : []), ...options])].sort();
   return (
     <div className="flex items-center gap-1.5">
+      {showLabel && <span className="w-9 shrink-0 font-mono text-[10px] text-ink-300">{cmte.committee}</span>}
       <select
-        defaultValue={item.advisor ?? ""}
+        defaultValue={cmte.advisor ?? ""}
         disabled={saving}
         onChange={async (e) => {
           setSaving(true);
           const fd = new FormData();
-          fd.set("itemId", item.id);
+          fd.set("itemId", itemId);
+          fd.set("committee", cmte.committee);
           fd.set("advisor", e.target.value);
           await reassignAdvisorAction(fd);
           setSaving(false);
@@ -129,7 +162,7 @@ function AdvisorSelect({ item, options }: { item: WhipItem; options: string[] })
           </option>
         ))}
       </select>
-      {item.isOverride && <span title="Reassigned (overrides committee default)" className="text-[10px] text-gold-600">✎</span>}
+      {cmte.isOverride && <span title="Reassigned (overrides committee default)" className="text-[10px] text-gold-600">✎</span>}
     </div>
   );
 }

@@ -16,13 +16,24 @@ async function requireWhip() {
   return createAdminClient();
 }
 
-/** Reassign a file's advisor. Empty value clears the override (→ committee default). */
+/**
+ * Reassign the advisor for one committee of a file. Empty value clears that
+ * committee's override (→ committee default). Overrides live in the
+ * `assigned_advisors` map ({ committee: advisor }).
+ */
 export async function reassignAdvisorAction(formData: FormData): Promise<void> {
   const admin = await requireWhip();
   const itemId = String(formData.get("itemId") ?? "");
+  const committee = String(formData.get("committee") ?? "").trim();
   const advisor = String(formData.get("advisor") ?? "").trim();
-  if (!itemId) return;
-  await admin.from("items").update({ assigned_advisor: advisor || null }).eq("id", itemId);
+  if (!itemId || !committee) return;
+
+  const { data: row } = await admin.from("items").select("assigned_advisors").eq("id", itemId).single();
+  const map: Record<string, string> = { ...(row?.assigned_advisors ?? {}) };
+  if (advisor) map[committee] = advisor;
+  else delete map[committee];
+
+  await admin.from("items").update({ assigned_advisors: map }).eq("id", itemId);
   revalidatePath("/whip");
 }
 

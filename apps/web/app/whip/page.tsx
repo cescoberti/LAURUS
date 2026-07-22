@@ -1,7 +1,7 @@
 import { TopNav } from "@/components/TopNav";
 import { WhipBoard, type WhipSession, type WhipItem } from "@/components/WhipBoard";
 import { createClient } from "@/lib/supabase/server";
-import { COMMITTEES } from "@/lib/committees";
+import { COMMITTEES, COMMITTEE_CANDIDATES } from "@/lib/committees";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,8 @@ interface ItemRow {
   title: { en?: string; it?: string };
   rapporteur: string | null;
   committee: string | null;
-  assigned_advisor: string | null;
+  committees: string[] | null;
+  assigned_advisors: Record<string, string> | null;
   note_status: "pending" | "submitted" | "na";
   note_submitted_at: string | null;
 }
@@ -45,7 +46,7 @@ export default async function WhipPage() {
   const sessionRows = (sessions as SessionRow[] | null) ?? [];
   const { data: items } = await supabase
     .from("items")
-    .select("id, code, title, rapporteur, committee, assigned_advisor, note_status, note_submitted_at, session_id")
+    .select("id, code, title, rapporteur, committee, committees, assigned_advisors, note_status, note_submitted_at, session_id")
     .in("session_id", sessionRows.map((s) => s.id))
     .order("code");
 
@@ -55,16 +56,22 @@ export default async function WhipPage() {
     const sessionItems: WhipItem[] = ((items as (ItemRow & { session_id: string })[] | null) ?? [])
       .filter((it) => it.session_id === s.id)
       .map((it) => {
-        const committeeAdvisor = it.committee ? advisorByCommittee.get(it.committee) ?? null : null;
-        const advisor = it.assigned_advisor ?? committeeAdvisor;
+        const codes = it.committees?.length ? it.committees : it.committee ? [it.committee] : [];
+        const overrides = it.assigned_advisors ?? {};
+        const committees = codes.map((c) => {
+          const override = overrides[c] ?? null;
+          return {
+            committee: c,
+            advisor: override ?? advisorByCommittee.get(c) ?? null,
+            isOverride: override != null,
+          };
+        });
         return {
           id: it.id,
           code: it.code,
           rapporteur: it.rapporteur,
           title: it.title.en || it.title.it || it.code,
-          committee: it.committee,
-          advisor,
-          isOverride: !!it.assigned_advisor,
+          committees,
           noteStatus: it.note_status,
           submittedAt: it.note_submitted_at,
           deadline,
@@ -91,7 +98,7 @@ export default async function WhipPage() {
           Advisor assigned to each file, and the status of the plenary note. Advisors default from the
           committee (ECR map); reassign any file as needed. Note due {NOTE_LEAD_DAYS} days before the sitting.
         </p>
-        <WhipBoard sessions={board} advisorOptions={advisorOptions} committees={COMMITTEES} />
+        <WhipBoard sessions={board} advisorOptions={advisorOptions} committees={COMMITTEES} committeeCandidates={COMMITTEE_CANDIDATES} />
       </main>
     </div>
   );
