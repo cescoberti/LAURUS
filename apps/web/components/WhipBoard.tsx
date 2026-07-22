@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { reassignAdvisorAction, setNoteStatusAction } from "@/app/whip/actions";
+import { rapporteurLabel } from "@/lib/rapporteur";
 
 export interface WhipItemCommittee {
   committee: string;
@@ -82,7 +83,7 @@ export function WhipBoard({
                     <tr key={it.id} className="border-b border-slate-50 align-top">
                       <td className="max-w-[360px] px-4 py-3">
                         <p className="text-sm font-semibold uppercase tracking-wide text-ink-900">
-                          {it.rapporteur ? it.rapporteur.toUpperCase() : <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
+                          {rapporteurLabel(it.rapporteur) ?? <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
                         </p>
                         <p className="text-xs text-ink-500">{it.title}</p>
                         <p className="mt-0.5 font-mono text-[11px] text-laurel-700">{it.code}</p>

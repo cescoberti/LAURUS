@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { DayGroup } from "@/lib/types";
+import { rapporteurLabel } from "@/lib/rapporteur";
 import { CommitteeChip, DocLinks, StaffAvatar, VlBadge } from "./badges";
 
-// Reports are referred to by rapporteur ("the Streit report"), not by title,
-// so the rapporteur leads and the subject sits underneath it.
-const HEAD = ["Rapporteur / subject", "Code", "Cmte", "VL", "Docs", "Staff"];
+// A file is shown as a hierarchy: MEP surname (upper case), then the subject,
+// then the code underneath.
+const HEAD = ["Rapporteur / subject", "Cmte", "VL", "Docs", "Staff"];
 
 export function ItemTable({ group }: { group: DayGroup }) {
   return (
@@ -35,18 +36,11 @@ export function ItemTable({ group }: { group: DayGroup }) {
               >
                 <td className="max-w-[460px] px-4 py-3 align-top">
                   <Link href={`/items/${item.code}`} className="block">
-                    <span className="text-sm font-semibold leading-snug text-ink-900 group-hover:text-laurel-800">
-                      {item.rapporteur ?? <span className="font-normal text-ink-300">No rapporteur</span>}
+                    <span className="block text-sm font-semibold uppercase tracking-wide leading-snug text-ink-900 group-hover:text-laurel-800">
+                      {rapporteurLabel(item.rapporteur) ?? <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-ink-500">{item.title}</span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <Link
-                    href={`/items/${item.code}`}
-                    className="whitespace-nowrap font-mono text-[13px] font-medium text-laurel-900 hover:text-laurel-700 hover:underline"
-                  >
-                    {item.code}
+                    <span className="mt-0.5 block font-mono text-[11px] text-laurel-700">{item.code}</span>
                   </Link>
                 </td>
                 <td className="px-4 py-3 align-top"><CommitteeChip code={item.committee} /></td>

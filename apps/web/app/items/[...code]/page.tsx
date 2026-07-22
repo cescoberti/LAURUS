@@ -1,6 +1,7 @@
 import { TopNav } from "@/components/TopNav";
 import { ItemTabs } from "@/components/ItemTabs";
 import { CommitteeChip } from "@/components/badges";
+import { rapporteurLabel } from "@/lib/rapporteur";
 import { getItemByCode, getItemAmendments, getItemVotRequests } from "@/lib/data";
 import { hasAnnotatedVl } from "@/lib/annotatedVl";
 import { createClient } from "@/lib/supabase/server";
@@ -39,13 +40,15 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
       <main className="mx-auto max-w-5xl px-6 py-8">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-          <p className="font-mono text-sm text-laurel-700">{code}</p>
+          {item?.rapporteur && (
+            <p className="text-sm font-semibold uppercase tracking-wide text-laurel-800">{rapporteurLabel(item.rapporteur)}</p>
+          )}
           <h1 className="mt-1 text-2xl font-bold text-ink-900">
             {item?.title.en || item?.title.it || "Item not found"}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-500">
+            <span className="font-mono text-laurel-700">{code}</span>
             {item?.committee && <CommitteeChip code={item.committee} />}
-            {item?.rapporteur && <span>{item.rapporteur}</span>}
             {item?.vote_date && (
               <span>
                 Voted{" "}

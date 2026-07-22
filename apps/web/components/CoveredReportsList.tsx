@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CommitteeChip } from "@/components/badges";
+import { rapporteurLabel } from "@/lib/rapporteur";
 
 export interface CoveredReport {
   code: string;
@@ -47,17 +48,17 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
                 href={`/items/${r.code}`}
                 className="block rounded-lg border border-slate-200/70 bg-white px-4 py-3 transition-colors hover:border-laurel-200 hover:bg-laurel-50/40"
               >
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-sm font-semibold text-ink-900">
-                    {r.rapporteur ?? "—"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-right text-sm text-ink-700">
-                    {r.title.en || r.title.it || ""}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-4">
-                  <span className="font-mono text-xs text-laurel-700">{r.code}</span>
-                  <span className="flex items-center gap-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <span className="block text-sm font-semibold uppercase tracking-wide text-ink-900">
+                      {rapporteurLabel(r.rapporteur) ?? "—"}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-ink-500">
+                      {r.title.en || r.title.it || ""}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[11px] text-laurel-700">{r.code}</span>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2">
                     {r.committee && <CommitteeChip code={r.committee} />}
                     <span className="rounded-full bg-laurel-100 px-2 text-xs font-semibold text-laurel-800">
                       {r.am_count} am.
