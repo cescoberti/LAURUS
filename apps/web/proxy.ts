@@ -31,8 +31,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Gate admin pages and enforce mandatory onboarding in one profile read.
-  const needsProfile = pathname.startsWith("/admin") || !pathname.startsWith("/api/");
+  // Gate admin/whip pages and enforce mandatory onboarding in one profile read.
+  const needsProfile = pathname.startsWith("/admin") || pathname.startsWith("/whip") || !pathname.startsWith("/api/");
   if (needsProfile) {
     const { data: profile } = await supabase
       .from("users")
@@ -41,6 +41,13 @@ export async function proxy(req: NextRequest) {
       .single();
 
     if (pathname.startsWith("/admin") && profile?.role !== "admin") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+
+    // The whip cruscotto is open to whips and admins.
+    if (pathname.startsWith("/whip") && profile?.role !== "whip" && profile?.role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);

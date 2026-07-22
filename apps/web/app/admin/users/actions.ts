@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type Role = "admin" | "member";
+export type Role = "admin" | "whip" | "member";
 
 export interface CreateUserState {
   error?: string;
@@ -30,7 +30,8 @@ export async function createUserAction(
 
   const email = String(formData.get("email") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim();
-  const role: Role = formData.get("role") === "admin" ? "admin" : "member";
+  const roleInput = String(formData.get("role") ?? "member");
+  const role: Role = roleInput === "admin" ? "admin" : roleInput === "whip" ? "whip" : "member";
 
   if (!email || !email.includes("@")) {
     return { error: "Email non valida." };

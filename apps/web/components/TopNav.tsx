@@ -48,6 +48,14 @@ export async function TopNav({ active }: { active?: "All Votes" | "VL Generator"
               </span>
             ),
           )}
+          {(profile?.role === "admin" || profile?.role === "whip") && (
+            <Link
+              href="/whip"
+              className="rounded-md px-3 py-1.5 font-medium text-ink-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
+            >
+              Whip
+            </Link>
+          )}
           {profile?.role === "admin" && (
             <>
               <Link

@@ -31,6 +31,7 @@ export function NewUserForm() {
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
         >
           <option value="member">Member</option>
+          <option value="whip">Whip</option>
           <option value="admin">Admin</option>
         </select>
         <button
