@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAnnotatedVl } from "@/lib/annotatedVl";
-import { buildVlFromAmendments, type DbAmendment } from "@/lib/annotatedVl/fromDb";
+import { buildVlFromAmendments, type DbAmendment, type VlVotPayload } from "@/lib/annotatedVl/fromDb";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { EU_LANGUAGE_CODES } from "@/lib/languages";
@@ -50,14 +50,24 @@ export async function GET(request: Request) {
     .limit(1)
     .maybeSingle();
   if (item) {
-    const { data: amRows } = await supabase
-      .from("amendments")
-      .select("number, language, target, tabled_by, original_text, amended_text, kind")
-      .eq("item_id", item.id)
-      .in("language", [...new Set([lang, "it", "en"])])
-      .order("number");
-    if (amRows && amRows.length > 0) {
-      vl = buildVlFromAmendments(item, amRows as DbAmendment[], lang);
+    const langsWanted = [...new Set([lang, "it", "en"])];
+    const [{ data: amRows }, { data: votRows }] = await Promise.all([
+      supabase
+        .from("amendments")
+        .select("number, language, target, tabled_by, original_text, amended_text, kind")
+        .eq("item_id", item.id)
+        .in("language", langsWanted)
+        .order("number"),
+      supabase.from("vot_requests").select("language, payload").eq("item_id", item.id).in("language", langsWanted),
+    ]);
+
+    // Split/separate for the requested language, IT/EN as fallback.
+    const votByLang = new Map((votRows ?? []).map((r) => [r.language, r.payload as VlVotPayload]));
+    const vot = votByLang.get(lang) ?? votByLang.get("it") ?? votByLang.get("en") ?? null;
+
+    const hasVot = !!vot && ((vot.splitVotes?.length ?? 0) > 0 || (vot.separateVotes?.length ?? 0) > 0);
+    if ((amRows && amRows.length > 0) || hasVot) {
+      vl = buildVlFromAmendments(item, (amRows ?? []) as DbAmendment[], vot, lang);
     }
   }
   vl ??= getAnnotatedVl(code);

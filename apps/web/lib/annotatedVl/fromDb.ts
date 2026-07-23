@@ -1,5 +1,6 @@
 import type { AnnotatedVotingList, AnnotatedVlRow } from "@laurus/parser/voting-list-docx";
 import { remarksFor } from "@laurus/parser";
+import { rapporteurLabel } from "@/lib/rapporteur";
 
 /**
  * Build a per-report annotated voting list straight from ingested EP data —
@@ -23,6 +24,12 @@ export interface DbAmendment {
   original_text: string | null;
   amended_text: string | null;
   kind: string;
+}
+
+/** Split/separate requests from the official VOT (laurus.vot_requests.payload). */
+export interface VlVotPayload {
+  splitVotes?: Array<{ group: string; subject: string; parts: Array<{ section: string; text: string }> }>;
+  separateVotes?: Array<{ group: string; targets: string }>;
 }
 
 /** DocAmend artifacts stored in tabled_by before author extraction existed. */
@@ -54,6 +61,7 @@ const COMMITTEE_LABEL: Record<string, string> = {
 export function buildVlFromAmendments(
   item: DbItem,
   amendments: DbAmendment[],
+  vot: VlVotPayload | null = null,
   lang = "it",
 ): AnnotatedVotingList {
   // One entry per number in the requested language; EN then IT as fallbacks
@@ -76,6 +84,35 @@ export function buildVlFromAmendments(
       splitParts: [],
     }));
 
+  const cleanGroup = (g: string) => (g && g !== "—" ? g : null);
+
+  // Split votes → one row per request, with the parts as sub-rows (the part
+  // text goes in Remarks, Vote is left for the advisor).
+  for (const sv of vot?.splitVotes ?? []) {
+    rows.push({
+      subject: sv.subject || "",
+      amNo: null,
+      author: cleanGroup(sv.group),
+      voteType: "split",
+      vote: null,
+      remarks: "",
+      splitParts: sv.parts.map((p, i) => ({ label: p.section || `${i + 1}`, vote: "", remarks: p.text })),
+    });
+  }
+
+  // Separate votes → one row per request on its target.
+  for (const s of vot?.separateVotes ?? []) {
+    rows.push({
+      subject: s.targets || "",
+      amNo: null,
+      author: cleanGroup(s.group),
+      voteType: "separate",
+      vote: null,
+      remarks: "",
+      splitParts: [],
+    });
+  }
+
   rows.push({
     subject: "vote: resolution (as a whole)",
     amNo: null,
@@ -87,13 +124,10 @@ export function buildVlFromAmendments(
     isFinalVote: true,
   });
 
-  // 'STREIT' style surname: last word of the rapporteur, uppercased.
-  const rapporteurLabel = item.rapporteur ? (item.rapporteur.split(/\s+/).pop() ?? item.rapporteur).toUpperCase() : null;
-
   return {
     documentTitle: "INDICATIVE VOTING LIST",
     version: "LAURUS DRAFT",
-    rapporteur: rapporteurLabel,
+    rapporteur: rapporteurLabel(item.rapporteur),
     reportCode: item.code,
     procedureType: null,
     reportTitle: item.title.en || item.title.it || null,
