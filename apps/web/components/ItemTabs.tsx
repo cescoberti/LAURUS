@@ -210,7 +210,7 @@ function AmendmentsView({
 // ---------------------------------------------------------------------------
 
 interface FlatVotRow {
-  type: "split" | "separate" | "rcv";
+  type: "split" | "separate";
   subject: string;
   group: string;
   part: string | null;
@@ -220,9 +220,10 @@ interface FlatVotRow {
 const TYPE_LABEL: Record<string, string> = {
   split: "Split",
   separate: "Separate",
-  rcv: "Roll-call",
 };
 
+// Only split and separate votes belong here — roll-call requests (p.rollCalls)
+// are already flagged on the voting list itself, so they are intentionally left out.
 function flattenVot(p: VotPayload): FlatVotRow[] {
   const rows: FlatVotRow[] = [];
   for (const sv of p.splitVotes) {
@@ -231,8 +232,16 @@ function flattenVot(p: VotPayload): FlatVotRow[] {
     }
   }
   for (const s of p.separateVotes) rows.push({ type: "separate", subject: s.targets, group: s.group, part: null, text: null });
-  for (const r of p.rollCalls) rows.push({ type: "rcv", subject: r.targets, group: r.group, part: null, text: null });
   return rows;
+}
+
+// The table stays scannable; the full official partValue is kept in the CSV
+// export and on hover (title attribute).
+function shortText(t: string, max = 80): string {
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
 function votCsv(rows: FlatVotRow[]): string {
@@ -282,8 +291,8 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
     <div>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm text-ink-500">
-          <span className="font-semibold text-ink-900">{rows.length}</span> vote requests —
-          from the official VOT, full text for every part.
+          <span className="font-semibold text-ink-900">{rows.length}</span> split &amp; separate requests
+          from the official VOT — full text in the CSV export and on hover.
         </p>
         <div className="flex items-center gap-2">
           {langs.length > 1 && (
@@ -333,11 +342,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
                 <td className="px-4 py-3 align-top">
                   <span
                     className={`inline-flex whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                      r.type === "split"
-                        ? "bg-laurel-100 text-laurel-800"
-                        : r.type === "separate"
-                          ? "bg-gold-500/15 text-gold-600"
-                          : "bg-slate-100 text-ink-500"
+                      r.type === "split" ? "bg-laurel-100 text-laurel-800" : "bg-gold-500/15 text-gold-600"
                     }`}
                   >
                     {TYPE_LABEL[r.type]}
@@ -346,8 +351,8 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
                 <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-ink-900">{r.subject}</td>
                 <td className="px-4 py-3 align-top text-sm text-ink-700">{r.group}</td>
                 <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-ink-500">{r.part ?? "–"}</td>
-                <td className="px-4 py-3 align-top text-sm leading-relaxed text-ink-700">
-                  {r.text ?? <span className="text-ink-300">–</span>}
+                <td className="px-4 py-3 align-top text-sm leading-relaxed text-ink-700" title={r.text ?? undefined}>
+                  {r.text ? shortText(r.text) : <span className="text-ink-300">–</span>}
                 </td>
               </tr>
             ))}
