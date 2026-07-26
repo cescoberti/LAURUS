@@ -17,7 +17,7 @@
  * cited in each <vote> label. Idempotent: upsert on (item_id, language).
  */
 import { createClient } from "@supabase/supabase-js";
-import { XMLParser } from "fast-xml-parser";
+import { parseVotXml } from "@laurus/parser/vot-xml";
 import { fetchBytes } from "./httpFetch.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
@@ -32,90 +32,8 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ---------------------------------------------------------------------------
-// XML shapes (only what we read; fast-xml-parser output)
-// ---------------------------------------------------------------------------
-
-interface XmlGroupBlock {
-  title?: string;
-  politicalGroups?: { label?: string };
-  translation?: string;
-}
-
-interface XmlSplitItem {
-  title?: string;
-  parts?: { part?: Array<{ partSection?: string; partValue?: string }> | { partSection?: string; partValue?: string } };
-}
-
-interface XmlRemark {
-  remarkRollCalls?: { RemarkRollCallSeparated?: XmlGroupBlock[] | XmlGroupBlock };
-  remarkSeparateds?: { RemarkRollCallSeparated?: XmlGroupBlock[] | XmlGroupBlock };
-  remarkSplitVotes?: {
-    remarkSplitVote?:
-      | Array<{ politicalGroups?: { label?: string }; items?: { item?: XmlSplitItem[] | XmlSplitItem } }>
-      | { politicalGroups?: { label?: string }; items?: { item?: XmlSplitItem[] | XmlSplitItem } };
-  };
-}
-
-export interface VotSplitRequestFull {
-  group: string;
-  subject: string;
-  parts: Array<{ section: string; text: string }>;
-}
-
-export interface VotPayload {
-  itemTitle?: string;
-  splitVotes: VotSplitRequestFull[];
-  separateVotes: Array<{ group: string; targets: string }>;
-  rollCalls: Array<{ group: string; targets: string }>;
-}
-
-const arr = <T>(v: T[] | T | undefined): T[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
-
-function groupLabel(b: XmlGroupBlock): string {
-  return (b.politicalGroups?.label ?? b.title ?? "").replace(/:\s*$/, "").trim();
-}
-
-/** Extract the structured payload from one parsed <vote> element. */
-function payloadFromVote(vote: Record<string, unknown>): VotPayload | null {
-  const remarks = (vote.remarks as { remark?: XmlRemark[] | XmlRemark } | undefined)?.remark;
-  const out: VotPayload = { splitVotes: [], separateVotes: [], rollCalls: [] };
-  const title = (vote.title as string | undefined) ?? undefined;
-  if (title) out.itemTitle = String(title);
-
-  for (const remark of arr(remarks)) {
-    for (const rc of arr(remark.remarkRollCalls?.RemarkRollCallSeparated)) {
-      const g = groupLabel(rc);
-      if (g && rc.translation) out.rollCalls.push({ group: g, targets: String(rc.translation).trim() });
-    }
-    for (const sep of arr(remark.remarkSeparateds?.RemarkRollCallSeparated)) {
-      const g = groupLabel(sep);
-      if (g && sep.translation) out.separateVotes.push({ group: g, targets: String(sep.translation).trim() });
-    }
-    for (const sv of arr(remark.remarkSplitVotes?.remarkSplitVote)) {
-      const g = (sv.politicalGroups?.label ?? "").replace(/:\s*$/, "").trim();
-      for (const item of arr(sv.items?.item)) {
-        const parts = arr(item.parts?.part)
-          .map((p) => ({
-            section: String(p.partSection ?? "").trim(),
-            text: String(p.partValue ?? "").trim().replace(/^"|"$/g, ""),
-          }))
-          .filter((p) => p.text);
-        if (parts.length) {
-          out.splitVotes.push({ group: g || "—", subject: String(item.title ?? "").trim(), parts });
-        }
-      }
-    }
-  }
-
-  if (!out.splitVotes.length && !out.separateVotes.length && !out.rollCalls.length) return null;
-  return out;
-}
-
-/** All report codes cited in a vote label, e.g. "Relazione: X (A10-0170/2026)". */
-function codesFromLabel(label: string): string[] {
-  return [...label.matchAll(/\b([A-Z]+\d+-\d+\/\d{4})\b/g)].map((m) => m[1]!);
-}
+// The XML shapes and the extraction live in @laurus/parser/vot-xml so the
+// voting-list verifier can re-derive the same requests from the same source.
 
 async function main() {
   const { data: run } = await supabase
@@ -152,7 +70,6 @@ async function main() {
     if (itemErr || !items) throw new Error(`items read: ${itemErr?.message}`);
     const itemByCode = new Map(items.map((i) => [i.code, i.id]));
 
-    const parser = new XMLParser({ ignoreAttributes: false, trimValues: false });
     let stored = 0;
     let daysWithVot = 0;
 
@@ -168,28 +85,19 @@ async function main() {
         if (res.status !== 200) continue;
         daysWithVot++;
 
-        let doc: Record<string, unknown>;
+        let votes;
         try {
-          doc = parser.parse(res.body.toString("utf8"));
+          votes = parseVotXml(res.body.toString("utf8"));
         } catch (err) {
           console.warn(`  ${day} ${lang}: XML parse failed — ${err}`);
           continue;
         }
-        const votes = arr(
-          ((doc.file as Record<string, unknown>)?.sitting as Record<string, unknown> | undefined)?.votes
-            ? (((doc.file as Record<string, unknown>).sitting as Record<string, unknown>).votes as Record<string, unknown>).vote
-            : undefined,
-        ) as Array<Record<string, unknown>>;
 
         const rows: Array<Record<string, unknown>> = [];
         for (const vote of votes) {
-          const label = String(vote.label ?? "");
-          const payload = payloadFromVote(vote);
-          if (!payload) continue;
-          const codes = codesFromLabel(label);
-          const itemId = codes.map((c) => itemByCode.get(c)).find(Boolean);
+          const itemId = vote.codes.map((c) => itemByCode.get(c)).find(Boolean);
           if (!itemId) continue;
-          rows.push({ item_id: itemId, language: lang, source_url: url, payload });
+          rows.push({ item_id: itemId, language: lang, source_url: url, payload: vote.payload });
         }
         if (rows.length) {
           // One VOT file can cite the same item once only; still de-dupe defensively.

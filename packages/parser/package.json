@@ -8,13 +8,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./amendments-docx": "./src/amendmentsDocx.ts",
-    "./voting-list-docx": "./src/indicativeVotingList.ts"
+    "./voting-list-docx": "./src/indicativeVotingList.ts",
+    "./vot-xml": "./src/votXml.ts"
   },
   "scripts": {
     "build": "tsc -b",
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.10.1",
     "mammoth": "^1.12.0"
   }
 }
