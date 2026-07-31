@@ -84,7 +84,9 @@ export function renderVlReportHtml(report: VlVerificationReport, opts: { attache
   <p style="color:#8a9a92;font-size:12px;margin:24px 0 0;border-top:1px solid #e4e9e6;padding-top:12px">
     Pass 1 checks the list against the data LAURUS holds. Pass 2 re-downloads the official VOT and the
     published amendment files and compares them, text by text, with the list. The Vote column is left
-    empty by design — that call is yours.
+    empty by design — that call is yours.<br>
+    Checks run on ${new Date(report.generatedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+    — an identical list already checked against final sources is not re-checked.
   </p>
 </div>`;
 }

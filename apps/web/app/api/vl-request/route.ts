@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadVotingList } from "@/lib/annotatedVl/load";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
-import { verifyVotingList } from "@/lib/vlVerify";
+import { verifyVotingList, votingListFingerprint, type VlVerificationReport } from "@/lib/vlVerify";
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
@@ -14,18 +14,25 @@ import { checkVlRateLimit } from "@/lib/rateLimit";
  * Request a VERIFIED annotated voting list.
  *   POST /api/vl-request  { code, lang }
  *
- * The list is built, put through both verification passes (completeness against
- * what LAURUS holds, correctness against the official sources re-downloaded on
- * the spot) and emailed with its report. Nothing is returned to the browser:
- * the point of this route is that a list only reaches a human after it has been
- * checked, and always alongside the report saying what was checked.
+ * The caller is answered straight away and the work continues after the
+ * response: the list is built, put through both verification passes and emailed
+ * with its report. Nothing is returned to the browser — a list only reaches a
+ * human once it has been checked, and always next to the report of what was
+ * checked.
  *
- * Re-downloading and re-parsing the official files is slow by design — hence
- * the extended duration (60s is the Vercel plan ceiling; a report with many
- * amendment blocks can bump into it, in which case the request is reported as
- * failed rather than delivered unverified).
+ * Speed comes from not repeating work, never from skipping checks:
+ *   - the year's AMENDMENT_LIST index is cached in `ep_doc_index`, so locating
+ *     a report's amendment blocks costs no API paging after the first run
+ *   - the amendment files are downloaded a few at a time
+ *   - if the rebuilt list is byte-identical to one already verified AND the
+ *     official sources are final (the vote has happened), that verification is
+ *     reused instead of re-downloading them
  */
 export const maxDuration = 60;
+
+const INDEX_MAX_AGE_DAYS = 3;
+const VERIFICATION_MAX_AGE_DAYS = 30;
+const DAY = 86_400_000;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -44,13 +51,14 @@ export async function POST(request: Request) {
   const langParam = (langRaw ?? "it").toLowerCase();
   const lang = EU_LANGUAGE_CODES.has(langParam) ? langParam : "it";
 
-  const admin = createAdminClient();
   const { data: profile } = await supabase.from("users").select("email").eq("id", user.id).maybeSingle();
   const to = profile?.email ?? user.email;
   if (!to) return NextResponse.json({ error: "no email address on file" }, { status: 400 });
   if (!emailConfigured()) {
     return NextResponse.json({ error: "email delivery is not configured on this deployment" }, { status: 503 });
   }
+
+  const admin = createAdminClient();
 
   // A run killed by the function timeout leaves its row behind; retire those so
   // the history never shows a request as still working long after the fact.
@@ -68,55 +76,102 @@ export async function POST(request: Request) {
     .single();
   const requestId = req?.id as string | undefined;
 
-  const fail = async (message: string, status = 500) => {
-    if (requestId) {
-      await admin
-        .from("vl_requests")
-        .update({ status: "failed", error: message, finished_at: new Date().toISOString() })
-        .eq("id", requestId);
+  // Everything below runs after the response is sent — the advisor doesn't wait
+  // on the EP downloads. Uses the service-role client, which needs no cookies.
+  after(async () => {
+    const finish = (patch: Record<string, unknown>) =>
+      requestId
+        ? admin.from("vl_requests").update({ ...patch, finished_at: new Date().toISOString() }).eq("id", requestId)
+        : Promise.resolve();
+
+    try {
+      const loaded = await loadVotingList(admin, code, lang);
+      if (!loaded) {
+        await finish({ status: "failed", error: "No amendments or vote requests ingested for this report yet." });
+        return;
+      }
+
+      const fingerprint = votingListFingerprint(loaded.vl);
+      const voteDate = loaded.item?.vote_date ?? null;
+      // The VOT and the published amendments stop changing once the vote is
+      // held; before that, always re-read them.
+      const sourcesFinal = !!voteDate && Date.parse(voteDate) < Date.now();
+
+      let report: VlVerificationReport | null = null;
+      let reused = false;
+
+      if (sourcesFinal) {
+        const { data: cached } = await admin
+          .from("vl_verifications")
+          .select("fingerprint, report, verified_at")
+          .eq("item_code", code)
+          .eq("language", lang)
+          .maybeSingle();
+        if (
+          cached?.fingerprint === fingerprint &&
+          Date.parse(cached.verified_at as string) > Date.now() - VERIFICATION_MAX_AGE_DAYS * DAY
+        ) {
+          report = cached.report as VlVerificationReport;
+          reused = true;
+        }
+      }
+
+      if (!report) {
+        const year = Number(code.slice(-4));
+        const { data: idx } = await admin
+          .from("ep_doc_index")
+          .select("identifiers, fetched_at")
+          .eq("year", year)
+          .eq("work_type", "AMENDMENT_LIST")
+          .maybeSingle();
+        const indexFresh =
+          idx && Date.parse(idx.fetched_at as string) > Date.now() - INDEX_MAX_AGE_DAYS * DAY
+            ? (idx.identifiers as string[])
+            : null;
+
+        let freshIndex: string[] | null = null;
+        report = await verifyVotingList(loaded.vl, {
+          itemCode: code,
+          voteDate,
+          language: lang,
+          amendments: loaded.amendments,
+          vot: loaded.vot,
+          amendmentIndex: indexFresh,
+          onIndexFetched: (ids) => {
+            freshIndex = ids;
+          },
+        });
+
+        if (freshIndex) {
+          await admin.from("ep_doc_index").upsert(
+            { year, work_type: "AMENDMENT_LIST", identifiers: freshIndex, fetched_at: new Date().toISOString() },
+            { onConflict: "year,work_type" },
+          );
+        }
+        if (sourcesFinal) {
+          await admin.from("vl_verifications").upsert(
+            { item_code: code, language: lang, fingerprint, report, verified_at: new Date().toISOString() },
+            { onConflict: "item_code,language" },
+          );
+        }
+      }
+
+      const docx = await renderAnnotatedVlDocx(loaded.vl);
+      const stamp = report.verified ? "VERIFIED" : "UNVERIFIED";
+      const filename = `annotated-vl-${stamp}-${(loaded.vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}-${lang.toUpperCase()}.docx`;
+
+      const sent = await sendVlEmail({ to, report, filename, docx });
+      if (!sent.ok) {
+        await finish({ status: "failed", error: `Verified, but the email could not be sent: ${sent.error}`, report });
+        return;
+      }
+
+      await finish({ status: report.verified ? "verified" : "issues", report, emailed_to: to });
+      void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, verified: report.verified, reused } });
+    } catch (err) {
+      await finish({ status: "failed", error: (err as Error).message });
     }
-    return NextResponse.json({ error: message }, { status });
-  };
+  });
 
-  try {
-    const loaded = await loadVotingList(supabase, code, lang);
-    if (!loaded) return await fail("No amendments or vote requests ingested for this report yet.", 404);
-
-    const report = await verifyVotingList(loaded.vl, {
-      itemCode: code,
-      voteDate: loaded.item?.vote_date ?? null,
-      language: lang,
-      amendments: loaded.amendments,
-      vot: loaded.vot,
-    });
-
-    const docx = await renderAnnotatedVlDocx(loaded.vl);
-    const stamp = report.verified ? "VERIFIED" : "UNVERIFIED";
-    const filename = `annotated-vl-${stamp}-${(loaded.vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}-${lang.toUpperCase()}.docx`;
-
-    const sent = await sendVlEmail({ to, report, filename, docx });
-    if (!sent.ok) return await fail(`Verification finished but the email could not be sent: ${sent.error}`);
-
-    if (requestId) {
-      await admin
-        .from("vl_requests")
-        .update({
-          status: report.verified ? "verified" : "issues",
-          report,
-          emailed_to: to,
-          finished_at: new Date().toISOString(),
-        })
-        .eq("id", requestId);
-    }
-    void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, verified: report.verified } });
-
-    return NextResponse.json({
-      ok: true,
-      verified: report.verified,
-      emailedTo: to,
-      issues: report.checks.filter((c) => c.status !== "ok").length,
-    });
-  } catch (err) {
-    return await fail((err as Error).message);
-  }
+  return NextResponse.json({ ok: true, queued: true, emailedTo: to });
 }

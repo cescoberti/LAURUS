@@ -4,6 +4,7 @@
  * from exactly the same list — the only difference is whether it is verified.
  */
 import type { createClient } from "@/lib/supabase/server";
+import type { createAdminClient } from "@/lib/supabase/admin";
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { buildVlFromAmendments, type DbAmendment } from "./fromDb";
@@ -17,8 +18,11 @@ export interface LoadedVl {
   vot: VotPayload | null;
 }
 
-/** The `laurus`-schema client returned by lib/supabase/server. */
-type LaurusClient = Awaited<ReturnType<typeof createClient>>;
+/**
+ * Either `laurus`-schema client: the request-scoped one (RLS as the signed-in
+ * user) or the service-role one used by work that runs after the response.
+ */
+type LaurusClient = Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>;
 
 export async function loadVotingList(
   supabase: LaurusClient,

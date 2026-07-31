@@ -23,6 +23,7 @@ import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseVotXml, type VotPayload } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { remarksFor } from "@laurus/parser";
+import { createHash } from "node:crypto";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "@/lib/annotatedVl/fromDb";
 
@@ -210,28 +211,68 @@ function epDocId(code: string): string | null {
   return `${prefix}-${term}-${year}-${num.padStart(4, "0")}`;
 }
 
-/** Amendment blocks published for a report, e.g. 'A-10-2026-0170-AM-006-010'. */
-async function amendmentBlockIds(code: string, year: number): Promise<string[] | null> {
+/**
+ * Amendment blocks published for a report, e.g. 'A-10-2026-0170-AM-006-010'.
+ *
+ * The EP API has no per-report filter, so this means paging the year's whole
+ * AMENDMENT_LIST index. That index is the same for every report, so the caller
+ * can hand in a cached copy (`index`) and get zero network calls; when it has
+ * to be fetched, the fresh index comes back so the caller can store it.
+ */
+async function amendmentBlockIds(
+  code: string,
+  year: number,
+  index: string[] | null,
+): Promise<{ blocks: string[] | null; freshIndex: string[] | null }> {
   const docId = epDocId(code);
-  if (!docId) return null;
+  if (!docId) return { blocks: null, freshIndex: null };
   const wanted = `${docId}-AM-`;
-  const out: string[] = [];
+
+  if (index?.length) {
+    return { blocks: index.filter((id) => id.startsWith(wanted)), freshIndex: null };
+  }
+
+  const all: string[] = [];
   for (let offset = 0; offset < 4000; offset += 500) {
     const url =
       `${BASE}/api/v2/documents?year=${year}&work-type=AMENDMENT_LIST` +
       `&limit=500&offset=${offset}&format=application%2Fld%2Bjson`;
     const body = await fetchBytesWithBackoff(url);
-    if (!body) return out.length ? out : null;
+    if (!body) break;
     const rows = (JSON.parse(body.toString("utf8")) as { data?: Array<{ identifier: string }> }).data ?? [];
-    for (const r of rows) if (r.identifier?.startsWith(wanted)) out.push(r.identifier);
+    for (const r of rows) if (r.identifier) all.push(r.identifier);
     if (rows.length < 500) break;
   }
+  if (!all.length) return { blocks: null, freshIndex: null };
+  return { blocks: all.filter((id) => id.startsWith(wanted)), freshIndex: all };
+}
+
+/** Run `fn` over `items` with at most `limit` in flight. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i]!);
+      }
+    }),
+  );
   return out;
 }
 
 export async function verifyAgainstSource(
   vl: AnnotatedVotingList,
-  opts: { itemCode: string; voteDate: string | null; language: string },
+  opts: {
+    itemCode: string;
+    voteDate: string | null;
+    language: string;
+    /** Cached AMENDMENT_LIST index for the year, to skip paging the API. */
+    amendmentIndex?: string[] | null;
+    /** Called with a freshly fetched index so the caller can cache it. */
+    onIndexFetched?: (identifiers: string[]) => void;
+  },
 ): Promise<VlCheck[]> {
   const checks: VlCheck[] = [];
   const { itemCode, voteDate, language } = opts;
@@ -336,7 +377,9 @@ export async function verifyAgainstSource(
   let blocks: string[] | null = null;
   let amError: string | null = null;
   try {
-    blocks = await amendmentBlockIds(itemCode, year);
+    const found = await amendmentBlockIds(itemCode, year, opts.amendmentIndex ?? null);
+    blocks = found.blocks;
+    if (found.freshIndex) opts.onIndexFetched?.(found.freshIndex);
   } catch (err) {
     amError = (err as Error).message;
   }
@@ -352,27 +395,25 @@ export async function verifyAgainstSource(
     return checks;
   }
 
+  // A report has a handful of blocks, so a little concurrency is safe here —
+  // the EP rate limiter only bites on bulk ingestion of the whole year.
   const freshByNumber = new Map<number, { original?: string; amended?: string }>();
   let blocksRead = 0;
-  for (const id of blocks) {
+  const parsedBlocks = await mapLimit(blocks, 3, async (id) => {
     const url = `${BASE}/distribution/reds_iPlRp_Amd/${id}/${id}_${language}.docx`;
-    let buf: Buffer | null = null;
     try {
-      buf = await fetchBytesWithBackoff(url);
+      const buf = await fetchBytesWithBackoff(url);
+      if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;
+      return await parseAmendmentsDocx(buf, language);
     } catch (err) {
-      amError = (err as Error).message;
-      break;
+      amError ??= (err as Error).message;
+      return null;
     }
-    if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) continue;
-    try {
-      for (const a of await parseAmendmentsDocx(buf, language)) {
-        freshByNumber.set(a.number, { original: a.originalText, amended: a.amendedText });
-      }
-      blocksRead++;
-    } catch {
-      // a block that fails to parse is reported through the coverage check below
-    }
-    await new Promise((r) => setTimeout(r, 300));
+  });
+  for (const parsed of parsedBlocks) {
+    if (!parsed) continue;
+    for (const a of parsed) freshByNumber.set(a.number, { original: a.originalText, amended: a.amendedText });
+    blocksRead++;
   }
 
   if (amError && freshByNumber.size === 0) {
@@ -418,6 +459,24 @@ export async function verifyAgainstSource(
 // Both passes
 // ---------------------------------------------------------------------------
 
+/**
+ * Identity of the list itself — hash of the rows that carry meaning. Two builds
+ * with the same fingerprint are the same document, so a verification of one
+ * applies to the other (see the reuse rule in /api/vl-request).
+ */
+export function votingListFingerprint(vl: AnnotatedVotingList): string {
+  const material = vl.rows.map((r) => ({
+    s: r.subject,
+    a: r.amNo,
+    au: r.author,
+    t: r.voteType,
+    r: r.remarks,
+    p: r.splitParts.map((p) => [p.label, p.remarks]),
+    f: !!r.isFinalVote,
+  }));
+  return createHash("sha256").update(JSON.stringify(material)).digest("hex");
+}
+
 export async function verifyVotingList(
   vl: AnnotatedVotingList,
   ctx: {
@@ -426,6 +485,8 @@ export async function verifyVotingList(
     language: string;
     amendments: DbAmendment[];
     vot: VotPayload | null;
+    amendmentIndex?: string[] | null;
+    onIndexFetched?: (identifiers: string[]) => void;
   },
 ): Promise<VlVerificationReport> {
   const pass1 = verifyCompleteness(vl, ctx.amendments, ctx.vot, ctx.language);
@@ -436,6 +497,8 @@ export async function verifyVotingList(
       itemCode: ctx.itemCode,
       voteDate: ctx.voteDate,
       language: ctx.language,
+      amendmentIndex: ctx.amendmentIndex,
+      onIndexFetched: ctx.onIndexFetched,
     });
   } catch (err) {
     pass2 = [

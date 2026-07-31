@@ -4,9 +4,8 @@ import { useState } from "react";
 
 /**
  * Primary way to get a voting list: LAURUS builds it, runs both verification
- * passes and emails it with the report. It takes a while because the official
- * VOT and amendment files are re-downloaded and re-read for the second pass —
- * that wait is the point.
+ * passes and emails it with the report. The request comes back immediately —
+ * the checking continues server-side, so nobody watches a spinner.
  */
 export function RequestVerifiedVl({ code, lang }: { code: string; lang: string }) {
   const [state, setState] = useState<"idle" | "working" | "done" | "error">("idle");
@@ -21,24 +20,14 @@ export function RequestVerifiedVl({ code, lang }: { code: string; lang: string }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, lang }),
       });
-      const body = (await res.json()) as {
-        ok?: boolean;
-        verified?: boolean;
-        emailedTo?: string;
-        issues?: number;
-        error?: string;
-      };
+      const body = (await res.json()) as { ok?: boolean; emailedTo?: string; error?: string };
       if (!res.ok || !body.ok) {
         setState("error");
         setMessage(body.error ?? "Something went wrong.");
         return;
       }
       setState("done");
-      setMessage(
-        body.verified
-          ? `Verified and sent to ${body.emailedTo}.`
-          : `Sent to ${body.emailedTo} — the report flags ${body.issues} check${body.issues === 1 ? "" : "s"} to read before using it.`,
-      );
+      setMessage(`On its way to ${body.emailedTo}. The email says whether it passed both checks.`);
     } catch (err) {
       setState("error");
       setMessage((err as Error).message);
@@ -56,14 +45,9 @@ export function RequestVerifiedVl({ code, lang }: { code: string; lang: string }
           <path d="M4 4h16v16H4z" />
           <polyline points="4 7 12 13 20 7" />
         </svg>
-        {state === "working" ? "Verifying…" : `Email me the verified VL · ${lang.toUpperCase()}`}
+        {state === "working" ? "Sending…" : `Email me the verified VL · ${lang.toUpperCase()}`}
       </button>
 
-      {state === "working" && (
-        <p className="max-w-[16rem] text-right text-xs text-ink-300">
-          Re-reading the official VOT and amendment files. This takes a minute or two.
-        </p>
-      )}
       {state === "done" && <p className="max-w-[16rem] text-right text-xs text-laurel-700">{message}</p>}
       {state === "error" && <p className="max-w-[16rem] text-right text-xs text-red-600">{message}</p>}
     </div>
