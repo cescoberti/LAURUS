@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailConfigured } from "@/lib/notify/email";
 import { sendWhatsApp, whatsappConfigured } from "@/lib/notify/whatsapp";
+import { sendDueReminders } from "@/lib/notify/whipReminder";
 import { logEvent } from "@/lib/track";
 
 export const runtime = "nodejs";
@@ -14,6 +15,8 @@ export const runtime = "nodejs";
  *    last 25h → email/WhatsApp to members who opted in.
  * 2. Clean-final: items voted in the last 25h → members with wants_clean_final
  *    get the link to the adopted-text page and the report files.
+ * 3. Whip reminders: advisors with pending plenary notes, three weeks and two
+ *    weeks before a sitting. Idempotent through laurus.whip_reminders.
  *
  * Every send is recorded in laurus.notifications-like events, and the whole
  * run no-ops gracefully while the provider keys are not configured.
@@ -101,6 +104,17 @@ export async function GET(request: Request) {
     }
   }
 
-  void logEvent("cron_notify", { meta: { newVlItems: newVlItems.length, voted: votedItems?.length ?? 0, sent, skipped } });
-  return NextResponse.json({ newVlItems: newVlItems.map((i) => i.code), voted: votedItems?.length ?? 0, sent, skipped });
+  // --- Whip reminders (3 weeks / 2 weeks before a sitting) ----------------
+  const reminders = await sendDueReminders(supabase);
+
+  void logEvent("cron_notify", {
+    meta: { newVlItems: newVlItems.length, voted: votedItems?.length ?? 0, sent, skipped, reminders },
+  });
+  return NextResponse.json({
+    newVlItems: newVlItems.map((i) => i.code),
+    voted: votedItems?.length ?? 0,
+    sent,
+    skipped,
+    reminders,
+  });
 }

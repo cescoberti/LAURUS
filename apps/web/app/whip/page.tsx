@@ -1,5 +1,8 @@
 import { TopNav } from "@/components/TopNav";
 import { WhipBoard, type WhipSession, type WhipItem } from "@/components/WhipBoard";
+import { WhipReminders, type ReminderRow } from "@/components/WhipReminders";
+import { findDueReminders } from "@/lib/notify/whipReminder";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { COMMITTEES, COMMITTEE_CANDIDATES } from "@/lib/committees";
 
@@ -89,6 +92,22 @@ export default async function WhipPage() {
     };
   });
 
+  // The reminder view needs the whole picture (advisor accounts, what already
+  // went out), which RLS hides from the member client; the page itself is
+  // already gated to whip/admin by the proxy.
+  const reminderRows: ReminderRow[] = (await findDueReminders(createAdminClient())).flatMap((r) =>
+    r.recipients.map((rec) => ({
+      sessionLabel: r.sessionLabel,
+      startDate: r.startDate,
+      stage: r.stage,
+      dueOn: r.dueOn,
+      advisor: rec.advisor,
+      fileCount: rec.files.length,
+      email: rec.email,
+      sent: r.alreadySent.includes(rec.advisor),
+    })),
+  );
+
   return (
     <div className="min-h-screen">
       <TopNav />
@@ -99,6 +118,7 @@ export default async function WhipPage() {
           committee (ECR map); reassign any file as needed. Note due {NOTE_LEAD_DAYS} days before the sitting.
         </p>
         <WhipBoard sessions={board} advisorOptions={advisorOptions} committees={COMMITTEES} committeeCandidates={COMMITTEE_CANDIDATES} />
+        <WhipReminders rows={reminderRows} anyDue={reminderRows.some((r) => !r.sent && r.email)} />
       </main>
     </div>
   );

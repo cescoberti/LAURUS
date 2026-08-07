@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendDueReminders } from "@/lib/notify/whipReminder";
 
 /** The whip cruscotto is editable by whips and admins. */
 async function requireWhip() {
@@ -50,5 +51,17 @@ export async function setNoteStatusAction(formData: FormData): Promise<void> {
       note_submitted_at: status === "submitted" ? new Date().toISOString() : null,
     })
     .eq("id", itemId);
+  revalidatePath("/whip");
+}
+
+/**
+ * Send every reminder that is due today and has not gone out yet. The daily
+ * cron does this on its own; this is the whip's manual nudge, and it is safe to
+ * press twice — `whip_reminders` stops a second email per (session, advisor,
+ * stage).
+ */
+export async function sendRemindersAction(): Promise<void> {
+  const admin = await requireWhip();
+  await sendDueReminders(admin);
   revalidatePath("/whip");
 }
