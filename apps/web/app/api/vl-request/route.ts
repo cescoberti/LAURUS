@@ -2,8 +2,9 @@ import { after, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadVotingList } from "@/lib/annotatedVl/load";
+import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
-import { verifyVotingList, votingListFingerprint, type VlVerificationReport } from "@/lib/vlVerify";
+import { verifyVotingList, votingListFingerprint, type VlVerificationReport, type VlCheck } from "@/lib/vlVerify";
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
@@ -91,6 +92,28 @@ export async function POST(request: Request) {
         return;
       }
 
+      // Expand split notations into the full text of each part (cut on the
+      // English report, rendered in the list's language, [EN] original under
+      // each cell). Runs BEFORE the fingerprint so the cached verification is
+      // of the document actually delivered; rows that cannot be expanded keep
+      // their official notation and are listed in the report.
+      const expansionNotes = await expandSplitRows(loaded.vl, {
+        itemCode: code,
+        language: lang,
+        votEn: loaded.votEn,
+        votLang: loaded.vot,
+        amendments: loaded.amendments,
+      });
+      const expansionCheck: VlCheck = {
+        id: "split-expansion",
+        pass: 2,
+        label: "Split parts expanded to their full text",
+        status: expansionNotes.some((n) => n.level === "error") ? "issue" : "ok",
+        detail: expansionNotes.length
+          ? expansionNotes.map((n) => `${n.subject}: ${n.code} — ${n.detail}`).join(" · ")
+          : "every split part carries the literal text it votes on",
+      };
+
       const fingerprint = votingListFingerprint(loaded.vl);
       const voteDate = loaded.item?.vote_date ?? null;
       // The VOT and the published amendments stop changing once the vote is
@@ -141,6 +164,10 @@ export async function POST(request: Request) {
             freshIndex = ids;
           },
         });
+        // The expansion outcome is part of the report: an unexpanded split row
+        // (official notation kept) must be flagged, not passed off as clean.
+        report.checks.push(expansionCheck);
+        report.verified = report.checks.every((c) => c.status === "ok");
 
         if (freshIndex) {
           await admin.from("ep_doc_index").upsert(

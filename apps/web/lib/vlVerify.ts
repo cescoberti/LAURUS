@@ -159,7 +159,10 @@ export function verifyCompleteness(
       continue;
     }
     for (const [i, p] of sv.parts.entries()) {
-      if (!same(row.splitParts[i]!.remarks, p.text)) {
+      // Expanded rows keep the official notation in `notation`; that is what
+      // must match the request, not the reconstructed full text.
+      const part = row.splitParts[i]!;
+      if (!same(part.notation ?? part.remarks, p.text)) {
         splitIssues.push(`split "${short(sv.subject, 40)}" part ${i + 1}: text differs from the request`);
       }
     }
@@ -326,7 +329,8 @@ export async function verifyAgainstSource(
           continue;
         }
         for (const [i, p] of sv.parts.entries()) {
-          if (!same(row.splitParts[i]!.remarks, p.text)) {
+          const part = row.splitParts[i]!;
+          if (!same(part.notation ?? part.remarks, p.text)) {
             issues.push(`split "${short(sv.subject, 40)}" part ${i + 1}: wording differs from the official VOT`);
           }
         }

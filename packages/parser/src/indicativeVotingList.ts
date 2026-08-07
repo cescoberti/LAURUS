@@ -24,6 +24,12 @@ export interface AnnotatedVlSplitPart {
   label: string; // '1 RCV', 'First part', …
   vote: string;
   remarks: string;
+  /**
+   * The official VOT notation for this part (e.g. 'text as a whole excluding
+   * the words "…"'). Kept when `remarks` is expanded to the full part text, so
+   * verification can still compare the request against the official source.
+   */
+  notation?: string;
 }
 
 export interface AnnotatedVlRow {

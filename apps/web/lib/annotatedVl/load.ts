@@ -16,6 +16,8 @@ export interface LoadedVl {
   item: { id: string; code: string; vote_date: string | null } | null;
   amendments: DbAmendment[];
   vot: VotPayload | null;
+  /** English VOT payload — splits are tabled on English, so expansion cuts on it. */
+  votEn: VotPayload | null;
 }
 
 /**
@@ -38,6 +40,8 @@ export async function loadVotingList(
 
   if (item) {
     const langsWanted = [...new Set([lang, "it", "en"])];
+    // "en" is always in langsWanted, so votEn below can only be missing when
+    // the English VOT itself was never ingested.
     const [{ data: amRows }, { data: votRows }] = await Promise.all([
       supabase
         .from("amendments")
@@ -60,11 +64,12 @@ export async function loadVotingList(
         item: { id: item.id, code: item.code, vote_date: item.vote_date ?? null },
         amendments,
         vot,
+        votEn: votByLang.get("en") ?? null,
       };
     }
   }
 
   const registered = getAnnotatedVl(code);
-  if (registered) return { vl: registered, item: null, amendments: [], vot: null };
+  if (registered) return { vl: registered, item: null, amendments: [], vot: null, votEn: null };
   return null;
 }

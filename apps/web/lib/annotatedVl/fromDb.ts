@@ -96,7 +96,10 @@ export function buildVlFromAmendments(
       voteType: "split",
       vote: null,
       remarks: "",
-      splitParts: sv.parts.map((p, i) => ({ label: p.section || `${i + 1}`, vote: "", remarks: p.text })),
+      // remarks starts as the official notation; the split expansion step
+      // replaces it with the full text of the part, keeping `notation` for
+      // verification against the VOT.
+      splitParts: sv.parts.map((p, i) => ({ label: p.section || `${i + 1}`, vote: "", remarks: p.text, notation: p.text })),
     });
   }
 
