@@ -37,13 +37,18 @@ try {
   await page.goto(VOTES_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // The challenge page reloads itself once the token is set; the real page
   // has the per-file notice blocks.
+  // First wait for the challenge to hand over to the real page (it has the
+  // page's title, the challenge has none), then give the listing a moment.
   try {
-    await page.waitForSelector("div.notice", { timeout: 90_000 });
+    await page.waitForFunction(() => /lists of votes/i.test(document.title), null, { timeout: 90_000 });
   } catch (err) {
     const body = (await page.content()).replace(/\s+/g, " ");
-    console.error(`still no page after 90 s — url ${page.url()} — ${body.slice(0, 600)}`);
+    console.error(`still on the challenge after 90 s — url ${page.url()} — ${body.slice(0, 400)}`);
     throw err;
   }
+  await page.waitForSelector("div.notice", { timeout: 20_000 }).catch(() => {
+    console.warn("page loaded but no notice blocks found — outside a plenary week, or the markup changed");
+  });
   const html = await page.content();
   const cookies = await context.cookies("https://www.europarl.europa.eu/");
   const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
