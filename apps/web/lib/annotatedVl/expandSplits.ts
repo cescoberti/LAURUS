@@ -11,12 +11,14 @@
  *     stands if re-composing the parts gives back the original character for
  *     character — otherwise the row is NOT expanded and keeps its notation,
  *     marked with an error code;
- *   - the Italian (or requested-language) rendering prefers a crop of the
- *     official translation; when the corresponding words are not one
- *     contiguous run, the official notation is kept as the rendering and
- *     flagged RESA_NON_LETTERALE;
- *   - every expanded cell carries the English crop underneath ("[EN] …"),
- *     because English is the text the vote is on.
+ *   - the rendering is the advisor's: the parent row is emptied, part 1 is
+ *     the whole paragraph in the list's language with the split-off words
+ *     struck through, the later parts are those words;
+ *   - the translated words come from the translated request when it exists
+ *     (the VOT, after the vote) or, before the vote, are located in the
+ *     translated paragraph by alignQuotes (Claude, verbatim-checked, flagged
+ *     RESA_AUTOMATICA); when they are not one contiguous run the official
+ *     notation is kept as the rendering and flagged RESA_NON_LETTERALE.
  *
  * Error codes (row NOT expanded, notation left intact):
  *   OGGETTO_NON_RISOLTO, TERMINI_NON_TROVATI, TERMINI_AMBIGUI,
@@ -29,6 +31,7 @@ import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
+import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
 
 const BASE = "https://data.europarl.europa.eu";
 
@@ -176,24 +179,26 @@ function resolveSubject(
 // ---------------------------------------------------------------------------
 
 interface PartTexts {
-  /** Rendering in the list's language (or the EN crop when that IS the language). */
+  /** Rendering in the list's language (light HTML: `<s>` marks the split-off words). */
   main: string;
-  /** EN crop, shown underneath unless it already is the main text. */
-  en: string | null;
   warning?: { code: string; detail: string };
 }
+
+/** Locates the translated runs for English quotes (see alignQuotes.ts). */
+type Aligner = (enParagraph: string, quotesEn: string[], langParagraph: string) => Promise<Array<string | null> | null>;
 
 /**
  * Cut one subject's text according to an excluding-grammar split.
  * Returns one entry per part, or an error that leaves the row untouched.
  */
-function cutParts(
+async function cutParts(
   enSubject: string,
   langSubject: string | null,
   enParts: Array<{ text: string }>,
   langParts: Array<{ text: string }>,
   isEnglishList: boolean,
-): { parts: PartTexts[] } | { error: { code: string; detail: string } } {
+  align: Aligner | null,
+): Promise<{ parts: PartTexts[] } | { error: { code: string; detail: string } }> {
   const first = norm(enParts[0]?.text ?? "");
   if (SEQUENTIAL.test(first)) {
     return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: "sequential-cut notation; which side keeps the quoted words is not stated" } };
@@ -238,70 +243,72 @@ function cutParts(
   }
   const firstEnText = tidy(firstEn.replaceAll(" ", " "));
 
-  if (isEnglishList) {
-    return {
-      parts: [
-        { main: firstEnText, en: null },
-        ...quotesEn.map((q) => ({ main: q, en: null })),
-      ],
-    };
-  }
+  void firstEnText;
 
-  // Rendering in the list's language: crop the official translation when the
-  // corresponding words are one contiguous unique run; otherwise keep the
-  // official notation as the rendering and flag it.
-  const langQuotes = langParts.length === enParts.length
-    ? (langParts.length >= 2 && langParts.slice(1).every((p) => !THOSE_WORDS.test(norm(p.text)))
+  // Rendering, as an advisor reads an amendment: part 1 is the WHOLE
+  // paragraph with the split-off words struck through, the later parts are
+  // those words — so the first row shows what was taken out.
+  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn) }, ...quotesEn.map((q) => ({ main: q }))] };
+
+  const fallback = (code: string, detail: string): { parts: PartTexts[] } => ({
+    parts: enParts.map((p, i) => ({
+      main: norm(langParts[i]?.text ?? p.text),
+      warning: i === 0 ? { code, detail } : undefined,
+    })),
+  });
+  if (!langSubject) return fallback("VERSIONE_TRADOTTA_ASSENTE", "translated report not available");
+  const paraLang = norm(langSubject);
+
+  // The translated words: from the translated request when there is one
+  // (the VOT, after the vote); before the vote, located in the translated
+  // paragraph by the aligner and checked verbatim; else the official
+  // notation stands, flagged.
+  let langQuotes: string[] | null = null;
+  let warning: PartTexts["warning"];
+  if (langParts.length === enParts.length && langParts.length > 0) {
+    langQuotes =
+      langParts.length >= 2 && langParts.slice(1).every((p) => !THOSE_WORDS.test(norm(p.text)))
         ? langParts.slice(1).map((p) => stripOuterQuotes(norm(p.text)))
         : (() => {
             const t = excludedTerms(norm(langParts[0]?.text ?? ""));
             return t ? [t] : null;
-          })())
-    : null;
-
-  const fallback = (i: number, code: string, detail: string): PartTexts => ({
-    main: norm(langParts[i]?.text ?? enParts[i]?.text ?? ""),
-    en: i === 0 ? firstEnText : quotesEn[i - 1]!,
-    warning: { code, detail },
-  });
-
-  if (langParts.length === 0) {
-    // Before the vote only the English request exists (the list's own notes):
-    // the literal English cut is the honest rendering; the translated paragraph
-    // stays on the parent row.
-    return {
-      parts: [
-        { main: firstEnText, en: null, warning: { code: "VERSIONE_TRADOTTA_ASSENTE", detail: "no translated request yet (pre-vote) — parts shown in English" } },
-        ...quotesEn.map((q) => ({ main: q, en: null })),
-      ],
-    };
-  }
-  if (!langSubject || !langQuotes) {
-    return {
-      parts: enParts.map((_, i) =>
-        fallback(i, "VERSIONE_TRADOTTA_ASSENTE", langSubject ? "translated notation incomplete" : "translated report not available"),
-      ),
-    };
+          })();
+    if (!langQuotes) return fallback("VERSIONE_TRADOTTA_ASSENTE", "translated notation incomplete");
+  } else if (align) {
+    const aligned = await align(para, quotesEn, paraLang);
+    if (!aligned || !aligned.every((a): a is string => a !== null)) {
+      return fallback("RESA_NON_LETTERALE", "the translated words could not be located as one contiguous run");
+    }
+    langQuotes = aligned.map((a) => norm(a));
+    warning = { code: "RESA_AUTOMATICA", detail: "translated words located automatically and checked verbatim against the report — review" };
+  } else {
+    return fallback("VERSIONE_TRADOTTA_ASSENTE", "no translated request before the vote (ANTHROPIC_API_KEY not set for automatic alignment)");
   }
 
-  const paraLang = norm(langSubject);
   let firstLang = paraLang;
   for (const q of langQuotes) {
     if (occurrences(paraLang, q) !== 1) {
-      // The norm, not a failure: the translation reorders. Official notation + EN crop.
-      return {
-        parts: enParts.map((_, i) => fallback(i, "RESA_NON_LETTERALE", "the translated words are not one contiguous run")),
-      };
+      // The norm, not a failure: the translation reorders. Official notation.
+      return fallback("RESA_NON_LETTERALE", "the translated words are not one contiguous run");
     }
     firstLang = firstLang.replace(q, " ");
   }
 
+  void firstLang;
+
   return {
     parts: [
-      { main: tidy(firstLang), en: firstEnText },
-      ...langQuotes.map((q, i) => ({ main: q, en: quotesEn[i]! })),
+      { main: struck(paraLang, langQuotes), warning },
+      ...langQuotes.map((q) => ({ main: q })),
     ],
   };
+}
+
+/** The paragraph with each quoted run struck through (light HTML `<s>`). */
+function struck(paragraph: string, quotes: string[]): string {
+  let out = paragraph;
+  for (const q of quotes) out = out.replace(q, `<s>${q}</s>`);
+  return out;
 }
 
 /**
@@ -358,16 +365,21 @@ export async function expandSplitRows(
     const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang);
     const langSubject = resolvedLang && !("error" in resolvedLang) ? resolvedLang.text : null;
 
-    const cut = cutParts(resolvedEn.text, langSubject, reqEn.parts, reqLang?.parts ?? [], isEnglishList);
+    const align: Aligner | null = quoteAlignmentAvailable()
+      ? (en, quotes, langPara) => alignQuotes(en, quotes, langPara, opts.language)
+      : null;
+    const cut = await cutParts(resolvedEn.text, langSubject, reqEn.parts, reqLang?.parts ?? [], isEnglishList, align);
     if ("error" in cut) {
       notes.push({ subject, level: "error", code: cut.error.code, detail: cut.error.detail });
       continue;
     }
 
+    // The parent row stays empty: what is voted is in the parts.
+    row.remarks = "";
     for (const [i, part] of cut.parts.entries()) {
       const target = row.splitParts[i]!;
       target.notation ??= target.remarks;
-      target.remarks = part.en ? `${part.main}\n[EN] ${part.en}` : part.main;
+      target.remarks = part.main;
       if (part.warning && i === 0) {
         notes.push({ subject, level: "warning", code: part.warning.code, detail: part.warning.detail });
       }

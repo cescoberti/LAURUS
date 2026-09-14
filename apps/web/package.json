@@ -10,6 +10,7 @@
     "bootstrap-admin": "tsx --env-file=.env.local scripts/bootstrap-admin.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@laurus/parser": "*",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.58.0",
