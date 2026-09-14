@@ -1,0 +1,48 @@
+# Live sync during plenary weeks.
+#
+# Every five minutes, pull what the EP has published for the part-session in
+# progress — agenda changes, new amendment blocks, results-of-votes XML — into
+# Supabase, so the site (which reads the database live) stays current while
+# the votes are happening. Outside a part-session the script exits after one
+# cheap query, so the schedule costs nothing the rest of the month.
+#
+# GitHub schedules are best-effort: under load a tick can slip by a few
+# minutes, and GitHub disables schedules on repos with no commits for 60 days
+# (any commit re-enables them). Run it by hand from the Actions tab whenever
+# a tick matters.
+name: live-sync
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      session_start:
+        description: "Force a part-session by start date (YYYY-MM-DD); blank = the one running today"
+        required: false
+
+# One run at a time: a slow tick queues the next one instead of overlapping it.
+concurrency:
+  group: live-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EP_USER_AGENT: "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Sync the part-session in progress
+        run: npm run sync-live:ci --workspace @laurus/ingest -- ${{ inputs.session_start }}

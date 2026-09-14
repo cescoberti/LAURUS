@@ -10,6 +10,8 @@
     "start": "node --experimental-strip-types src/cli.ts",
     "sync": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/sync.ts",
     "sync-agenda": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAgenda.ts",
+    "sync-live": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncLive.ts",
+    "sync-live:ci": "node --experimental-strip-types src/syncLive.ts",
     "seed-agenda": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/seedAgenda.ts",
     "sync-amendments": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncAmendments.ts",
     "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",

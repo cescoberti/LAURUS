@@ -131,3 +131,40 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i:
   );
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Draft agenda (foreseen-activities) helpers
+// ---------------------------------------------------------------------------
+
+export interface ForeseenActivity {
+  activity_id: string;
+  activity_date?: string;
+  activity_label?: Record<string, string>;
+  based_on_a_realization_of?: string[];
+  had_activity_type?: string;
+}
+
+/** GET a sitting's draft agenda; tolerate the not-yet-published 404/empty case. */
+export async function foreseenActivities(meetingId: string): Promise<ForeseenActivity[]> {
+  const url = new URL(`${BASE}/api/v2/meetings/${meetingId}/foreseen-activities`);
+  url.searchParams.set("format", "application/ld+json");
+  url.searchParams.set("limit", "300");
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/ld+json", "User-Agent": UA } });
+      if (res.status === 404) return []; // agenda not published yet
+      if (!res.ok) throw new Error(`foreseen-activities ${meetingId} ${res.status}`);
+      return ((await res.json()) as { data?: ForeseenActivity[] }).data ?? [];
+    } catch (err) {
+      if (attempt >= 3) throw err;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
+  }
+}
+
+/** Pick the committee report (A/B/RC) a foreseen file item is based on, if any. */
+export function reportRef(item: ForeseenActivity): string | undefined {
+  return (item.based_on_a_realization_of ?? [])
+    .map((ref) => ref.split("/").pop()!)
+    .find((id) => /^(A|B|RC)-\d+-\d{4}-\d+$/.test(id));
+}
