@@ -24,7 +24,8 @@ export const VOTES_PAGE_URL = "https://www.europarl.europa.eu/plenary/en/votes.h
 /** Headers that get past the EP's bot gate for votes.html and its files. */
 export const BROWSER_HEADERS: Record<string, string> = {
   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-  Accept: "*/*",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-GB,en;q=0.9,it;q=0.8",
   Referer: VOTES_PAGE_URL,
 };
 

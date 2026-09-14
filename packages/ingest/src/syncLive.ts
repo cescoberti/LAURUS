@@ -33,7 +33,7 @@ import { getDocument } from "./epApi.ts";
 import { parseVotXml } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { amendmentBlockUrl } from "@laurus/parser";
-import { fetchBytes } from "./httpFetch.ts";
+import { fetchBytes, fetchBytesPatiently } from "./httpFetch.ts";
 import { createHash } from "node:crypto";
 import { parseVotesPage, BROWSER_HEADERS, VOTES_PAGE_URL } from "./votesPage.ts";
 import {
@@ -457,8 +457,10 @@ async function syncVot(s: Session, days: string[]): Promise<{ files: number; row
 const RECHECK_MS = 60 * 60 * 1000;
 
 async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: number; unchanged: number }> {
-  const page = await fetchBytes(VOTES_PAGE_URL, 5, BROWSER_HEADERS);
-  if (page.status !== 200) throw new Error(`votes page HTTP ${page.status}`);
+  const page = await fetchBytesPatiently(VOTES_PAGE_URL, BROWSER_HEADERS);
+  if (page.status !== 200) {
+    throw new Error(`votes page HTTP ${page.status} (${page.body.length} B${page.body.length ? `: ${page.body.toString("utf8").slice(0, 120).replace(/\s+/g, " ")}` : ""})`);
+  }
   const entries = parseVotesPage(page.body.toString("utf8")).filter((e) => e.docxUrl);
 
   const { data: items } = await supabase.from("items").select("id, code, vote_date").eq("session_id", s.id);
@@ -496,7 +498,7 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
     const headers = sameLabel && have?.etag ? { ...BROWSER_HEADERS, "If-None-Match": have.etag } : BROWSER_HEADERS;
     let res;
     try {
-      res = await fetchBytes(e.docxUrl!, 5, headers);
+      res = await fetchBytesPatiently(e.docxUrl!, headers);
     } catch (err) {
       console.warn(`  vl ${e.code}: ${(err as Error).message}`);
       continue;

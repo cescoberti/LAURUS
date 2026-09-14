@@ -16,6 +16,28 @@ export interface FetchBytesResult {
   body: Buffer;
   etag?: string;
   lastModified?: string;
+  setCookie?: string[];
+}
+
+/**
+ * The EP's www host answers datacenter clients with an empty HTTP 202 (a
+ * bot-gate "come back") before serving the page. Retry a few times, carrying
+ * the cookies it set, before giving up on this tick.
+ */
+export async function fetchBytesPatiently(
+  url: string,
+  headers: Record<string, string>,
+  attempts = 4,
+): Promise<FetchBytesResult> {
+  let cookie = "";
+  let res = await fetchBytes(url, 5, headers);
+  for (let i = 1; i < attempts && res.status === 202; i++) {
+    const jar = (res.setCookie ?? []).map((c) => c.split(";")[0]).filter(Boolean);
+    if (jar.length) cookie = [cookie, ...jar].filter(Boolean).join("; ");
+    await new Promise((r) => setTimeout(r, 2_500 * i));
+    res = await fetchBytes(url, 5, cookie ? { ...headers, Cookie: cookie } : headers);
+  }
+  return res;
 }
 
 /**
@@ -41,6 +63,7 @@ export function fetchBytes(url: string, maxRedirects = 5, headers: Record<string
           body: Buffer.concat(chunks),
           etag: typeof res.headers.etag === "string" ? res.headers.etag : undefined,
           lastModified: typeof res.headers["last-modified"] === "string" ? res.headers["last-modified"] : undefined,
+          setCookie: res.headers["set-cookie"],
         }),
       );
       res.on("error", reject);
