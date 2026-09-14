@@ -35,6 +35,7 @@ import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes, fetchBytesPatiently } from "./httpFetch.ts";
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { parseVotesPage, BROWSER_HEADERS, VOTES_PAGE_URL } from "./votesPage.ts";
 import {
   BASE,
@@ -457,11 +458,25 @@ async function syncVot(s: Session, days: string[]): Promise<{ files: number; row
 const RECHECK_MS = 60 * 60 * 1000;
 
 async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: number; unchanged: number }> {
-  const page = await fetchBytesPatiently(VOTES_PAGE_URL, BROWSER_HEADERS);
-  if (page.status !== 200) {
-    throw new Error(`votes page HTTP ${page.status} (${page.body.length} B${page.body.length ? `: ${page.body.toString("utf8").slice(0, 2600).replace(/\s+/g, " ")}` : ""})`);
+  // In CI a headless browser has already fetched the page past the EP's
+  // JavaScript challenge (votesPageBrowser.ts) and left its cookies for the
+  // file downloads; elsewhere a plain fetch is enough.
+  const pageFile = process.env.EP_VOTES_PAGE_FILE;
+  const cookieFile = process.env.EP_WWW_COOKIE_FILE;
+  let html: string;
+  if (pageFile && existsSync(pageFile)) {
+    html = readFileSync(pageFile, "utf8");
+  } else {
+    const page = await fetchBytesPatiently(VOTES_PAGE_URL, BROWSER_HEADERS);
+    if (page.status !== 200) {
+      const challenged = /awswaf|challenge\.js/i.test(page.body.toString("utf8"));
+      throw new Error(`votes page HTTP ${page.status}${challenged ? " (EP JavaScript challenge — needs the browser step)" : ""}`);
+    }
+    html = page.body.toString("utf8");
   }
-  const entries = parseVotesPage(page.body.toString("utf8")).filter((e) => e.docxUrl);
+  const cookie = cookieFile && existsSync(cookieFile) ? readFileSync(cookieFile, "utf8").trim() : "";
+  const wwwHeaders = cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS;
+  const entries = parseVotesPage(html).filter((e) => e.docxUrl);
 
   const { data: items } = await supabase.from("items").select("id, code, vote_date").eq("session_id", s.id);
   const byCode = new Map((items ?? []).map((i) => [i.code as string, i]));
@@ -495,7 +510,7 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
     if (sameLabel && Date.now() - Date.parse(have!.checked_at) < RECHECK_MS) continue;
 
     // Same label as last time → ask the EP whether the file changed at all.
-    const headers = sameLabel && have?.etag ? { ...BROWSER_HEADERS, "If-None-Match": have.etag } : BROWSER_HEADERS;
+    const headers = sameLabel && have?.etag ? { ...wwwHeaders, "If-None-Match": have.etag } : wwwHeaders;
     let res;
     try {
       res = await fetchBytesPatiently(e.docxUrl!, headers);

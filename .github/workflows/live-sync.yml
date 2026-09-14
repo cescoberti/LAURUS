@@ -44,7 +44,26 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
+      # The EP's www host (where the official voting lists live) fronts
+      # datacenter clients with a JavaScript challenge. A headless Chromium
+      # passes it; its page and cookies are handed to the sync below.
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx --workspace @laurus/ingest playwright install --with-deps chromium
+
+      - name: Open the votes page in a browser
+        continue-on-error: true
+        run: npm run votes-page:ci --workspace @laurus/ingest -- $RUNNER_TEMP/ep/votes.html $RUNNER_TEMP/ep/cookie.txt
+
       - name: Sync the part-session in progress
+        env:
+          EP_VOTES_PAGE_FILE: ${{ runner.temp }}/ep/votes.html
+          EP_WWW_COOKIE_FILE: ${{ runner.temp }}/ep/cookie.txt
         run: npm run sync-live:ci --workspace @laurus/ingest -- ${{ inputs.session_start }}
 
       # Tell followers what changed. The route fingerprints each followed file

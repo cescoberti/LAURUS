@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
 import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
+import { motionFor } from "@/lib/annotatedVl/load";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { checkVlRateLimit } from "@/lib/rateLimit";
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
   // Amendments for this report, Italian text first, English as fallback.
   const { data: item } = await supabase
     .from("items")
-    .select("id, code")
+    .select("id, code, ep_work_id")
     .eq("code", vl.reportCode)
     .limit(1)
     .maybeSingle();
@@ -79,7 +80,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const { vl: filledVl, report } = fillRemarks(vl, amendments);
+  // "§ | original text" rows quote the report's own paragraph, in Italian —
+  // the language the Remarks are filled in here.
+  const motion = item ? await motionFor(item.ep_work_id as string | null, "it") : null;
+  const { vl: filledVl, report } = fillRemarks(vl, amendments, motion);
   const buffer = await renderAnnotatedVlDocx(filledVl);
   void logEvent("vl_generate", {
     userId: user.id,

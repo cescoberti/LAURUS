@@ -58,7 +58,7 @@ function bytesOf(hex: string): Buffer {
 }
 
 /** The report's motion for a resolution in `lang`, from the EP distribution DOCX. */
-async function motionFor(epWorkId: string | null, lang: string): Promise<MotionText | null> {
+export async function motionFor(epWorkId: string | null, lang: string): Promise<MotionText | null> {
   const id = epWorkId?.split("/").pop();
   if (!id) return null;
   try {
