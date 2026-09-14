@@ -459,7 +459,7 @@ const RECHECK_MS = 60 * 60 * 1000;
 async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: number; unchanged: number }> {
   const page = await fetchBytesPatiently(VOTES_PAGE_URL, BROWSER_HEADERS);
   if (page.status !== 200) {
-    throw new Error(`votes page HTTP ${page.status} (${page.body.length} B${page.body.length ? `: ${page.body.toString("utf8").slice(0, 120).replace(/\s+/g, " ")}` : ""})`);
+    throw new Error(`votes page HTTP ${page.status} (${page.body.length} B${page.body.length ? `: ${page.body.toString("utf8").slice(0, 2600).replace(/\s+/g, " ")}` : ""})`);
   }
   const entries = parseVotesPage(page.body.toString("utf8")).filter((e) => e.docxUrl);
 
