@@ -24,7 +24,9 @@ if (!htmlOut || !cookieOut) {
   process.exit(2);
 }
 
-const browser = await chromium.launch({ headless: true });
+// The plain headless shell is what the challenge is built to spot; the full
+// Chromium in (new) headless mode is a browser like any other.
+const browser = await chromium.launch({ headless: true, channel: "chromium" });
 try {
   const context = await browser.newContext({
     userAgent: BROWSER_HEADERS["User-Agent"],
@@ -35,7 +37,13 @@ try {
   await page.goto(VOTES_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
   // The challenge page reloads itself once the token is set; the real page
   // has the per-file notice blocks.
-  await page.waitForSelector("div.notice", { timeout: 90_000 });
+  try {
+    await page.waitForSelector("div.notice", { timeout: 90_000 });
+  } catch (err) {
+    const body = (await page.content()).replace(/\s+/g, " ");
+    console.error(`still no page after 90 s — url ${page.url()} — ${body.slice(0, 600)}`);
+    throw err;
+  }
   const html = await page.content();
   const cookies = await context.cookies("https://www.europarl.europa.eu/");
   const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
