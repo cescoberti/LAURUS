@@ -46,3 +46,14 @@ jobs:
 
       - name: Sync the part-session in progress
         run: npm run sync-live:ci --workspace @laurus/ingest -- ${{ inputs.session_start }}
+
+      # Tell followers what changed. The route fingerprints each followed file
+      # and only messages on a real change, so calling it every tick is free.
+      - name: Alert followers
+        if: always()
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://laurus-web-theta.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET not set — skipping alerts"; exit 0; fi
+          curl -sS -X POST "$SITE_URL/api/alerts/vl" -H "Authorization: Bearer $CRON_SECRET" -w "\nHTTP %{http_code}\n"

@@ -1,6 +1,7 @@
 import { TopNav } from "@/components/TopNav";
 import { ItemTabs } from "@/components/ItemTabs";
 import { RequestVerifiedVl } from "@/components/RequestVerifiedVl";
+import { FollowButton } from "@/components/FollowButton";
 import { CommitteeChip } from "@/components/badges";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { getItemByCode, getItemAmendments, getItemVotRequests } from "@/lib/data";
@@ -28,6 +29,13 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
     ? await supabase.from("users").select("languages").eq("id", user.id).single()
     : { data: null };
   const userLangs: string[] = profile?.languages?.length ? profile.languages : DEFAULT_LANGUAGES;
+
+  // Is this member following the file, and on which channels?
+  const { data: subs } =
+    user && item
+      ? await supabase.from("subscriptions").select("channel").eq("user_id", user.id).eq("scope", "item").eq("target_id", item.id)
+      : { data: null };
+  const followChannels = (subs ?? []).map((s) => s.channel as string);
 
   const reportEn = item?.documents.find((d) => d.type === "report" && d.language === "en");
   const reportIt = item?.documents.find((d) => d.type === "report" && d.language === "it");
@@ -73,8 +81,12 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           </div>
           </div>
 
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {item && user && (
+              <FollowButton itemId={item.id} code={code} following={followChannels.length > 0} channels={followChannels} />
+            )}
           {annotatedVlAvailable && (
-            <div className="flex shrink-0 flex-col items-end gap-2">
+            <>
               <RequestVerifiedVl code={code} lang={userLangs[0] ?? "it"} />
 
               {/* The instant file skips both verification passes, so it is
@@ -96,8 +108,9 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
                   ))}
                 </div>
               </details>
-            </div>
+            </>
           )}
+          </div>
         </div>
 
         <ItemTabs amendments={amendments} languages={languages} votRequests={votRequests} />
