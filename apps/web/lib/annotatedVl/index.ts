@@ -10,7 +10,7 @@ import streit from "./streit.json";
  * (M3), this map is replaced by a Supabase lookup of voting_list_rows.
  */
 const REGISTRY: Record<string, AnnotatedVotingList> = {
-  "A10-0170/2026": streit as AnnotatedVotingList,
+  "A10-0170/2026": { notes: [], ...(streit as Omit<AnnotatedVotingList, "notes">) },
 };
 
 export function getAnnotatedVl(code: string): AnnotatedVotingList | null {

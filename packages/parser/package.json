@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./amendments-docx": "./src/amendmentsDocx.ts",
     "./voting-list-docx": "./src/indicativeVotingList.ts",
-    "./vot-xml": "./src/votXml.ts"
+    "./vot-xml": "./src/votXml.ts",
+    "./report-docx": "./src/reportDocx.ts"
   },
   "scripts": {
     "build": "tsc -b",

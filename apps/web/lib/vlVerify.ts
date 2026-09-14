@@ -87,11 +87,18 @@ function short(s: string, max = 90): string {
 // Pass 1 — completeness against what LAURUS holds
 // ---------------------------------------------------------------------------
 
+/** Rows that vote on an amendment — "§" (original text) rows carry no number. */
+function amendmentRows(vl: AnnotatedVotingList) {
+  return vl.rows.filter((r) => /^\d+$/.test((r.amNo ?? "").trim()));
+}
+
 export function verifyCompleteness(
   vl: AnnotatedVotingList,
   amendments: DbAmendment[],
   vot: VotPayload | null,
   lang: string,
+  /** The list is the EP's own: what is not on it was taken off by the Tabling Service. */
+  official = false,
 ): VlCheck[] {
   const checks: VlCheck[] = [];
   const add = (id: string, label: string, issues: string[], okDetail: string) =>
@@ -103,7 +110,7 @@ export function verifyCompleteness(
       detail: issues.length ? issues.join(" · ") : okDetail,
     });
 
-  const amRows = vl.rows.filter((r) => r.amNo);
+  const amRows = amendmentRows(vl);
   const splitRows = vl.rows.filter((r) => r.voteType === "split");
   const separateRows = vl.rows.filter((r) => r.voteType === "separate");
 
@@ -111,14 +118,18 @@ export function verifyCompleteness(
   const expected = new Set<number>();
   for (const a of amendments) expected.add(a.number);
 
-  // 1. every ingested amendment is on the list
+  // 1. every ingested amendment is on the list — on an official list an
+  //    amendment that is not there was cancelled or withdrawn, which is
+  //    information, not a defect (the list's own notes usually say so).
   const present = new Set(amRows.map((r) => Number(r.amNo)));
   const missing = [...expected].filter((n) => !present.has(n)).sort((a, b) => a - b);
   add(
     "am-coverage",
-    "Every ingested amendment is on the list",
-    missing.length ? [`missing amendment ${missing.join(", ")}`] : [],
-    `${expected.size} amendments, all present`,
+    official ? "Ingested amendments not on the official list" : "Every ingested amendment is on the list",
+    missing.length && !official ? [`missing amendment ${missing.join(", ")}`] : [],
+    missing.length
+      ? `am ${missing.join(", ")} published but not on the EP's list (cancelled or withdrawn)`
+      : `${expected.size} amendments, all present`,
   );
 
   // 2. no duplicates
@@ -365,7 +376,7 @@ export async function verifyAgainstSource(
   }
 
   // --- 2b. Remarks, re-derived from the published amendment DOCX -----------
-  const amRows = vl.rows.filter((r) => r.amNo);
+  const amRows = amendmentRows(vl);
   if (amRows.length === 0) {
     checks.push({
       id: "am-source",
@@ -491,9 +502,10 @@ export async function verifyVotingList(
     vot: VotPayload | null;
     amendmentIndex?: string[] | null;
     onIndexFetched?: (identifiers: string[]) => void;
+    official?: boolean;
   },
 ): Promise<VlVerificationReport> {
-  const pass1 = verifyCompleteness(vl, ctx.amendments, ctx.vot, ctx.language);
+  const pass1 = verifyCompleteness(vl, ctx.amendments, ctx.vot, ctx.language, ctx.official ?? false);
 
   let pass2: VlCheck[];
   try {
@@ -523,7 +535,7 @@ export async function verifyVotingList(
     generatedAt: new Date().toISOString(),
     counts: {
       rows: vl.rows.length,
-      amendments: vl.rows.filter((r) => r.amNo).length,
+      amendments: amendmentRows(vl).length,
       splits: vl.rows.filter((r) => r.voteType === "split").length,
       separates: vl.rows.filter((r) => r.voteType === "separate").length,
       rollCallsExcluded: ctx.vot?.rollCalls?.length ?? 0,

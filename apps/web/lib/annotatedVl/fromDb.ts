@@ -136,5 +136,6 @@ export function buildVlFromAmendments(
     reportTitle: item.title.en || item.title.it || null,
     committee: item.committee ? (COMMITTEE_LABEL[item.committee] ?? item.committee) : null,
     rows,
+    notes: [],
   };
 }

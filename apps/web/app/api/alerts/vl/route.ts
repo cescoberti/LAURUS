@@ -13,7 +13,8 @@ export const runtime = "nodejs";
  *
  * Called by the live-sync workflow after every tick during a plenary week.
  * For each item follow (subscriptions, scope='item') the file's current
- * state is fingerprinted — amendment count + which VOT languages exist — and
+ * state is fingerprinted — amendment count, which VOT languages exist, the
+ * version of the EP's official voting list — and
  * a message goes out only when that fingerprint has not been announced to
  * that subscription before (vl_alerts). So: one message per real change,
  * none for the ticks where nothing happened.
@@ -28,14 +29,20 @@ interface ItemState {
   title: { en?: string; it?: string };
   am_count: number;
   votLangs: string[];
+  /** Version label of the latest official voting list, "" when none yet. */
+  vlVersion: string;
 }
 
-function describe(it: ItemState, previous: { am: number; vot: string[] } | null): string {
+function describe(it: ItemState, previous: { am: number; vot: string[]; vl: string } | null): string {
   const bits: string[] = [];
   if (!previous) {
+    if (it.vlVersion) bits.push(`official voting list published (${it.vlVersion})`);
     if (it.am_count > 0) bits.push(`${it.am_count} amendment${it.am_count === 1 ? "" : "s"} loaded`);
     if (it.votLangs.length) bits.push("split/separate requests loaded");
   } else {
+    if (it.vlVersion && it.vlVersion !== previous.vl) {
+      bits.push(previous.vl ? `new voting list version: ${it.vlVersion}` : `official voting list published (${it.vlVersion})`);
+    }
     if (it.am_count > previous.am) {
       const d = it.am_count - previous.am;
       bits.push(`${d} new amendment${d === 1 ? "" : "s"} (now ${it.am_count})`);
@@ -63,9 +70,10 @@ export async function POST(request: Request) {
   if (!subs?.length) return NextResponse.json({ followed: 0, sent: 0 });
 
   const itemIds = [...new Set(subs.map((s) => s.target_id as string))];
-  const [{ data: items }, { data: vots }, { data: users }] = await Promise.all([
+  const [{ data: items }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([
     admin.from("items").select("id, code, rapporteur, title, am_count").in("id", itemIds),
     admin.from("vot_requests").select("item_id, language").in("item_id", itemIds),
+    admin.from("voting_lists").select("item_id, version_label, fetched_at").in("item_id", itemIds).order("fetched_at", { ascending: false }),
     admin
       .from("users")
       .select("id, email, whatsapp_phone, wants_email, wants_whatsapp")
@@ -74,6 +82,8 @@ export async function POST(request: Request) {
 
   const votByItem = new Map<string, string[]>();
   for (const v of vots ?? []) votByItem.set(v.item_id as string, [...(votByItem.get(v.item_id as string) ?? []), v.language as string].sort());
+  const vlByItem = new Map<string, string>();
+  for (const v of vls ?? []) if (!vlByItem.has(v.item_id as string)) vlByItem.set(v.item_id as string, v.version_label as string);
   const stateById = new Map<string, ItemState>();
   for (const it of items ?? []) {
     stateById.set(it.id as string, {
@@ -83,6 +93,7 @@ export async function POST(request: Request) {
       title: (it.title as ItemState["title"]) ?? {},
       am_count: (it.am_count as number) ?? 0,
       votLangs: votByItem.get(it.id as string) ?? [],
+      vlVersion: vlByItem.get(it.id as string) ?? "",
     });
   }
   const userById = new Map((users ?? []).map((u) => [u.id as string, u]));
@@ -101,8 +112,8 @@ export async function POST(request: Request) {
     seen.add(`${k}|${a.fingerprint}`);
   }
   const parseFp = (fp: string) => {
-    const [am, vot] = fp.split(":");
-    return { am: Number(am ?? 0), vot: vot ? vot.split(",") : [] };
+    const [am, vot, vl] = fp.split(":");
+    return { am: Number(am ?? 0), vot: vot ? vot.split(",") : [], vl: vl ?? "" };
   };
 
   let sent = 0;
@@ -115,9 +126,9 @@ export async function POST(request: Request) {
     const u = userById.get(sub.user_id as string);
     if (!it || !u) continue;
     // Nothing to announce until there is something on the file.
-    if (it.am_count === 0 && it.votLangs.length === 0) continue;
+    if (it.am_count === 0 && it.votLangs.length === 0 && !it.vlVersion) continue;
 
-    const fingerprint = `${it.am_count}:${it.votLangs.join(",")}`;
+    const fingerprint = `${it.am_count}:${it.votLangs.join(",")}:${it.vlVersion}`;
     const key = `${sub.id}|${it.id}`;
     if (seen.has(`${key}|${fingerprint}`)) continue;
 

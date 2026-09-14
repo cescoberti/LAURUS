@@ -52,6 +52,12 @@ export interface AnnotatedVotingList {
   reportTitle: string | null;
   committee: string | null;
   rows: AnnotatedVlRow[];
+  /**
+   * Paragraphs printed under the table, verbatim: "Ams 2 and 14 were
+   * cancelled…", "Requests for roll-call votes", the per-group request lists.
+   * They are part of the list and are reproduced as they are.
+   */
+  notes: string[];
 }
 
 function cellText(html: string): string {
@@ -85,7 +91,8 @@ export async function parseIndicativeVotingList(
   const pre = tableStart >= 0 ? html.slice(0, tableStart) : html;
   const preText = cellText(pre.replace(/<\/p>/gi, " | "));
 
-  const version = /FINAL VERSION/i.test(pre) ? "FINAL VERSION" : /DRAFT/i.test(pre) ? "DRAFT" : null;
+  // "FINAL VERSION", "REVISED VERSION", … as printed; a LAURUS draft says so.
+  const version = /\b([A-Z]+ VERSION)\b/.exec(cellText(pre))?.[1] ?? (/DRAFT/i.test(pre) ? "DRAFT" : null);
 
   // Header, Tabling Service variant: "Report: STREIT (A10-0170/2026) [init.]".
   const reportLine = metaField(pre, "Report") ?? "";
@@ -114,7 +121,10 @@ export async function parseIndicativeVotingList(
     }
   }
 
-  const table = tableStart >= 0 ? /<table[\s\S]*?<\/table>/i.exec(html)?.[0] ?? "" : "";
+  const tableMatch = tableStart >= 0 ? /<table[\s\S]*?<\/table>/i.exec(html) : null;
+  const table = tableMatch?.[0] ?? "";
+  const post = tableMatch ? html.slice(tableMatch.index + table.length) : "";
+  const notes = [...post.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cellText(m[1] ?? "")).filter(Boolean);
   const rows: AnnotatedVlRow[] = [];
   let current: AnnotatedVlRow | null = null;
   let lastSubject = "";
@@ -178,5 +188,6 @@ export async function parseIndicativeVotingList(
     reportTitle: titleMatch?.[1]?.trim() || null,
     committee,
     rows,
+    notes,
   };
 }

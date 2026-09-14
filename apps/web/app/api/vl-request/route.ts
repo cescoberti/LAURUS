@@ -114,6 +114,22 @@ export async function POST(request: Request) {
           : "every split part carries the literal text it votes on",
       };
 
+      // When the EP's own list was used, say so, and how the Remarks fill went:
+      // every row it could not fill is a row the advisor must look at.
+      const officialCheck: VlCheck | null = loaded.official
+        ? {
+            id: "official-list",
+            pass: 2,
+            label: `Built on the EP's list (${loaded.official.versionLabel})`,
+            status: loaded.official.fill.anomalies.length ? "issue" : "ok",
+            detail: [
+              `${loaded.official.fill.filled}/${loaded.official.fill.candidates} Remarks filled`,
+              loaded.official.motionRead ? "original text taken from the report" : "the report text could not be read — original-text rows left empty",
+              ...loaded.official.fill.anomalies.map((a) => `${a.subject}${a.amNo ? ` (am ${a.amNo})` : ""}: ${a.reason.replace(/_/g, " ")}`),
+            ].join(" · "),
+          }
+        : null;
+
       const fingerprint = votingListFingerprint(loaded.vl);
       const voteDate = loaded.item?.vote_date ?? null;
       // The VOT and the published amendments stop changing once the vote is
@@ -159,6 +175,7 @@ export async function POST(request: Request) {
           language: lang,
           amendments: loaded.amendments,
           vot: loaded.vot,
+          official: loaded.official !== null,
           amendmentIndex: indexFresh,
           onIndexFetched: (ids) => {
             freshIndex = ids;
@@ -167,6 +184,7 @@ export async function POST(request: Request) {
         // The expansion outcome is part of the report: an unexpanded split row
         // (official notation kept) must be flagged, not passed off as clean.
         report.checks.push(expansionCheck);
+        if (officialCheck) report.checks.push(officialCheck);
         report.verified = report.checks.every((c) => c.status === "ok");
 
         if (freshIndex) {

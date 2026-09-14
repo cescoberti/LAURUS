@@ -125,3 +125,22 @@ export async function getItemByCode(code: string): Promise<ItemRow | null> {
     .maybeSingle();
   return (data as ItemRow) ?? null;
 }
+
+export interface OfficialVlRow {
+  version_label: string;
+  source_url: string;
+  fetched_at: string;
+}
+
+/** The latest official Tabling Service list the live sync stored for an item. */
+export async function getItemOfficialVl(itemId: string): Promise<OfficialVlRow | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("voting_lists")
+    .select("version_label, source_url, fetched_at")
+    .eq("item_id", itemId)
+    .order("fetched_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as OfficialVlRow | null) ?? null;
+}

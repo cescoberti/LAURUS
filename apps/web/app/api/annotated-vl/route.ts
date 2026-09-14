@@ -45,10 +45,15 @@ export async function GET(request: Request) {
   if (!loaded) return NextResponse.json({ error: "no amendments ingested for this item yet" }, { status: 404 });
   const { vl } = loaded;
 
-  // This is the UNVERIFIED draft route — the verified list goes out by email
-  // from /api/vl-request after both verification passes.
+  // This is the UNVERIFIED route — the verified list goes out by email from
+  // /api/vl-request after both verification passes. On the EP's own list the
+  // header keeps the EP's version label, so the file name carries the caveat;
+  // a list LAURUS built itself is a draft and is named as one.
   const buffer = await renderAnnotatedVlDocx(vl);
-  const filename = `annotated-vl-DRAFT-${(vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}-${lang.toUpperCase()}.docx`;
+  const who = (vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-");
+  const filename = loaded.official
+    ? `VL-${who}-${lang.toUpperCase()}-unverified.docx`
+    : `annotated-vl-DRAFT-${who}-${lang.toUpperCase()}.docx`;
   void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang } });
 
   return new NextResponse(new Uint8Array(buffer), {

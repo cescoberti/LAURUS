@@ -4,7 +4,7 @@ import { RequestVerifiedVl } from "@/components/RequestVerifiedVl";
 import { FollowButton } from "@/components/FollowButton";
 import { CommitteeChip } from "@/components/badges";
 import { rapporteurLabel } from "@/lib/rapporteur";
-import { getItemByCode, getItemAmendments, getItemVotRequests } from "@/lib/data";
+import { getItemByCode, getItemAmendments, getItemVotRequests, getItemOfficialVl } from "@/lib/data";
 import { hasAnnotatedVl } from "@/lib/annotatedVl";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_LANGUAGES } from "@/lib/languages";
@@ -19,6 +19,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
     ? await getItemAmendments(item.id)
     : { amendments: [], languages: [] };
   const votRequests = item ? await getItemVotRequests(item.id) : {};
+  const officialVl = item ? await getItemOfficialVl(item.id) : null;
 
   // The member's working languages drive which VL downloads are offered.
   const supabase = await createClient();
@@ -39,8 +40,9 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
 
   const reportEn = item?.documents.find((d) => d.type === "report" && d.language === "en");
   const reportIt = item?.documents.find((d) => d.type === "report" && d.language === "it");
-  // Real amendments in DB → VL generated from EP data; else static registry.
-  const annotatedVlAvailable = amendments.length > 0 || hasAnnotatedVl(code);
+  // The EP's own list, or real amendments in DB → VL generated from EP data;
+  // else static registry.
+  const annotatedVlAvailable = officialVl !== null || amendments.length > 0 || hasAnnotatedVl(code);
 
   return (
     <div className="min-h-screen">
@@ -60,7 +62,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
             {item?.committee && <CommitteeChip code={item.committee} />}
             {item?.vote_date && (
               <span>
-                Voted{" "}
+                {item.vote_date >= new Date().toISOString().slice(0, 10) ? "Vote on" : "Voted"}{" "}
                 {new Date(`${item.vote_date}T12:00:00Z`).toLocaleDateString("en-GB", {
                   day: "numeric",
                   month: "long",
@@ -79,6 +81,23 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
               </a>
             )}
           </div>
+          {/* Where the list comes from: the EP's own, with its version, or
+              a LAURUS draft until the EP publishes one. */}
+          <p className="mt-2 text-xs text-ink-500">
+            {officialVl ? (
+              <>
+                <span className="font-semibold text-laurel-800">Official voting list · {officialVl.version_label}</span>
+                {" · "}
+                <a href={officialVl.source_url} target="_blank" rel="noreferrer" className="text-laurel-600 hover:underline">
+                  EP source
+                </a>
+                {" · fetched "}
+                {new Date(officialVl.fetched_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </>
+            ) : amendments.length > 0 ? (
+              <span>No official voting list from the EP yet — the download is a LAURUS draft built from the amendments.</span>
+            ) : null}
+          </p>
           </div>
 
           <div className="flex shrink-0 flex-col items-end gap-2">

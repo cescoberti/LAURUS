@@ -1,4 +1,5 @@
 import type { AnnotatedVotingList, AnnotatedVlRow } from "@laurus/parser/voting-list-docx";
+import { originalTextFor, type MotionText } from "@laurus/parser/report-docx";
 import { remarksFor } from "@laurus/parser";
 
 /**
@@ -11,6 +12,9 @@ import { remarksFor } from "@laurus/parser";
  *   - a row with split parts gets the full amendment text on the parent row —
  *     the per-part boundaries are a human call (the VOT split requests only
  *     exist after the deadline), so parts are left for the advisor;
+ *   - a row voting on the report's own text ("§ 2 | § | original text") gets
+ *     that paragraph from the motion for a resolution in the list's language,
+ *     when the motion text is supplied;
  *   - anything unresolved is reported as an anomaly, not guessed.
  */
 
@@ -24,7 +28,16 @@ export interface AmendmentText {
 export interface FillReport {
   filled: number;
   candidates: number;
-  anomalies: Array<{ subject: string; amNo: string | null; reason: "not_found" | "no_text" | "oral" | "withdrawn" | "compromise_cam" }>;
+  anomalies: Array<{
+    subject: string;
+    amNo: string | null;
+    reason: "not_found" | "no_text" | "oral" | "withdrawn" | "compromise_cam" | "original_text_not_found";
+  }>;
+}
+
+/** "§ | original text" rows: a vote on the report's own paragraph, no amendment. */
+function isOriginalTextRow(row: AnnotatedVlRow): boolean {
+  return /^original text$/i.test((row.author ?? "").trim()) || (row.amNo ?? "").trim() === "§";
 }
 
 function amendmentNumber(row: AnnotatedVlRow): number | null {
@@ -35,13 +48,28 @@ function amendmentNumber(row: AnnotatedVlRow): number | null {
 export function fillRemarks(
   vl: AnnotatedVotingList,
   amendments: Map<number, AmendmentText>,
+  motion: MotionText | null = null,
 ): { vl: AnnotatedVotingList; report: FillReport } {
   const report: FillReport = { filled: 0, candidates: 0, anomalies: [] };
 
   const rows = vl.rows.map((row): AnnotatedVlRow => {
     if (row.isFinalVote) return row;
+
+    if (isOriginalTextRow(row)) {
+      if (!motion) return row;
+      report.candidates++;
+      if (row.remarks.trim()) return row;
+      const text = originalTextFor(row.subject, motion);
+      if (!text) {
+        report.anomalies.push({ subject: row.subject, amNo: row.amNo, reason: "original_text_not_found" });
+        return row;
+      }
+      report.filled++;
+      return { ...row, remarks: text };
+    }
+
     const n = amendmentNumber(row);
-    if (n === null) return row; // §/recital votes carry no amendment text
+    if (n === null) return row; // nothing to quote for a row without an amendment
     report.candidates++;
 
     if (row.remarks.trim()) return row; // advisor already wrote something — keep it

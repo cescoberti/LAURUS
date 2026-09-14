@@ -20,7 +20,12 @@
  *   4. VOT       the sitting days' results-of-votes XML (404 until the votes
  *                happen) → vot_requests; an item found in day D's VOT gets
  *                vote_date = D if it had none
- *   5. vote_count refreshed so the board and whip page show the session
+ *   5. voting lists  the official Tabling Service lists on "Order and lists
+ *                of votes" → voting_lists (append-only, one row per distinct
+ *                file); a new version label is fetched at once, an unchanged
+ *                one re-checked (conditional GET) at most hourly; the page's
+ *                sitting day fills vote_date ahead of the vote
+ *   6. vote_count refreshed so the board and whip page show the session
  *
  * Everything is idempotent: re-running is the normal mode of operation.
  */
@@ -29,6 +34,8 @@ import { parseVotXml } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
+import { createHash } from "node:crypto";
+import { parseVotesPage, BROWSER_HEADERS, VOTES_PAGE_URL } from "./votesPage.ts";
 import {
   BASE,
   makeAdminClient,
@@ -444,6 +451,94 @@ async function syncVot(s: Session, days: string[]): Promise<{ files: number; row
 }
 
 // ---------------------------------------------------------------------------
+// 5. Official voting lists from "Order and lists of votes"
+// ---------------------------------------------------------------------------
+
+const RECHECK_MS = 60 * 60 * 1000;
+
+async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: number; unchanged: number }> {
+  const page = await fetchBytes(VOTES_PAGE_URL, 5, BROWSER_HEADERS);
+  if (page.status !== 200) throw new Error(`votes page HTTP ${page.status}`);
+  const entries = parseVotesPage(page.body.toString("utf8")).filter((e) => e.docxUrl);
+
+  const { data: items } = await supabase.from("items").select("id, code, vote_date").eq("session_id", s.id);
+  const byCode = new Map((items ?? []).map((i) => [i.code as string, i]));
+  const resolve = (code: string) =>
+    byCode.get(code) ?? (code.includes("/") ? undefined : (items ?? []).find((i) => (i.code as string).startsWith(`${code}/`)));
+
+  const { data: stored } = await supabase
+    .from("voting_lists")
+    .select("item_id, version_label, sha256, etag, checked_at, fetched_at")
+    .in("item_id", (items ?? []).map((i) => i.id as string))
+    .order("fetched_at", { ascending: false });
+  const latest = new Map<string, { version_label: string; sha256: string; etag: string | null; checked_at: string }>();
+  for (const r of stored ?? []) if (!latest.has(r.item_id as string)) latest.set(r.item_id as string, r as never);
+
+  let listed = 0;
+  let fetched = 0;
+  let unchanged = 0;
+  for (const e of entries) {
+    const item = resolve(e.code);
+    if (!item) continue; // a file this session does not track (e.g. a C document)
+    listed++;
+
+    if (e.day && !item.vote_date) {
+      await supabase.from("items").update({ vote_date: e.day }).eq("id", item.id);
+      (item as { vote_date: string | null }).vote_date = e.day;
+    }
+
+    const have = latest.get(item.id as string);
+    const label = e.versionLabel ?? "unknown";
+    const sameLabel = have?.version_label === label;
+    if (sameLabel && Date.now() - Date.parse(have!.checked_at) < RECHECK_MS) continue;
+
+    // Same label as last time → ask the EP whether the file changed at all.
+    const headers = sameLabel && have?.etag ? { ...BROWSER_HEADERS, "If-None-Match": have.etag } : BROWSER_HEADERS;
+    let res;
+    try {
+      res = await fetchBytes(e.docxUrl!, 5, headers);
+    } catch (err) {
+      console.warn(`  vl ${e.code}: ${(err as Error).message}`);
+      continue;
+    }
+    if (res.status === 304) {
+      await supabase.from("voting_lists").update({ checked_at: new Date().toISOString() }).eq("item_id", item.id).eq("sha256", have!.sha256);
+      unchanged++;
+      await sleep(300);
+      continue;
+    }
+    if (res.status !== 200 || res.body.length < 4 || res.body[0] !== 0x50 || res.body[1] !== 0x4b) {
+      console.warn(`  vl ${e.code}: HTTP ${res.status} (${res.body.length} B) — not a DOCX, skipped this tick`);
+      await sleep(1000);
+      continue;
+    }
+    const sha256 = createHash("sha256").update(res.body).digest("hex");
+    if (have?.sha256 === sha256) {
+      await supabase.from("voting_lists").update({ checked_at: new Date().toISOString(), version_label: label }).eq("item_id", item.id).eq("sha256", sha256);
+      unchanged++;
+    } else {
+      const { error } = await supabase.from("voting_lists").insert({
+        item_id: item.id,
+        version_label: label,
+        source_url: e.docxUrl,
+        sha256,
+        byte_size: res.body.length,
+        docx: `\\x${res.body.toString("hex")}`,
+        etag: res.etag ?? null,
+        last_modified: res.lastModified ?? null,
+      });
+      if (error) console.warn(`  vl ${e.code}: insert failed — ${error.message}`);
+      else {
+        fetched++;
+        console.log(`  vl ${e.code} ${label}: ${res.body.length} B`);
+      }
+    }
+    await sleep(600);
+  }
+  return { listed, fetched, unchanged };
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -462,7 +557,7 @@ async function main() {
     .select("id")
     .single();
 
-  // The four stages are independent: the EP API failing on one (504s under
+  // The stages are independent: the EP API failing on one (504s under
   // load are routine) must not stop the others, and must not fail the run —
   // a failed scheduled run emails the repo owner, every five minutes. A stage
   // that could not run is logged, recorded on the run, and retried next tick.
@@ -491,6 +586,9 @@ async function main() {
   const vot = await stage("vot", () => syncVot(s, days), { files: 0, rows: 0 });
   console.log(`vot: ${vot.files} file(s), ${vot.rows} item rows`);
 
+  const vls = await stage("voting lists", () => syncVotingLists(s), { listed: 0, fetched: 0, unchanged: 0 });
+  console.log(`voting lists: ${vls.listed} on the page, ${vls.fetched} new file(s), ${vls.unchanged} re-checked unchanged`);
+
   const { count } = await supabase.from("items").select("id", { count: "exact", head: true }).eq("session_id", s.id);
   await supabase.from("sessions").update({ vote_count: count ?? 0 }).eq("id", s.id);
 
@@ -502,7 +600,7 @@ async function main() {
         status: "ok",
         finished_at: new Date().toISOString(),
         error: errors.length ? errors.join(" | ") : null,
-        found: { new_files: newFiles, reconciled: rec.merged.length, unmatched: rec.unmatched.length, ...am, vot },
+        found: { new_files: newFiles, reconciled: rec.merged.length, unmatched: rec.unmatched.length, ...am, vot, voting_lists: vls },
       })
       .eq("id", run.id);
   }

@@ -182,6 +182,15 @@ export async function renderAnnotatedVlDocx(vl: AnnotatedVotingList): Promise<Bu
             ],
           }),
           table,
+          // Whatever the Tabling Service printed under the table — cancelled
+          // amendments, roll-call and separate-vote requests — verbatim.
+          ...vl.notes.map(
+            (n, i) =>
+              new Paragraph({
+                spacing: { before: i === 0 ? 200 : 60 },
+                children: [new TextRun({ text: n, size: 18, color: "000000" })],
+              }),
+          ),
           new Paragraph({
             spacing: { before: 200 },
             alignment: AlignmentType.RIGHT,
