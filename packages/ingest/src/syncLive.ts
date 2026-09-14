@@ -253,6 +253,8 @@ async function reconcilePlaceholders(s: Session): Promise<{ merged: string[]; un
       patch.note_submitted_at = p.note_submitted_at;
     }
     await supabase.from("items").update(patch).eq("id", target.id);
+    // Whoever followed the placeholder follows the real file from now on.
+    await supabase.from("subscriptions").update({ target_id: target.id }).eq("scope", "item").eq("target_id", p.id);
     await supabase.from("items").delete().eq("id", p.id);
     merged.push(`${p.code} → ${target.code}`);
   }

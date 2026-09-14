@@ -231,6 +231,17 @@ function cutParts(
     warning: { code, detail },
   });
 
+  if (langParts.length === 0) {
+    // Before the vote only the English request exists (the list's own notes):
+    // the literal English cut is the honest rendering; the translated paragraph
+    // stays on the parent row.
+    return {
+      parts: [
+        { main: firstEnText, en: null, warning: { code: "VERSIONE_TRADOTTA_ASSENTE", detail: "no translated request yet (pre-vote) — parts shown in English" } },
+        ...quotesEn.map((q) => ({ main: q, en: null })),
+      ],
+    };
+  }
   if (!langSubject || !langQuotes) {
     return {
       parts: enParts.map((_, i) =>

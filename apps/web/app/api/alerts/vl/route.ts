@@ -63,11 +63,46 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const { data: subs } = await admin
+  const { data: itemSubs } = await admin
     .from("subscriptions")
     .select("id, user_id, target_id, channel")
     .eq("scope", "item");
-  if (!subs?.length) return NextResponse.json({ followed: 0, sent: 0 });
+
+  // A committee follow ("every ECON file") is every file of that committee in
+  // the part-session in progress — or the next one, so the week before a
+  // plenary is covered too. Expanded here into (subscription, item) pairs;
+  // the send receipt is per pair, exactly as for a file follow.
+  const { data: committeeSubs } = await admin
+    .from("subscriptions")
+    .select("id, user_id, target_id, channel")
+    .eq("scope", "committee");
+  const subs: Array<{ id: string; user_id: string; target_id: string; channel: string }> = [
+    ...((itemSubs ?? []) as Array<{ id: string; user_id: string; target_id: string; channel: string }>),
+  ];
+  if (committeeSubs?.length) {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: session } = await admin
+      .from("sessions")
+      .select("id")
+      .gte("end_date", today)
+      .order("start_date")
+      .limit(1)
+      .maybeSingle();
+    if (session) {
+      const { data: sessionItems } = await admin
+        .from("items")
+        .select("id, committee, committees")
+        .eq("session_id", session.id);
+      for (const cs of committeeSubs) {
+        const code = (cs.target_id as string).toUpperCase();
+        for (const it of sessionItems ?? []) {
+          const cmtes = [it.committee, ...((it.committees as string[] | null) ?? [])].filter(Boolean) as string[];
+          if (cmtes.includes(code)) subs.push({ id: cs.id as string, user_id: cs.user_id as string, target_id: it.id as string, channel: cs.channel as string });
+        }
+      }
+    }
+  }
+  if (!subs.length) return NextResponse.json({ followed: 0, sent: 0 });
 
   const itemIds = [...new Set(subs.map((s) => s.target_id as string))];
   const [{ data: items }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([

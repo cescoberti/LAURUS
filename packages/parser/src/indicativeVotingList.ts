@@ -191,3 +191,50 @@ export async function parseIndicativeVotingList(
     notes,
   };
 }
+
+export interface SplitRequest {
+  group: string;
+  subject: string;
+  parts: Array<{ section: string; text: string }>;
+}
+
+/**
+ * The split-vote requests printed under the list, in the shape the VOT gives
+ * them after the vote — so the same expansion code serves before the vote:
+ *
+ *   Requests for split votes
+ *   EPP
+ *   § 54
+ *   1st part: Text as a whole excluding the words “of all kinds”
+ *   2nd part: These words
+ *
+ * A group line opens a block, a subject line ("§ 54", "Am 3", "Recital C")
+ * opens a request, "Nth part: …" lines are its parts. Ends at the next
+ * "Requests for …" heading.
+ */
+export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
+  const out: SplitRequest[] = [];
+  const start = notes.findIndex((n) => /^requests? for split votes?/i.test(n.trim()));
+  if (start < 0) return out;
+  let group = "";
+  let current: SplitRequest | null = null;
+  for (const raw of notes.slice(start + 1)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^requests? for /i.test(line)) break;
+    const part = /^(\d+)(?:st|nd|rd|th)\s+part\s*:\s*(.*)$/i.exec(line);
+    if (part && current) {
+      current.parts.push({ section: part[1]!, text: part[2]!.trim() });
+      continue;
+    }
+    if (/^(§|am\b|ams?\.?\s*\d|amendment|recital|citation|paragraph)/i.test(line)) {
+      current = { group, subject: line, parts: [] };
+      out.push(current);
+      continue;
+    }
+    // Anything else is the tabling group's name (may end with a colon).
+    group = line.replace(/:$/, "").trim();
+    current = null;
+  }
+  return out.filter((r) => r.parts.length > 0);
+}
