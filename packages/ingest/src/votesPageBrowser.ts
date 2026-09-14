@@ -46,7 +46,7 @@ try {
     console.error(`still on the challenge after 90 s — url ${page.url()} — ${body.slice(0, 400)}`);
     throw err;
   }
-  await page.waitForSelector("div.notice", { timeout: 20_000 }).catch(() => {
+  await page.waitForSelector("div.notice", { state: "attached", timeout: 20_000 }).catch(() => {
     console.warn("page loaded but no notice blocks found — outside a plenary week, or the markup changed");
   });
   const html = await page.content();
