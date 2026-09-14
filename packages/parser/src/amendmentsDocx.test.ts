@@ -43,6 +43,40 @@ test("never fabricates: header labels are not emitted as content", async () => {
   }
 });
 
+// Committee amendment block (no <Amend> tokens): A10-0230/2026, ENVI,
+// "AMENDMENTS 001-006 by the Committee". Captured 2026-09-14 from
+// distribution/reds_iPlRp_Amd.
+
+test("parses a committee amendment block by paragraph style", async () => {
+  const ams = await parseAmendmentsDocx(fixture("am-A-10-2026-0230-AM-001-006-en.docx"), "en");
+
+  assert.deepEqual(ams.map((a) => a.number), [1, 2, 3, 4, 5, 6]);
+  for (const a of ams) assert.equal(a.tabledBy, "Committee on the Environment, Climate and Food Safety");
+
+  const first = ams[0];
+  assert.equal(first.target, "Citation 5");
+  assert.match(first.originalText ?? "", /^Having regard to the opinion of the Committee of the Regions/);
+  assert.equal(first.amendedText, "After consulting the Committee of the Regions,");
+  // Footnotes below the underscore separator are not amendment text.
+  assert.doesNotMatch(first.originalText ?? "", /OJ C/);
+  assert.doesNotMatch(first.originalText ?? "", /_____/);
+
+  // Multi-level target: amending act + amended act, one line each.
+  const fifth = ams[4];
+  assert.equal(fifth.target, "Article 1 – paragraph 1 – Decision (EU) 2015/1814 – Article 5 – paragraph 2");
+  assert.equal(fifth.amendedText, "deleted");
+});
+
+test("a consolidated-text block yields its single amendment with the full body", async () => {
+  const ams = await parseAmendmentsDocx(fixture("am-A-10-2026-0197-AM-001-001-en.docx"), "en");
+  assert.equal(ams.length, 1);
+  assert.equal(ams[0].number, 1);
+  assert.equal(ams[0].tabledBy, "Committee on Industry, Research and Energy");
+  assert.match(ams[0].amendedText ?? "", /^Proposal for a COUNCIL REGULATION/);
+  assert.match(ams[0].amendedText ?? "", /HAS ADOPTED THIS REGULATION/);
+  assert.ok(!ams[0].originalText);
+});
+
 test("consolidates EN + IT of the same report by amendment number", async () => {
   const [en, it] = await Promise.all([
     parseAmendmentsDocx(fixture("rep-A-10-2026-0064-en.docx"), "en"),

@@ -8,3 +8,4 @@ export * from "./votingList.ts";
 export * from "./consolidate.ts";
 export * from "./splitSeparate.ts";
 export * from "./remarksDiff.ts";
+export * from "./epUrls.ts";

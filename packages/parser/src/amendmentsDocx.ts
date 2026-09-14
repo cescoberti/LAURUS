@@ -25,10 +25,26 @@ import type { ParsedAmendment } from "./types.ts";
  * appear as a left cell with an empty right cell; insertions as the reverse.
  * We keep the columns verbatim: left → originalText, right → amendedText.
  *
+ * Committee amendment blocks ("AMENDMENTS 001-084 by the Committee on …", the
+ * committee's own text re-tabled for plenary) come from a different template
+ * with NO `<Amend>`/`<NumAm>` tokens: the amendment number is a paragraph in
+ * the `AmNumberTabs` style ("Amendment<tab>12"), the document context one in
+ * `NormalBold12b`, the target a plain paragraph (or several), then the same
+ * two-column table. Mammoth drops paragraph styles unless asked, so those two
+ * are mapped to classes and drive the fallback parse. A block whose single
+ * amendment is a consolidated text has no table at all: its body paragraphs
+ * are the amended text.
+ *
  * Deterministic and text-faithful: it extracts what the document contains and
  * never invents or paraphrases. Validated against real fixtures under
  * packages/parser/fixtures/.
  */
+
+const STYLE_MAP = [
+  "p[style-name='AmNumberTabs'] => p.am-number:fresh",
+  "p[style-name='AMNumberTabs0'] => p.am-number:fresh",
+  "p[style-name='NormalBold12b'] => p.am-doc:fresh",
+];
 
 // Template tokens arrive HTML-escaped in mammoth's output (`&lt;NumAm&gt;`).
 const NUM_AM_RE = /&lt;NumAm&gt;\s*([0-9]+\s*[a-z]?)\s*&lt;\/NumAm&gt;/i;
@@ -113,19 +129,70 @@ function classifyKind(numAm: string, header: string): ParsedAmendment["kind"] {
   return "standard";
 }
 
-/**
- * Parse all amendments from one report DOCX.
- *
- * @param buffer   the .docx bytes (Node Buffer / Uint8Array / ArrayBuffer)
- * @param language ISO 639-1 code the file is in (stored on each amendment)
- */
-export async function parseAmendmentsDocx(
-  buffer: Buffer | Uint8Array | ArrayBuffer,
-  language: string,
-): Promise<ParsedAmendment[]> {
-  const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
-  const { value: html } = await mammoth.convertToHtml({ buffer: buf });
+interface Columns {
+  headerText: string;
+  originalText?: string;
+  amendedText?: string;
+  originalRich?: string;
+  amendedRich?: string;
+}
 
+/** The two columns of a block's amendment table, header row detected and skipped. */
+function columnsOf(block: string): Columns {
+  const rows = firstTableRows(block);
+  // Row 0 is the colspan spacer, row 1 the language-specific header; content
+  // starts at row 2. Guard for templates without the spacer row.
+  let headerText = "";
+  let contentStart = 0;
+  for (let i = 0; i < rows.length && i < 3; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const [l, r] = row;
+    const lt = textOf(l.html);
+    const rt = r ? textOf(r.html) : "";
+    // A header row has short labels in BOTH columns and no long body text.
+    if (rt && lt && lt.length < 60 && rt.length < 40 && contentStart === i) {
+      headerText = `${lt} | ${rt}`;
+      contentStart = i + 1;
+    } else if (!lt && !rt && contentStart === i) {
+      contentStart = i + 1; // spacer row
+    }
+  }
+
+  const originalParts: string[] = [];
+  const amendedParts: string[] = [];
+  const originalRichParts: string[] = [];
+  const amendedRichParts: string[] = [];
+  for (let i = contentStart; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const [l, r] = row;
+    const lt = textOf(l.html);
+    const rt = r ? textOf(r.html) : "";
+    // A row of underscores is the footnote separator: what follows are the
+    // footnotes, not amendment text.
+    if (/^_{5,}$/.test(lt) && (!rt || /^_{5,}$/.test(rt))) break;
+    if (lt) {
+      originalParts.push(lt);
+      originalRichParts.push(richTextOf(l.html));
+    }
+    if (rt) {
+      amendedParts.push(rt);
+      amendedRichParts.push(richTextOf(r!.html));
+    }
+  }
+
+  return {
+    headerText,
+    originalText: originalParts.join("\n") || undefined,
+    amendedText: amendedParts.join("\n") || undefined,
+    originalRich: originalRichParts.join("\n") || undefined,
+    amendedRich: amendedRichParts.join("\n") || undefined,
+  };
+}
+
+/** Plenary/report template: one `<Amend>` token block per amendment. */
+function parseTokenBlocks(html: string, language: string): ParsedAmendment[] {
   const out: ParsedAmendment[] = [];
   for (const block of amendBlocks(html)) {
     const numMatch = NUM_AM_RE.exec(block);
@@ -142,58 +209,94 @@ export async function parseAmendmentsDocx(
     const members = MEMBERS_RE.exec(block)?.[1]?.trim();
     const docAmend = group || (members ? textOf(members) : undefined) || DOC_AMEND_RE.exec(block)?.[1]?.trim();
 
-    const rows = firstTableRows(block);
-    // Row 0 is the colspan spacer, row 1 the language-specific header; content
-    // starts at row 2. Guard for templates without the spacer row.
-    let headerText = "";
-    let contentStart = 0;
-    for (let i = 0; i < rows.length && i < 3; i++) {
-      const row = rows[i];
-      if (!row) continue;
-      const [l, r] = row;
-      const lt = textOf(l.html);
-      const rt = r ? textOf(r.html) : "";
-      // A header row has short labels in BOTH columns and no long body text.
-      if (rt && lt && lt.length < 60 && rt.length < 40 && contentStart === i) {
-        headerText = `${lt} | ${rt}`;
-        contentStart = i + 1;
-      } else if (!lt && !rt && contentStart === i) {
-        contentStart = i + 1; // spacer row
-      }
-    }
-
-    const originalParts: string[] = [];
-    const amendedParts: string[] = [];
-    const originalRichParts: string[] = [];
-    const amendedRichParts: string[] = [];
-    for (let i = contentStart; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row) continue;
-      const [l, r] = row;
-      const lt = textOf(l.html);
-      const rt = r ? textOf(r.html) : "";
-      if (lt) {
-        originalParts.push(lt);
-        originalRichParts.push(richTextOf(l.html));
-      }
-      if (rt) {
-        amendedParts.push(rt);
-        amendedRichParts.push(richTextOf(r!.html));
-      }
-    }
-
+    const { headerText, ...columns } = columnsOf(block);
     out.push({
       number,
       language,
       kind: classifyKind(rawNum, headerText),
       target: target || undefined,
       tabledBy: docAmend || undefined,
-      originalText: originalParts.join("\n") || undefined,
-      amendedText: amendedParts.join("\n") || undefined,
-      originalRich: originalRichParts.join("\n") || undefined,
-      amendedRich: amendedRichParts.join("\n") || undefined,
+      ...columns,
     });
   }
-
   return out;
+}
+
+const COMMITTEE_RE = /&lt;Committee&gt;([\s\S]*?)&lt;\/Committee&gt;/i;
+const AM_NUMBER_P = /<p class="am-number">/i;
+const AM_DOC_P_RE = /<p class="am-doc">([\s\S]*?)<\/p>/i;
+
+/**
+ * Committee template: no tokens; the number paragraph (style `AmNumberTabs`,
+ * mapped to `p.am-number`) opens each amendment. The tabling author is the
+ * committee named in the preamble, the same for every amendment of the block.
+ */
+function parseCommitteeBlocks(html: string, language: string): ParsedAmendment[] {
+  // Now and then a number paragraph lost its style in the EP's editing (one in
+  // 291 for A10-0039/2026). It is still "<word> <number>" right before the
+  // document-context paragraph, which nothing else in the block is.
+  const repaired = html.replace(/<p>([\s\S]{0,80}?)<\/p>(?=<p class="am-doc">)/gi, (m, inner: string) =>
+    /^\S+\s+\d+$/.test(textOf(inner)) ? `<p class="am-number">${inner}</p>` : m,
+  );
+  const parts = repaired.split(AM_NUMBER_P);
+  const preamble = parts[0] ?? "";
+  const committee = COMMITTEE_RE.exec(preamble)?.[1];
+  const tabledBy = committee ? textOf(committee) || undefined : undefined;
+
+  const out: ParsedAmendment[] = [];
+  for (const block of parts.slice(1)) {
+    const numberPara = /^([\s\S]*?)<\/p>/.exec(block)?.[1] ?? "";
+    const number = parseInt(/(\d+)\s*$/.exec(textOf(numberPara))?.[1] ?? "", 10);
+    if (!Number.isFinite(number)) continue;
+    const rest = block.slice(numberPara.length + 4);
+
+    const docEnd = AM_DOC_P_RE.exec(rest);
+    const afterDoc = docEnd ? rest.slice(docEnd.index + docEnd[0].length) : rest;
+    const tableAt = afterDoc.search(/<table/i);
+
+    if (tableAt < 0) {
+      // A consolidated-text amendment: no columns, the whole body is the text.
+      const body = textOf(afterDoc);
+      if (!body) continue;
+      out.push({ number, language, kind: "standard", tabledBy, amendedText: body, amendedRich: richTextOf(afterDoc) });
+      continue;
+    }
+
+    // The target is whatever plain paragraphs sit between the document
+    // context and the table — one line per level ("Article 1 – paragraph 1",
+    // "Decision (EU) 2015/1814", "Article 5 – paragraph 2").
+    const target = [...afterDoc.slice(0, tableAt).matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+      .map((m) => textOf(m[1] ?? ""))
+      .filter(Boolean)
+      .join(" – ");
+
+    const { headerText, ...columns } = columnsOf(afterDoc.slice(tableAt));
+    out.push({
+      number,
+      language,
+      kind: classifyKind(String(number), headerText),
+      target: target || undefined,
+      tabledBy,
+      ...columns,
+    });
+  }
+  return out;
+}
+
+/**
+ * Parse all amendments from one report or amendment-block DOCX.
+ *
+ * @param buffer   the .docx bytes (Node Buffer / Uint8Array / ArrayBuffer)
+ * @param language ISO 639-1 code the file is in (stored on each amendment)
+ */
+export async function parseAmendmentsDocx(
+  buffer: Buffer | Uint8Array | ArrayBuffer,
+  language: string,
+): Promise<ParsedAmendment[]> {
+  const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
+  const { value: html } = await mammoth.convertToHtml({ buffer: buf }, { styleMap: STYLE_MAP });
+
+  const fromTokens = parseTokenBlocks(html, language);
+  if (fromTokens.length) return fromTokens;
+  return parseCommitteeBlocks(html, language);
 }

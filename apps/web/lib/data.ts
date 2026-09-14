@@ -22,6 +22,7 @@ export interface ItemRow {
   committee: string | null;
   vote_date: string | null;
   vl_status: "none" | "draft" | "final";
+  am_count: number;
   documents: Array<{ type: string; language: string; source_url: string }>;
 }
 
@@ -40,7 +41,7 @@ export async function getSessionItems(sessionId: string): Promise<ItemRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("items")
-    .select("id, code, title, rapporteur, committee, vote_date, vl_status, documents (type, language, source_url)")
+    .select("id, code, title, rapporteur, committee, vote_date, vl_status, am_count, documents (type, language, source_url)")
     .eq("session_id", sessionId)
     .order("vote_date")
     .order("code");
@@ -118,7 +119,7 @@ export async function getItemByCode(code: string): Promise<ItemRow | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("items")
-    .select("id, code, title, rapporteur, committee, vote_date, vl_status, documents (type, language, source_url)")
+    .select("id, code, title, rapporteur, committee, vote_date, vl_status, am_count, documents (type, language, source_url)")
     .eq("code", code)
     .limit(1)
     .maybeSingle();

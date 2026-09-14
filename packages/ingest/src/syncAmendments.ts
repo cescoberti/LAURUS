@@ -7,7 +7,7 @@
  * Plenary amendments are published per report in AMENDMENT_LIST blocks
  * ("A-10-2026-0170-AM-006-010" = Am 6–10). We enumerate them from
  * `/api/v2/documents?work-type=AMENDMENT_LIST`, build the distribution path
- * directly (`distribution/reds_iPlRp_Amd/{ID}/{ID}_{lang}.docx`), download the
+ * directly (`distribution/reds_iPlR[pe]_Amd/{ID}/{ID}_{lang}.docx`), download the
  * DOCX and parse the EP two-column template with @laurus/parser.
  *
  * Two hard-won transport facts (do not "simplify" them away):
@@ -21,6 +21,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
+import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
@@ -76,7 +77,7 @@ function itemCodeOf(identifier: string): string | null {
 // ---------------------------------------------------------------------------
 
 async function fetchBlockDocx(identifier: string, lang: string): Promise<Buffer | null> {
-  const url = `${BASE}/distribution/reds_iPlRp_Amd/${identifier}/${identifier}_${lang}.docx`;
+  const url = amendmentBlockUrl(identifier, lang);
   let delay = 10_000;
   for (let attempt = 0; attempt < 8; attempt++) {
     let status: number, body: Buffer;

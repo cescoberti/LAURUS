@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { DisplayItem, VlStatus } from "@/lib/types";
 
 // Subtle per-committee tint so the eye can group rows at a glance.
@@ -20,7 +21,22 @@ export function CommitteeChip({ code }: { code: string }) {
   );
 }
 
-export function VlBadge({ status }: { status: VlStatus }) {
+/**
+ * What the file's voting-list material looks like right now. `vl_status` is
+ * the member-facing state (draft/final); before that, the amendment count is
+ * the honest signal: > 0 means the VL can be generated from the file page.
+ */
+export function VlBadge({ status, amCount = 0 }: { status: VlStatus; amCount?: number }) {
+  if (status === "none" && amCount > 0) {
+    return (
+      <span
+        title={`${amCount} amendment${amCount === 1 ? "" : "s"} loaded — VL ready to generate`}
+        className="inline-flex items-center gap-1 rounded-md bg-laurel-50 px-2 py-0.5 text-xs font-semibold text-laurel-800 ring-1 ring-inset ring-laurel-200"
+      >
+        {amCount} AM
+      </span>
+    );
+  }
   if (status === "final") {
     return (
       <span className="inline-flex items-center gap-1 rounded-md bg-laurel-800 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
@@ -39,15 +55,6 @@ export function VlBadge({ status }: { status: VlStatus }) {
   return <span className="text-sm text-ink-300">–</span>;
 }
 
-/** Muted chip for features that ship with a later milestone. */
-function ComingSoon({ label, milestone }: { label: string; milestone: string }) {
-  return (
-    <span title={`Disponibile con ${milestone}`} className="cursor-default text-xs font-medium text-ink-300">
-      {label}
-    </span>
-  );
-}
-
 export function DocLinks({ item }: { item: DisplayItem }) {
   return (
     <div className="flex items-center gap-2">
@@ -63,7 +70,19 @@ export function DocLinks({ item }: { item: DisplayItem }) {
       ) : (
         <span className="cursor-default text-xs font-medium text-ink-300">File</span>
       )}
-      <ComingSoon label="VL" milestone="M3" />
+      {item.amCount > 0 ? (
+        <Link
+          href={`/items/${item.code}`}
+          title="Amendments loaded — request the VL from the file page"
+          className="text-xs font-medium text-laurel-600 transition-colors hover:text-laurel-800 hover:underline"
+        >
+          VL
+        </Link>
+      ) : (
+        <span title="No amendments published yet" className="cursor-default text-xs font-medium text-ink-300">
+          VL
+        </span>
+      )}
     </div>
   );
 }

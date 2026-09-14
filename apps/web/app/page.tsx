@@ -41,6 +41,7 @@ export default async function Dashboard({
     committee: r.committee ?? "TBD",
     voteDate: r.vote_date ?? undefined,
     vl: r.vl_status,
+    amCount: r.am_count,
     fileUrl: r.documents.find((d) => d.type === "report" && d.language === "en")?.source_url,
   }));
 

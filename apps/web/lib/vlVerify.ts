@@ -22,7 +22,7 @@
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseVotXml, type VotPayload } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
-import { remarksFor } from "@laurus/parser";
+import { remarksFor, amendmentBlockUrl } from "@laurus/parser";
 import { createHash } from "node:crypto";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "@/lib/annotatedVl/fromDb";
@@ -404,7 +404,7 @@ export async function verifyAgainstSource(
   const freshByNumber = new Map<number, { original?: string; amended?: string }>();
   let blocksRead = 0;
   const parsedBlocks = await mapLimit(blocks, 3, async (id) => {
-    const url = `${BASE}/distribution/reds_iPlRp_Amd/${id}/${id}_${language}.docx`;
+    const url = amendmentBlockUrl(id, language);
     try {
       const buf = await fetchBytesWithBackoff(url);
       if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;

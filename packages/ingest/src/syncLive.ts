@@ -27,6 +27,7 @@
 import { getDocument } from "./epApi.ts";
 import { parseVotXml } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
+import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
 import {
   BASE,
@@ -274,7 +275,12 @@ async function listAmendmentBlocks(year: number): Promise<string[]> {
       offset -= 500;
       continue;
     }
-    if (status !== 200) break;
+    if (status === 204) break; // past the last page
+    if (status !== 200) {
+      // A 504 here would silently look like "no new blocks" — say so.
+      console.warn(`  amendment index page ${offset}: HTTP ${status} — partial index this tick`);
+      break;
+    }
     const rows = (JSON.parse(body.toString("utf8")) as { data?: Array<{ identifier: string }> }).data ?? [];
     for (const r of rows) if (r.identifier) out.push(r.identifier);
     if (rows.length < 500) break;
@@ -288,7 +294,7 @@ async function fetchBlock(identifier: string, lang: string): Promise<Buffer | nu
   for (let attempt = 0; attempt < 5; attempt++) {
     let status: number, body: Buffer;
     try {
-      ({ status, body } = await fetchBytes(`${BASE}/distribution/reds_iPlRp_Amd/${identifier}/${identifier}_${lang}.docx`));
+      ({ status, body } = await fetchBytes(amendmentBlockUrl(identifier, lang)));
     } catch {
       await sleep(delay);
       delay = Math.min(delay * 2, 60_000);

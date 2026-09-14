@@ -8,6 +8,8 @@ export interface DisplayItem {
   committee: string; // committee code or "TBD"
   voteDate?: string; // ISO date of the plenary vote
   vl: VlStatus;
+  /** Amendments ingested for the file — the VL can be generated once > 0. */
+  amCount: number;
   /** Report PDF URL (English), from laurus.documents. */
   fileUrl?: string;
   staff?: string;

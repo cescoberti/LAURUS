@@ -44,7 +44,7 @@ export function ItemTable({ group }: { group: DayGroup }) {
                   </Link>
                 </td>
                 <td className="px-4 py-3 align-top"><CommitteeChip code={item.committee} /></td>
-                <td className="px-4 py-3 align-top"><VlBadge status={item.vl} /></td>
+                <td className="px-4 py-3 align-top"><VlBadge status={item.vl} amCount={item.amCount} /></td>
                 <td className="px-4 py-3 align-top"><DocLinks item={item} /></td>
                 <td className="px-4 py-3 align-top"><StaffAvatar initials={item.staff} /></td>
               </tr>
