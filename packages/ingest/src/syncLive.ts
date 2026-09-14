@@ -82,7 +82,16 @@ function sittingDays(s: Session): string[] {
 async function syncAgenda(s: Session, days: string[]): Promise<number> {
   const seen = new Map<string, { identifier: string; code: string; title: { en: string; it: string } }>();
   for (const day of days) {
-    for (const a of await foreseenActivities(`MTG-PL-${day}`)) {
+    // One day's agenda timing out (the EP API does 504 under load) must not
+    // cost the other days — it is simply re-read on the next tick.
+    let activities;
+    try {
+      activities = await foreseenActivities(`MTG-PL-${day}`);
+    } catch (err) {
+      console.warn(`  agenda ${day}: ${(err as Error).message} — skipped this tick`);
+      continue;
+    }
+    for (const a of activities) {
       const identifier = reportRef(a);
       if (!identifier) continue;
       const code = displayCode(identifier);
@@ -447,43 +456,51 @@ async function main() {
     .select("id")
     .single();
 
-  try {
-    const newFiles = await syncAgenda(s, days);
-    console.log(`agenda: ${newFiles} new file(s)`);
-
-    const rec = await reconcilePlaceholders(s);
-    if (rec.merged.length) console.log(`reconciled:\n  ${rec.merged.join("\n  ")}`);
-    if (rec.unmatched.length) console.log(`placeholders kept (no match): ${rec.unmatched.join(", ")}`);
-
-    const am = await syncAmendments(s);
-    console.log(`amendments: ${am.blocks} new block(s) across ${am.items} item(s)`);
-
-    const vot = await syncVot(s, days);
-    console.log(`vot: ${vot.files} file(s), ${vot.rows} item rows`);
-
-    const { count } = await supabase.from("items").select("id", { count: "exact", head: true }).eq("session_id", s.id);
-    await supabase.from("sessions").update({ vote_count: count ?? 0 }).eq("id", s.id);
-
-    if (run) {
-      await supabase
-        .from("ingestion_runs")
-        .update({
-          status: "ok",
-          finished_at: new Date().toISOString(),
-          found: { new_files: newFiles, reconciled: rec.merged.length, unmatched: rec.unmatched.length, ...am, vot },
-        })
-        .eq("id", run.id);
+  // The four stages are independent: the EP API failing on one (504s under
+  // load are routine) must not stop the others, and must not fail the run —
+  // a failed scheduled run emails the repo owner, every five minutes. A stage
+  // that could not run is logged, recorded on the run, and retried next tick.
+  const errors: string[] = [];
+  const stage = async <T>(name: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = `${name}: ${(err as Error).message}`;
+      console.warn(`  ${msg} — will retry next tick`);
+      errors.push(msg);
+      return fallback;
     }
-    console.log("live sync done.");
-  } catch (err) {
-    if (run) {
-      await supabase
-        .from("ingestion_runs")
-        .update({ status: "error", finished_at: new Date().toISOString(), error: String(err) })
-        .eq("id", run.id);
-    }
-    throw err;
+  };
+
+  const newFiles = await stage("agenda", () => syncAgenda(s, days), 0);
+  console.log(`agenda: ${newFiles} new file(s)`);
+
+  const rec = await stage("reconcile", () => reconcilePlaceholders(s), { merged: [], unmatched: [] });
+  if (rec.merged.length) console.log(`reconciled:\n  ${rec.merged.join("\n  ")}`);
+  if (rec.unmatched.length) console.log(`placeholders kept (no match): ${rec.unmatched.join(", ")}`);
+
+  const am = await stage("amendments", () => syncAmendments(s), { blocks: 0, items: 0 });
+  console.log(`amendments: ${am.blocks} new block(s) across ${am.items} item(s)`);
+
+  const vot = await stage("vot", () => syncVot(s, days), { files: 0, rows: 0 });
+  console.log(`vot: ${vot.files} file(s), ${vot.rows} item rows`);
+
+  const { count } = await supabase.from("items").select("id", { count: "exact", head: true }).eq("session_id", s.id);
+  await supabase.from("sessions").update({ vote_count: count ?? 0 }).eq("id", s.id);
+
+  if (run) {
+    await supabase
+      .from("ingestion_runs")
+      .update({
+        // The run did complete; `error` lists any stage deferred to the next tick.
+        status: "ok",
+        finished_at: new Date().toISOString(),
+        error: errors.length ? errors.join(" | ") : null,
+        found: { new_files: newFiles, reconciled: rec.merged.length, unmatched: rec.unmatched.length, ...am, vot },
+      })
+      .eq("id", run.id);
   }
+  console.log(errors.length ? `live sync done with ${errors.length} stage(s) deferred.` : "live sync done.");
 }
 
 main().catch((err) => {
