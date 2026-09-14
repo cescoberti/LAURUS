@@ -64,6 +64,33 @@ function stripOuterQuotes(s: string): string {
   return s.replace(/^["']\s*/, "").replace(/\s*["']$/, "").trim();
 }
 
+/**
+ * "emphasises that unpaid … labour market policies," → the literal span of
+ * `hay` from the first fragment to the end of the last one. Each fragment
+ * must occur exactly once, in order; a quote without an ellipsis is returned
+ * as it is.
+ */
+function expandEllipsis(hay: string, quote: string): { text: string } | { error: { code: string; detail: string } } {
+  const pieces = quote.split(/\s*(?:…|\.\.\.)\s*/).map((p) => p.trim()).filter(Boolean);
+  if (pieces.length < 2) return { text: quote };
+  let from = -1;
+  let to = -1;
+  for (let piece of pieces) {
+    // The request quotes the words with its own closing punctuation ("…
+    // policies,") where the paragraph has another ("… policies;"): the words
+    // are what is voted, so drop a trailing comma/semicolon that is not there.
+    if (occurrences(hay, piece) === 0 && /[,;.]$/.test(piece) && occurrences(hay, piece.slice(0, -1)) === 1) piece = piece.slice(0, -1);
+    const n = occurrences(hay, piece);
+    if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${piece.slice(0, 60)}…" is not in the subject text` } };
+    if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${piece.slice(0, 60)}…" occurs ${n} times in the subject text` } };
+    const at = hay.indexOf(piece);
+    if (at < to) return { error: { code: "TERMINI_NON_TROVATI", detail: `the abbreviated quote's fragments are not in order in the subject text` } };
+    if (from < 0) from = at;
+    to = at + piece.length;
+  }
+  return { text: hay.slice(from, to) };
+}
+
 /** Count non-overlapping occurrences of `needle` in `hay`. */
 function occurrences(hay: string, needle: string): number {
   if (!needle) return 0;
@@ -189,6 +216,13 @@ function cutParts(
 
   // EN cut, with the recomposition guarantee.
   const para = norm(enSubject);
+  // A long quote is often abbreviated "first words … last words": resolve it
+  // to the one literal span of the paragraph that starts and ends so.
+  for (const [i, q] of quotesEn.entries()) {
+    const span = expandEllipsis(para, q);
+    if ("error" in span) return { error: span.error };
+    quotesEn[i] = span.text;
+  }
   let firstEn = para;
   for (const q of quotesEn) {
     const n = occurrences(firstEn, q);
