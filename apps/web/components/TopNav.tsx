@@ -14,6 +14,7 @@ const NAV: Array<{ label: NavActive; href: string }> = [
 
 const ADMIN: Array<{ label: string; href: string }> = [
   { label: "Admin", href: "/admin/users" },
+  { label: "Inbox", href: "/admin/inbox" },
   { label: "Invites", href: "/admin/inviti" },
   { label: "Usage", href: "/admin/utilizzo" },
   { label: "Tracker", href: "/admin/tracker" },

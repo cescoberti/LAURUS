@@ -14,11 +14,19 @@ const LANG_ORDER = (() => {
 
 const STEPS = ["Welcome", "Committees", "Language", "Fair use", "Contact"];
 
-export function OnboardingWizard({ token }: { token: string }) {
+export function OnboardingWizard({
+  token,
+  initialCommittees = [],
+  initialLanguage = "it",
+}: {
+  token: string;
+  initialCommittees?: string[];
+  initialLanguage?: string;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [committees, setCommittees] = useState<string[]>([]);
-  const [language, setLanguage] = useState("it");
+  const [committees, setCommittees] = useState<string[]>(initialCommittees);
+  const [language, setLanguage] = useState(initialLanguage);
   const [understood, setUnderstood] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

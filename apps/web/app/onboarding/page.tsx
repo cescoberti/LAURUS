@@ -30,9 +30,16 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   if (user) {
     const { data: profile } = await supabase.from("users").select("onboarded_at").eq("id", user.id).single();
     if (profile?.onboarded_at) redirect("/");
+    // What the person told us by email, if the invite came from the Inbox.
+    type Prefill = { committees?: string[]; vl_language?: string };
+    let prefill: Prefill | null = null;
+    if (token) {
+      const { data } = await createAdminClient().from("invites").select("prefill").eq("token", token).maybeSingle();
+      prefill = (data?.prefill as Prefill | null) ?? null;
+    }
     return (
       <Shell>
-        <OnboardingWizard token={token ?? ""} />
+        <OnboardingWizard token={token ?? ""} initialCommittees={prefill?.committees ?? []} initialLanguage={prefill?.vl_language ?? "it"} />
       </Shell>
     );
   }
