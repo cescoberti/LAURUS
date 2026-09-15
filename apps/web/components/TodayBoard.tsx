@@ -36,8 +36,8 @@ export function TodayBoard({ items, today, sessionEnd }: { items: DisplayItem[];
       </div>
       <ul className="mt-2.5 grid gap-1.5 text-sm">
         {shown.slice(0, 5).map((i) => (
-          <li key={i.code}>
-            <Link href={`/items/${i.code}`} className="press flex items-center gap-2 rounded-md py-0.5 hover:bg-white/10">
+          <li key={i.code} className="min-w-0">
+            <Link href={`/items/${i.code}`} className="press flex min-w-0 items-center gap-2 rounded-md py-0.5 hover:bg-white/10">
               <span className={`h-[7px] w-[7px] shrink-0 rounded-full ${i.officialVl ? "bg-laurel-300" : "bg-gold-300"}`} />
               <span className="font-bold uppercase tracking-wide">{rapporteurLabel(i.rapporteur) ?? i.code}</span>
               <span className="min-w-0 truncate opacity-85">{i.title}</span>
