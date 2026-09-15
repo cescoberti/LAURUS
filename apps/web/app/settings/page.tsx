@@ -36,7 +36,7 @@ export default async function SettingsPage() {
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {COMMITTEES.map((c) => (
                 <label key={c.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
-                  <input type="checkbox" name="committees" value={c.code} defaultChecked={myCommittees.has(c.code)} className="accent-laurel-700" />
+                  <input type="checkbox" name="committees" value={c.code} defaultChecked={myCommittees.has(c.code)} className="accent-eu-700" />
                   <span className="font-mono text-xs font-semibold text-ink-300">{c.code}</span>
                   <span className="truncate">{c.name}</span>
                 </label>
@@ -81,7 +81,7 @@ export default async function SettingsPage() {
           </div>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
-            <input type="checkbox" name="wants_email" defaultChecked={profile?.wants_email ?? true} className="mt-0.5 accent-laurel-700" />
+            <input type="checkbox" name="wants_email" defaultChecked={profile?.wants_email ?? true} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">Email reminders</span>
               <span className="block text-xs text-ink-500">New voting lists available, new amendments on the reports you follow.</span>
@@ -89,7 +89,7 @@ export default async function SettingsPage() {
           </label>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
-            <input type="checkbox" name="wants_whatsapp" defaultChecked={profile?.wants_whatsapp ?? false} className="mt-0.5 accent-laurel-700" />
+            <input type="checkbox" name="wants_whatsapp" defaultChecked={profile?.wants_whatsapp ?? false} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">WhatsApp reminders</span>
               <span className="block text-xs text-ink-500">The same alerts, on the number above.</span>
@@ -97,7 +97,7 @@ export default async function SettingsPage() {
           </label>
 
           <label className="flex items-start gap-3 text-sm text-ink-900">
-            <input type="checkbox" name="wants_clean_final" defaultChecked={profile?.wants_clean_final ?? false} className="mt-0.5 accent-laurel-700" />
+            <input type="checkbox" name="wants_clean_final" defaultChecked={profile?.wants_clean_final ?? false} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">Final post-vote text by email</span>
               <span className="block text-xs text-ink-500">
@@ -119,7 +119,7 @@ export default async function SettingsPage() {
                     name="languages"
                     value={l.code}
                     defaultChecked={selected.has(l.code)}
-                    className="accent-laurel-700"
+                    className="accent-eu-700"
                   />
                   <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}
                 </label>
@@ -127,7 +127,7 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          <button type="submit" className="rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900">
+          <button type="submit" className="rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800">
             Save
           </button>
         </form>

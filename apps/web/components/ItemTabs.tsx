@@ -64,7 +64,7 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-ink-500 transition-colors hover:bg-laurel-50 hover:text-laurel-800"
+      className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-ink-500 transition-colors hover:bg-eu-50 hover:text-eu-900"
       title="Copy (formatting included) to paste into the VL"
     >
       {copied ? "Copied ✓" : label}
@@ -97,13 +97,13 @@ export function ItemTabs({
             onClick={() => setTab(t)}
             className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${
               tab === t
-                ? "border-laurel-700 text-laurel-800"
+                ? "border-eu-700 text-eu-900"
                 : "border-transparent text-ink-500 hover:text-ink-900"
             }`}
           >
             {t}
             {t === "Amendments" && amendments.length > 0 && (
-              <span className="rounded-full bg-laurel-100 px-1.5 text-[11px] font-semibold text-laurel-700">
+              <span className="rounded-full bg-eu-100 px-1.5 text-[11px] font-semibold text-eu-700">
                 {amendments.length}
               </span>
             )}
@@ -156,7 +156,7 @@ function AmendmentsView({
                 key={l}
                 onClick={() => setLang(l)}
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  lang === l ? "bg-white text-laurel-800 shadow-sm" : "text-ink-500 hover:text-ink-900"
+                  lang === l ? "bg-white text-eu-900 shadow-sm" : "text-ink-500 hover:text-ink-900"
                 }`}
               >
                 {LANG_LABEL[l] ?? l.toUpperCase()}
@@ -175,7 +175,7 @@ function AmendmentsView({
           return (
             <div key={a.number} className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
               <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-laurel-800 px-1.5 text-xs font-bold text-white">
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-eu-900 px-1.5 text-xs font-bold text-white">
                   {a.number}
                 </span>
                 <span className="text-sm font-medium text-ink-900">{target}</span>
@@ -302,7 +302,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
                   key={l}
                   onClick={() => setLang(l)}
                   className={`rounded-md px-2.5 py-1 text-xs font-semibold uppercase transition-colors ${
-                    lang === l ? "bg-white text-laurel-800 shadow-sm" : "text-ink-500 hover:text-ink-900"
+                    lang === l ? "bg-white text-eu-900 shadow-sm" : "text-ink-500 hover:text-ink-900"
                   }`}
                 >
                   {l}
@@ -318,7 +318,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
           </button>
           <button
             onClick={download}
-            className="rounded-lg bg-laurel-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-laurel-900"
+            className="rounded-lg bg-eu-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-eu-800"
           >
             Download CSV
           </button>
@@ -342,7 +342,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
                 <td className="px-4 py-3 align-top">
                   <span
                     className={`inline-flex whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                      r.type === "split" ? "bg-laurel-100 text-laurel-800" : "bg-gold-500/15 text-gold-600"
+                      r.type === "split" ? "bg-eu-100 text-eu-900" : "bg-gold-500/15 text-gold-600"
                     }`}
                   >
                     {TYPE_LABEL[r.type]}

@@ -54,11 +54,11 @@ export function OnboardingWizard({ token }: { token: string }) {
           <span>
             Step {step + 1} of {STEPS.length}
           </span>
-          <span className="text-laurel-700">{STEPS[step]}</span>
+          <span className="text-eu-700">{STEPS[step]}</span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-laurel-700 transition-all duration-300"
+            className="h-full rounded-full bg-eu-700 transition-all duration-300"
             style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
           />
         </div>
@@ -88,10 +88,10 @@ export function OnboardingWizard({ token }: { token: string }) {
                     type="button"
                     onClick={() => toggleCommittee(c.code)}
                     className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      on ? "border-laurel-400 bg-laurel-50 text-laurel-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
+                      on ? "border-laurel-400 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
                     }`}
                   >
-                    <span className={`font-mono text-xs font-semibold ${on ? "text-laurel-700" : "text-ink-300"}`}>{c.code}</span>
+                    <span className={`font-mono text-xs font-semibold ${on ? "text-eu-700" : "text-ink-300"}`}>{c.code}</span>
                     <span className="truncate">{c.name}</span>
                   </button>
                 );
@@ -111,7 +111,7 @@ export function OnboardingWizard({ token }: { token: string }) {
                   type="button"
                   onClick={() => setLanguage(l.code)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                    language === l.code ? "border-laurel-400 bg-laurel-50 text-laurel-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
+                    language === l.code ? "border-laurel-400 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
                   }`}
                 >
                   <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}
@@ -140,7 +140,7 @@ export function OnboardingWizard({ token }: { token: string }) {
               </p>
             </div>
             <label className="mt-4 flex items-center gap-2 text-sm font-medium text-ink-900">
-              <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="accent-laurel-700" />
+              <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="accent-eu-700" />
               Got it
             </label>
           </div>
@@ -151,7 +151,7 @@ export function OnboardingWizard({ token }: { token: string }) {
             <h2 className="text-lg font-bold text-ink-900">Found a bug or have an idea? 💡</h2>
             <p className="mt-3 text-sm leading-relaxed text-ink-700">
               Spotted something off, or have an idea to make LAURUS better? Feel free to drop a line to{" "}
-              <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-laurel-700 hover:underline">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-eu-700 hover:underline">
                 {CONTACT_EMAIL}
               </a>
               . The service gets better thanks to your feedback.
@@ -176,7 +176,7 @@ export function OnboardingWizard({ token }: { token: string }) {
             type="button"
             onClick={finish}
             disabled={saving}
-            className="rounded-lg bg-laurel-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-60"
+            className="rounded-lg bg-eu-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-60"
           >
             {saving ? "Saving…" : "Start using LAURUS"}
           </button>
@@ -185,7 +185,7 @@ export function OnboardingWizard({ token }: { token: string }) {
             type="button"
             onClick={() => canNext && setStep((s) => s + 1)}
             disabled={!canNext}
-            className="rounded-lg bg-laurel-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-40"
+            className="rounded-lg bg-eu-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-40"
           >
             Next →
           </button>

@@ -132,6 +132,44 @@ export interface OfficialVlRow {
   fetched_at: string;
 }
 
+/** Latest official list per item, for a whole part-session at once. */
+export async function getOfficialVlByItem(itemIds: string[]): Promise<Map<string, OfficialVlRow>> {
+  const out = new Map<string, OfficialVlRow>();
+  if (itemIds.length === 0) return out;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("voting_lists")
+    .select("item_id, version_label, source_url, fetched_at")
+    .in("item_id", itemIds)
+    .order("fetched_at", { ascending: false });
+  for (const row of (data ?? []) as Array<OfficialVlRow & { item_id: string }>) {
+    if (!out.has(row.item_id)) out.set(row.item_id, row);
+  }
+  return out;
+}
+
+/** What the signed-in member follows and works on, for the dashboard. */
+export async function getViewerContext(): Promise<{
+  followedItemIds: Set<string>;
+  committees: string[];
+  vlLanguage: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { followedItemIds: new Set(), committees: [], vlLanguage: "it" };
+  const [{ data: subs }, { data: profile }] = await Promise.all([
+    supabase.from("subscriptions").select("target_id").eq("user_id", user.id).eq("scope", "item"),
+    supabase.from("users").select("committees, vl_language").eq("id", user.id).single(),
+  ]);
+  return {
+    followedItemIds: new Set((subs ?? []).map((s) => s.target_id as string)),
+    committees: (profile?.committees as string[] | null) ?? [],
+    vlLanguage: (profile?.vl_language as string | null) ?? "it",
+  };
+}
+
 /** The latest official Tabling Service list the live sync stored for an item. */
 export async function getItemOfficialVl(itemId: string): Promise<OfficialVlRow | null> {
   const supabase = await createClient();

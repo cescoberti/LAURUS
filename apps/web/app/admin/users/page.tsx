@@ -52,7 +52,7 @@ export default async function AdminUsersPage() {
                     <span
                       className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                         u.role === "admin"
-                          ? "bg-laurel-800 text-white ring-laurel-800"
+                          ? "bg-eu-900 text-white ring-eu-900"
                           : "bg-slate-100 text-ink-700 ring-slate-200"
                       }`}
                     >

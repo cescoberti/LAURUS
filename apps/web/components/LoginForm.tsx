@@ -17,7 +17,7 @@ export function LoginForm({ next }: { next: string }) {
           type="email"
           required
           autoFocus
-          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
+          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
         />
       </div>
 
@@ -27,7 +27,7 @@ export function LoginForm({ next }: { next: string }) {
           name="password"
           type="password"
           required
-          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
+          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
         />
       </div>
 
@@ -40,7 +40,7 @@ export function LoginForm({ next }: { next: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-laurel-700 disabled:opacity-60"
+        className="w-full rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-eu-700 disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

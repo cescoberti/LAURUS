@@ -16,7 +16,7 @@ export function InviteLinkRow({
 }) {
   const [copied, setCopied] = useState(false);
   const badge = {
-    active: { label: "Active", cls: "bg-laurel-100 text-laurel-800" },
+    active: { label: "Active", cls: "bg-eu-100 text-eu-900" },
     used: { label: "Used", cls: "bg-slate-100 text-ink-500" },
     expired: { label: "Expired", cls: "bg-gold-500/15 text-gold-600" },
   }[status];
@@ -40,7 +40,7 @@ export function InviteLinkRow({
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="shrink-0 rounded-lg bg-laurel-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-laurel-900"
+          className="shrink-0 rounded-lg bg-eu-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-eu-800"
         >
           {copied ? "Copied ✓" : "Copy link"}
         </button>

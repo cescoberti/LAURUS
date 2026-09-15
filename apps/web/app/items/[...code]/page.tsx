@@ -52,13 +52,13 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
           {item?.rapporteur && (
-            <p className="text-sm font-semibold uppercase tracking-wide text-laurel-800">{rapporteurLabel(item.rapporteur)}</p>
+            <h1 className="display text-[1.75rem] font-extrabold uppercase text-eu-900">{rapporteurLabel(item.rapporteur)}</h1>
           )}
-          <h1 className="mt-1 text-2xl font-bold text-ink-900">
+          <p className={`${item?.rapporteur ? "mt-1 text-lg font-semibold" : "text-2xl font-bold"} leading-snug text-ink-900`}>
             {item?.title.en || item?.title.it || "Item not found"}
-          </h1>
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-500">
-            <span className="font-mono text-laurel-700">{code}</span>
+            <span className="font-mono text-eu-700">{code}</span>
             {item?.committee && <CommitteeChip code={item.committee} />}
             {item?.vote_date && (
               <span>
@@ -71,12 +71,12 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
               </span>
             )}
             {reportEn && (
-              <a href={reportEn.source_url} target="_blank" rel="noreferrer" className="font-medium text-laurel-600 hover:underline">
+              <a href={reportEn.source_url} target="_blank" rel="noreferrer" className="font-medium text-eu-600 hover:underline">
                 Report (EN)
               </a>
             )}
             {reportIt && (
-              <a href={reportIt.source_url} target="_blank" rel="noreferrer" className="font-medium text-laurel-600 hover:underline">
+              <a href={reportIt.source_url} target="_blank" rel="noreferrer" className="font-medium text-eu-600 hover:underline">
                 Report (IT)
               </a>
             )}
@@ -86,9 +86,12 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           <p className="mt-2 text-xs text-ink-500">
             {officialVl ? (
               <>
-                <span className="font-semibold text-laurel-800">Official voting list · {officialVl.version_label}</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-ink-900">
+                  <span className={`h-[7px] w-[7px] rounded-full ${/final/i.test(officialVl.version_label) ? "bg-laurel-600" : "bg-amber-500"}`} />
+                  Official voting list · {officialVl.version_label}
+                </span>
                 {" · "}
-                <a href={officialVl.source_url} target="_blank" rel="noreferrer" className="text-laurel-600 hover:underline">
+                <a href={officialVl.source_url} target="_blank" rel="noreferrer" className="text-eu-600 hover:underline">
                   EP source
                 </a>
                 {" · fetched "}
@@ -119,7 +122,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
                     <a
                       key={l}
                       href={`/api/annotated-vl?code=${encodeURIComponent(code)}&lang=${l}`}
-                      className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold uppercase text-ink-500 transition-colors hover:border-laurel-300 hover:text-laurel-800"
+                      className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold uppercase text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
                       title={`Unverified draft in ${l.toUpperCase()}`}
                     >
                       {l}

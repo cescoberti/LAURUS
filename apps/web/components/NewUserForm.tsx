@@ -18,17 +18,17 @@ export function NewUserForm() {
           type="email"
           required
           placeholder="nome.cognome@epgroup.eu"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
         />
         <input
           name="fullName"
           placeholder="Full name"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
         />
         <select
           name="role"
           defaultValue="member"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-laurel-600 focus:ring-2 focus:ring-laurel-600/15"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
         >
           <option value="member">Member</option>
           <option value="whip">Whip</option>
@@ -37,7 +37,7 @@ export function NewUserForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-laurel-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-laurel-700 disabled:opacity-60"
+          className="rounded-lg bg-eu-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-eu-700 disabled:opacity-60"
         >
           {pending ? "Creating…" : "Invite"}
         </button>

@@ -61,7 +61,7 @@ export function WhipBoard({
                 {fmt(s.startDate)}–{fmt(s.endDate)} · {s.location} · notes due {fmt(s.deadline)}
               </span>
               <span className="ml-auto flex gap-2 text-[11px] font-semibold">
-                <span className="rounded-full bg-laurel-100 px-2 py-0.5 text-laurel-800">{submitted} done</span>
+                <span className="rounded-full bg-eu-100 px-2 py-0.5 text-eu-900">{submitted} done</span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-ink-500">{pending} pending</span>
                 {late > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">{late} late</span>}
               </span>
@@ -86,7 +86,7 @@ export function WhipBoard({
                           {rapporteurLabel(it.rapporteur) ?? <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
                         </p>
                         <p className="text-xs text-ink-500">{it.title}</p>
-                        <p className="mt-0.5 font-mono text-[11px] text-laurel-700">{it.code}</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-eu-700">{it.code}</p>
                       </td>
                       <td
                         className="px-4 py-3 text-xs text-ink-500"
@@ -182,7 +182,7 @@ function NoteControl({ item }: { item: WhipItem }) {
   if (item.noteStatus === "submitted") {
     return (
       <div className="flex items-center gap-2">
-        <span className="inline-flex rounded-md bg-laurel-800 px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="inline-flex rounded-md bg-eu-900 px-2 py-0.5 text-[11px] font-semibold text-white">
           Submitted{item.submittedAt ? ` · ${fmt(item.submittedAt)}` : ""}
         </span>
         <button onClick={() => set("pending")} disabled={saving} className="text-[11px] text-ink-300 hover:text-ink-700">
@@ -210,7 +210,7 @@ function NoteControl({ item }: { item: WhipItem }) {
       >
         {item.late ? "Late" : "Pending"}
       </span>
-      <button onClick={() => set("submitted")} disabled={saving} className="text-[11px] font-semibold text-laurel-700 hover:underline">
+      <button onClick={() => set("submitted")} disabled={saving} className="text-[11px] font-semibold text-eu-700 hover:underline">
         mark submitted
       </button>
       <button onClick={() => set("na")} disabled={saving} className="text-[11px] text-ink-300 hover:text-ink-700">

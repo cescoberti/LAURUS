@@ -41,7 +41,7 @@ export default async function TrackerPage() {
             <h1 className="text-2xl font-bold text-ink-900">Tracker</h1>
             <p className="mt-1 text-sm text-ink-500">Connected users and requested files — visible to admins only.</p>
           </div>
-          <Link href="/admin/users" className="text-sm font-medium text-laurel-700 hover:underline">
+          <Link href="/admin/users" className="text-sm font-medium text-eu-700 hover:underline">
             Manage users →
           </Link>
         </div>
@@ -54,7 +54,7 @@ export default async function TrackerPage() {
             ["Files requested", perItem.size],
           ].map(([label, n]) => (
             <div key={label} className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card">
-              <p className="text-2xl font-bold text-laurel-800">{n}</p>
+              <p className="text-2xl font-bold text-eu-900">{n}</p>
               <p className="text-xs text-ink-500">{label}</p>
             </div>
           ))}
@@ -72,7 +72,7 @@ export default async function TrackerPage() {
                     {topItems.map(([code, n]) => (
                       <tr key={code} className="border-b border-slate-50">
                         <td className="px-4 py-2.5">
-                          <Link href={`/items/${code}`} className="font-mono text-xs text-laurel-700 hover:underline">
+                          <Link href={`/items/${code}`} className="font-mono text-xs text-eu-700 hover:underline">
                             {code}
                           </Link>
                         </td>
@@ -97,7 +97,7 @@ export default async function TrackerPage() {
                         <p className="text-xs text-ink-300">{u.email}</p>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-ink-500">
-                        {u.role === "admin" && <span className="mr-1 rounded bg-laurel-100 px-1.5 py-0.5 font-semibold text-laurel-800">admin</span>}
+                        {u.role === "admin" && <span className="mr-1 rounded bg-eu-100 px-1.5 py-0.5 font-semibold text-eu-900">admin</span>}
                         {activeIds.has(u.id) && <span className="rounded bg-gold-500/15 px-1.5 py-0.5 font-semibold text-gold-600">active</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs text-ink-300">
@@ -125,7 +125,7 @@ export default async function TrackerPage() {
                         {new Date(e.created_at).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                       </td>
                       <td className="px-4 py-2 text-xs font-semibold text-ink-700">{TYPE_LABEL[e.type] ?? e.type}</td>
-                      <td className="px-4 py-2 font-mono text-xs text-laurel-700">{e.item_code ?? "—"}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-eu-700">{e.item_code ?? "—"}</td>
                       <td className="px-4 py-2 text-xs text-ink-500">{e.user_id ? emailById.get(e.user_id) ?? "?" : "anonymous"}</td>
                     </tr>
                   ))}

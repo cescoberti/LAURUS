@@ -40,8 +40,8 @@ export function FollowButton({
         disabled={busy}
         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-70 ${
           on
-            ? "border-laurel-300 bg-laurel-50 text-laurel-800 hover:bg-laurel-100"
-            : "border-slate-200 bg-white text-ink-700 hover:border-laurel-300 hover:text-laurel-800"
+            ? "border-laurel-200 bg-laurel-50 text-laurel-800 hover:bg-laurel-100"
+            : "border-slate-200 bg-white text-ink-700 hover:border-eu-200 hover:text-eu-900"
         }`}
         title={on ? "You are told when this file's VL material changes" : "Get told when this file's VL material changes"}
       >

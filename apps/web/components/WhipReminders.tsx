@@ -41,7 +41,7 @@ export function WhipReminders({ rows, anyDue }: { rows: ReminderRow[]; anyDue: b
               setDone(true);
             }}
             disabled={busy}
-            className="ml-auto rounded-lg bg-laurel-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-laurel-900 disabled:opacity-70"
+            className="ml-auto rounded-lg bg-eu-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-eu-800 disabled:opacity-70"
           >
             {busy ? "Sending…" : done ? "Sent ✓" : "Send due reminders now"}
           </button>
@@ -75,7 +75,7 @@ export function WhipReminders({ rows, anyDue }: { rows: ReminderRow[]; anyDue: b
                   <td className="px-4 py-2.5 text-xs text-ink-500">{r.fileCount}</td>
                   <td className="px-4 py-2.5">
                     {r.sent ? (
-                      <span className="rounded-md bg-laurel-100 px-2 py-0.5 text-[11px] font-semibold text-laurel-800">Sent</span>
+                      <span className="rounded-md bg-eu-100 px-2 py-0.5 text-[11px] font-semibold text-eu-900">Sent</span>
                     ) : r.email ? (
                       <span className="rounded-md bg-gold-500/15 px-2 py-0.5 text-[11px] font-semibold text-gold-600">Due</span>
                     ) : (

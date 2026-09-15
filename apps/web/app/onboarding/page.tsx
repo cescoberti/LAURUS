@@ -54,7 +54,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <p className="mt-2 text-sm text-ink-500">
           This invite link isn&apos;t valid, has expired, or has already been used. Ask your administrator
           for a new one, or{" "}
-          <a href="/login" className="font-medium text-laurel-700 hover:underline">
+          <a href="/login" className="font-medium text-eu-700 hover:underline">
             sign in
           </a>{" "}
           if you already have an account.
@@ -68,7 +68,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50/60">
       <div className="mx-auto flex max-w-xl flex-col items-center px-6 py-10">
-        <div className="mb-8 flex items-center text-laurel-800">
+        <div className="mb-8 flex items-center text-eu-900">
           <Wordmark className="h-6" />
         </div>
         <div className="w-full">{children}</div>

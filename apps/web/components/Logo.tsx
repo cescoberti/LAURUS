@@ -37,7 +37,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <LaurusMark className="text-laurel-700" />
-      <span className="text-[19px] font-semibold tracking-[0.14em] text-laurel-900">
+      <span className="text-[19px] font-bold tracking-[0.14em] text-eu-900">
         LAURUS
       </span>
     </div>

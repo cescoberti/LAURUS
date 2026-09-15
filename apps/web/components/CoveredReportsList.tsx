@@ -46,7 +46,7 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
             <li key={r.code}>
               <Link
                 href={`/items/${r.code}`}
-                className="block rounded-lg border border-slate-200/70 bg-white px-4 py-3 transition-colors hover:border-laurel-200 hover:bg-laurel-50/40"
+                className="block rounded-lg border border-slate-200/70 bg-white px-4 py-3 transition-colors hover:border-eu-200 hover:bg-eu-50/40"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -56,11 +56,11 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
                     <span className="mt-0.5 block truncate text-xs text-ink-500">
                       {r.title.en || r.title.it || ""}
                     </span>
-                    <span className="mt-0.5 block font-mono text-[11px] text-laurel-700">{r.code}</span>
+                    <span className="mt-0.5 block font-mono text-[11px] text-eu-700">{r.code}</span>
                   </div>
                   <span className="flex shrink-0 items-center gap-2">
                     {r.committee && <CommitteeChip code={r.committee} />}
-                    <span className="rounded-full bg-laurel-100 px-2 text-xs font-semibold text-laurel-800">
+                    <span className="rounded-full bg-eu-100 px-2 text-xs font-semibold text-eu-900">
                       {r.am_count} am.
                     </span>
                   </span>

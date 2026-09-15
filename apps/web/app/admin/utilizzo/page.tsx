@@ -107,7 +107,7 @@ export default async function UtilizzoPage() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-slate-200/70 bg-white px-4 py-3">
-      <p className="text-2xl font-bold text-laurel-700">{value}</p>
+      <p className="text-2xl font-bold text-eu-700">{value}</p>
       <p className="text-xs text-ink-500">{label}</p>
     </div>
   );

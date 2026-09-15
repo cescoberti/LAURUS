@@ -18,7 +18,7 @@ export default async function VlGeneratorPage() {
 
   return (
     <div className="min-h-screen">
-      <TopNav active="VL Generator" />
+      <TopNav active="Voting lists" />
 
       <main className="mx-auto max-w-5xl px-6 py-8">
         <h1 className="text-2xl font-bold text-ink-900">VL Generator</h1>
@@ -43,11 +43,11 @@ export default async function VlGeneratorPage() {
             type="file"
             required
             accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-700 file:mr-3 file:rounded-md file:border-0 file:bg-laurel-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-laurel-800"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-700 file:mr-3 file:rounded-md file:border-0 file:bg-eu-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-eu-900"
           />
           <button
             type="submit"
-            className="inline-flex w-fit items-center gap-2 rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-laurel-900"
+            className="inline-flex w-fit items-center gap-2 rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-eu-800"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

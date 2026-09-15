@@ -43,7 +43,7 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-lg bg-laurel-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-laurel-900 disabled:opacity-60"
+          className="w-full rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-60"
         >
           {pending ? "Creating…" : "Create account & continue"}
         </button>
