@@ -248,7 +248,7 @@ async function cutParts(
   // Rendering, as an advisor reads an amendment: part 1 is the WHOLE
   // paragraph with the split-off words struck through, the later parts are
   // those words — so the first row shows what was taken out.
-  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn) }, ...quotesEn.map((q) => ({ main: q }))] };
+  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn) }, ...quotesEn.map((q) => ({ main: sentenceCase(q) }))] };
 
   const fallback = (code: string, detail: string): { parts: PartTexts[] } => ({
     parts: enParts.map((p, i) => ({
@@ -299,7 +299,7 @@ async function cutParts(
   return {
     parts: [
       { main: struck(paraLang, langQuotes), warning },
-      ...langQuotes.map((q) => ({ main: q })),
+      ...langQuotes.map((q) => ({ main: sentenceCase(q) })),
     ],
   };
 }
@@ -309,6 +309,11 @@ function struck(paragraph: string, quotes: string[]): string {
   let out = paragraph;
   for (const q of quotes) out = out.replace(q, `<s>${q}</s>`);
   return out;
+}
+
+/** The split-off words stand alone in their row, so they open with a capital ("Di tutti i tipi"). */
+function sentenceCase(words: string): string {
+  return words.charAt(0).toLocaleUpperCase() + words.slice(1);
 }
 
 /**

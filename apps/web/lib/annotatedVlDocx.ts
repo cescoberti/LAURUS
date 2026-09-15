@@ -69,10 +69,11 @@ function para(value: string | null, align: (typeof AlignmentType)[keyof typeof A
 function cell(
   width: number,
   children: Paragraph[],
-  opts: { fill?: string; valign?: "top" | "center" | "bottom" } = {},
+  opts: { fill?: string; valign?: "top" | "center" | "bottom"; span?: number } = {},
 ): TableCell {
   return new TableCell({
     width: { size: width, type: WidthType.DXA },
+    columnSpan: opts.span,
     shading: opts.fill ? { fill: opts.fill } : undefined,
     verticalAlign: opts.valign ?? VerticalAlign.CENTER,
     margins: { top: 30, bottom: 30, left: 90, right: 90 },
@@ -111,14 +112,13 @@ function dataRows(row: AnnotatedVlRow): TableRow[] {
       ],
     }),
   );
+  // Part rows as on the Tabling Service list (and on a finished ECR list):
+  // the part number — "1", "2 RCV" — in one cell spanning Subject…RCV.
   for (const part of row.splitParts) {
     out.push(
       new TableRow({
         children: [
-          cell(COL_W[0]!, [para("", C)]),
-          cell(COL_W[1]!, [para("", C)]),
-          cell(COL_W[2]!, [para("", C)]),
-          cell(COL_W[3]!, [para(part.label, C)]),
+          cell(COL_W[0]! + COL_W[1]! + COL_W[2]! + COL_W[3]!, [para(part.label, C)], { span: 4 }),
           cell(COL_W[4]!, [para(part.vote, C, { bold: true })]),
           cell(COL_W[5]!, [para(part.remarks, J, { italics: true })], { valign: VerticalAlign.TOP }),
         ],
