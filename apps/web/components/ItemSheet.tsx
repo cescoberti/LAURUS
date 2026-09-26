@@ -34,7 +34,7 @@ export function ItemSheet({
   const scrimRef = useRef<HTMLDivElement>(null);
   const x = useRef(0); // current translateX in px; 0 = open
   const anim = useRef<ReturnType<typeof spring> | null>(null);
-  const drag = useRef<{ x0: number; base: number; hist: Array<[number, number]> } | null>(null);
+  const drag = useRef<{ x0: number; y0: number; base: number; active: boolean; hist: Array<[number, number]> } | null>(null);
   const [shown, setShown] = useState<DisplayItem | null>(item);
   const [mounted, setMounted] = useState(false);
 
@@ -84,16 +84,40 @@ export function ItemSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [item, onClose]);
 
+  // A window resized while the sheet is away changes where "away" is.
+  useEffect(() => {
+    if (item) return;
+    const onResize = () => paint(width());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item]);
+
   // 1:1 drag with the grab offset respected; velocity handoff on release.
+  // A gesture only becomes a drag once it has moved ~10px and is going
+  // sideways — below that it is a tap, and downwards it is the body
+  // scrolling (which `touch-pan-y` leaves to the browser).
+  const THRESHOLD = 10;
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
-    if ((e.target as HTMLElement).closest("a, button, input, textarea")) return;
+    if (!e.isPrimary || (e.target as HTMLElement).closest("a, button, input, textarea, select, details")) return;
     anim.current?.stop();
-    sheetRef.current?.setPointerCapture(e.pointerId);
-    drag.current = { x0: e.clientX, base: x.current, hist: [[e.clientX, performance.now()]] };
+    drag.current = { x0: e.clientX, y0: e.clientY, base: x.current, active: false, hist: [[e.clientX, performance.now()]] };
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLElement>) => {
     const d = drag.current;
     if (!d) return;
+    const dx = e.clientX - d.x0;
+    if (!d.active) {
+      const dy = e.clientY - d.y0;
+      if (Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        drag.current = null; // a scroll, not a dismissal
+        return;
+      }
+      d.active = true;
+      d.x0 = e.clientX; // no jump: the drag starts where it was recognised
+      sheetRef.current?.setPointerCapture(e.pointerId);
+    }
     let v = d.base + (e.clientX - d.x0);
     if (v < 0) v = (v * 0.55 * 300) / (300 + 0.55 * Math.abs(v)); // rubber-band past the open edge
     paint(v);
@@ -102,8 +126,8 @@ export function ItemSheet({
   };
   const onPointerUp = () => {
     const d = drag.current;
-    if (!d) return;
     drag.current = null;
+    if (!d?.active) return;
     const [x1, t1] = d.hist[0]!;
     const [x2, t2] = d.hist[d.hist.length - 1]!;
     const vel = ((x2 - x1) / Math.max(1, t2 - t1)) * 1000;
@@ -125,11 +149,12 @@ export function ItemSheet({
       <aside
         ref={sheetRef}
         aria-hidden={!item}
+        inert={!item} // off-screen: not in the tab order either
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="fixed bottom-2.5 right-2.5 top-2.5 z-40 flex w-[min(30rem,calc(100vw-20px))] touch-none flex-col overflow-hidden rounded-2xl border border-white/60 bg-[rgba(250,250,247,0.86)] shadow-sheet backdrop-blur-2xl backdrop-saturate-150 will-change-transform"
+        className="fixed bottom-2.5 right-2.5 top-2.5 z-40 flex w-[min(30rem,calc(100vw-20px))] touch-pan-y flex-col overflow-hidden rounded-2xl border border-white/60 bg-[rgba(250,250,247,0.86)] shadow-sheet backdrop-blur-2xl backdrop-saturate-150 will-change-transform"
         style={{ transform: "translateX(110%)" }}
       >
         {it && (

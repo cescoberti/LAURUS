@@ -42,7 +42,7 @@ export default async function InvitiPage() {
               type="email"
               name="email"
               placeholder="nome@europarl.europa.eu"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
             />
           </div>
           <button type="submit" className="rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800">

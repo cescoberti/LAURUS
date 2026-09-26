@@ -96,7 +96,7 @@ export function OnboardingWizard({
                     type="button"
                     onClick={() => toggleCommittee(c.code)}
                     className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                      on ? "border-laurel-400 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
+                      on ? "border-eu-600 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
                     }`}
                   >
                     <span className={`font-mono text-xs font-semibold ${on ? "text-eu-700" : "text-ink-300"}`}>{c.code}</span>
@@ -119,7 +119,7 @@ export function OnboardingWizard({
                   type="button"
                   onClick={() => setLanguage(l.code)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                    language === l.code ? "border-laurel-400 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
+                    language === l.code ? "border-eu-600 bg-eu-50 text-eu-900" : "border-slate-200 text-ink-700 hover:bg-slate-50"
                   }`}
                 >
                   <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}

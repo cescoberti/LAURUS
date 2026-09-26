@@ -52,7 +52,7 @@ export default async function SettingsPage() {
               id="vl_language"
               name="vl_language"
               defaultValue={defaultLang}
-              className="mt-1 block w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 focus:border-laurel-400 focus:outline-none"
+              className="mt-1 block w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 focus:border-eu-600 focus:outline-none"
             >
               {[...EU_LANGUAGES].sort((a, b) => (a.code === "it" ? -1 : b.code === "it" ? 1 : a.code === "en" ? -1 : b.code === "en" ? 1 : 0)).map((l) => (
                 <option key={l.code} value={l.code}>
@@ -73,7 +73,7 @@ export default async function SettingsPage() {
               type="tel"
               defaultValue={profile?.whatsapp_phone ?? ""}
               placeholder="+39 333 1234567"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
             />
             <p className="mt-1 text-xs text-ink-300">
               With international prefix. Used for reminders and for the WhatsApp bot.

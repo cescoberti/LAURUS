@@ -25,7 +25,7 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
             required
             defaultValue={presetEmail ?? ""}
             readOnly={!!presetEmail}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-laurel-400 focus:outline-none read-only:bg-slate-50 read-only:text-ink-500"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-eu-600 focus:outline-none read-only:bg-slate-50 read-only:text-ink-500"
           />
         </div>
         <div>
@@ -36,7 +36,7 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
             required
             minLength={8}
             placeholder="at least 8 characters"
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
           />
         </div>
         {state?.error && <p className="text-sm text-red-700">{state.error}</p>}

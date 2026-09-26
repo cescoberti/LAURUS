@@ -40,14 +40,17 @@ export async function approveInboxAction(formData: FormData): Promise<void> {
   const { data: msg } = await admin.from("inbox_messages").select("id, from_email, proposed_action, status").eq("id", id).single();
   if (!msg || msg.status !== "new") return;
 
-  // The admin may have corrected the form before approving.
-  const action = msg.proposed_action as ProposedAction;
+  // The admin may have corrected the form before approving. An untriaged
+  // message has no action: approving it just marks it done.
+  const action = (msg.proposed_action as ProposedAction | null) ?? { type: "none" as const };
   const committees = formData.getAll("committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
   let note = "";
 
   if (action.type === "create_invite") {
-    const email = String(formData.get("email") ?? action.email).trim().toLowerCase();
-    const lang = String(formData.get("vl_language") ?? action.vl_language);
+    const typed = String(formData.get("email") ?? "").trim().toLowerCase();
+    const email = typed || action.email;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`"${email}" is not a valid email address.`);
+    const lang = String(formData.get("vl_language") || action.vl_language);
     const prefill = { full_name: String(formData.get("full_name") ?? action.full_name ?? ""), ep_group: action.ep_group, committees, vl_language: lang };
     const { data: invite, error } = await admin.from("invites").insert({ email, created_by: user.id, prefill }).select("token").single();
     if (error) throw new Error(error.message);
@@ -60,8 +63,9 @@ export async function approveInboxAction(formData: FormData): Promise<void> {
       note = `Invite created (email not configured): ${url}`;
     }
   } else if (action.type === "update_committees") {
-    const { error } = await admin.from("users").update({ committees }).eq("email", action.email);
+    const { data: updated, error } = await admin.from("users").update({ committees }).eq("email", action.email).select("id");
     if (error) throw new Error(error.message);
+    if (!updated?.length) throw new Error(`No account with the address ${action.email}.`);
     note = `Committees set to ${committees.join(", ") || "none"} for ${action.email}`;
   } else if (action.type === "file_document") {
     note = "Filed";

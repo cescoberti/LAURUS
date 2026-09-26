@@ -34,7 +34,7 @@ export function CoveredReportsList({ reports }: { reports: CoveredReport[] }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search by rapporteur, code, committee or title…"
-        className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-laurel-400 focus:outline-none"
+        className="mb-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
       />
       {filtered.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-ink-300">

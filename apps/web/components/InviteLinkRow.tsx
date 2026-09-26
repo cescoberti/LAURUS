@@ -31,7 +31,7 @@ export function InviteLinkRow({
             {new Date(createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           </span>
         </div>
-        <p className="mt-1 truncate font-mono text-xs text-ink-400">{url}</p>
+        <p className="mt-1 truncate font-mono text-xs text-ink-300">{url}</p>
       </div>
       {status === "active" && (
         <button

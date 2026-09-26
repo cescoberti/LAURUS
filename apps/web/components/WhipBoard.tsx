@@ -154,7 +154,7 @@ function AdvisorSelect({
           await reassignAdvisorAction(fd);
           setSaving(false);
         }}
-        className="max-w-[160px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-ink-900 focus:border-laurel-400 focus:outline-none"
+        className="max-w-[160px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-ink-900 focus:border-eu-600 focus:outline-none"
       >
         <option value="">— unassigned —</option>
         {all.map((a) => (

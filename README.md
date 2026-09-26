@@ -49,6 +49,24 @@ The flagship *Remarks* matcher (`packages/parser/src/matchAmendmentRef.ts`) is
 unresolved rows (paragraph refs, withdrawn/oral/compromise amendments, missing
 numbers) become anomalies for human review.
 
+## Environment
+
+The web app reads these at runtime (local: `apps/web/.env.local`; production:
+Vercel → Settings → Environment Variables). Never commit any of them.
+
+| Variable | What it unlocks | Without it |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the app | nothing works |
+| `SUPABASE_SERVICE_ROLE_KEY` | server-side writes (invites, inbox, live sync) | admin flows fail |
+| `NEXT_PUBLIC_SITE_URL` | absolute links in emails | invite links come out relative |
+| `RESEND_API_KEY` | sending mail (alerts, verified VLs) | notifications disabled |
+| `EMAIL_FROM` | the From address, e.g. `LAURUS <alerts@laurus.the361.eu>` | falls back to `onboarding@resend.dev`, which only reaches the account owner |
+| `RESEND_ADMIN_KEY` | reading received mail (the send-only key cannot) | `/api/inbound` 500s |
+| `RESEND_WEBHOOK_SECRET` | the `email.received` signature check | every inbound call is rejected (fails closed) |
+| `ANTHROPIC_API_KEY` | inbox triage + Italian rendering of split parts | mail queues untriaged; split rows keep the official notation |
+| `INBOX_ADDRESS`, `HELLO_ADDRESS` | the two addresses shown on `/admin/inbox` | defaults to `inbox@`/`hello@laurus.the361.eu` |
+| `TWILIO_*` | WhatsApp alerts | email only |
+
 ## Database
 
 ```bash
