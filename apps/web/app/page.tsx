@@ -108,7 +108,7 @@ export default async function Dashboard({
                 <Stat value={items.filter((i) => i.mine).length} label={viewer.committees.length ? viewer.committees.join(" · ") : "my committees"} />
               </div>
             </div>
-            <TodayBoard items={items} today={today} sessionEnd={active.end_date} />
+            <TodayBoard items={items} today={today} sessionEnd={active.end_date} vlLanguage={viewer.vlLanguage} />
           </section>
         )}
 

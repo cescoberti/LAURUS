@@ -11,13 +11,25 @@ function dayWord(iso: string): string {
  * the table today (or, outside a voting day, the next ones), with the state
  * of their official list. Votes are at noon; this is what to open at 9.
  */
-export function TodayBoard({ items, today, sessionEnd }: { items: DisplayItem[]; today: string; sessionEnd: string }) {
+export function TodayBoard({
+  items,
+  today,
+  sessionEnd,
+  vlLanguage,
+}: {
+  items: DisplayItem[];
+  today: string;
+  sessionEnd: string;
+  vlLanguage: string;
+}) {
   const followed = items.filter((i) => i.following);
   const onToday = followed.filter((i) => i.voteDate === today);
   const upcoming = followed.filter((i) => i.voteDate && i.voteDate > today).sort((a, b) => a.voteDate!.localeCompare(b.voteDate!));
   const nextDay = upcoming[0]?.voteDate;
   const shown = onToday.length ? onToday : upcoming.filter((i) => i.voteDate === nextDay);
   const past = today > sessionEnd;
+  const day = onToday.length ? today : nextDay;
+  const withList = shown.filter((i) => i.officialVl || i.amCount > 0).length;
 
   const eyebrow = onToday.length
     ? `Today · ${dayWord(today)} · votes at 12:00`
@@ -50,6 +62,19 @@ export function TodayBoard({ items, today, sessionEnd }: { items: DisplayItem[];
           <li className="text-[13px] leading-snug opacity-80">Press the star on a row: you get an email within minutes when its list or amendments change.</li>
         )}
       </ul>
+
+      {/* One file to print and carry in: every list of that day, in order. */}
+      {day && withList > 0 && (
+        <a
+          href={`/api/annotated-vl/bundle?day=${day}&lang=${vlLanguage}`}
+          className="press mt-3.5 flex items-center justify-between rounded-xl bg-white/15 px-3.5 py-2.5 text-[13px] font-semibold backdrop-blur-sm hover:bg-white/25"
+        >
+          <span>
+            ↓ All {withList} list{withList === 1 ? "" : "s"} in one file · {vlLanguage.toUpperCase()}
+          </span>
+          <small className="font-medium opacity-70">.docx · unverified</small>
+        </a>
+      )}
     </aside>
   );
 }

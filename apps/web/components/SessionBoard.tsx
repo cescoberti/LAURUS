@@ -118,7 +118,14 @@ export function SessionBoard({
       )}
 
       {groups.map((g) => (
-        <ItemRows key={g.iso} group={g} isToday={g.iso === today} onOpen={(i) => setOpenCode(i.code)} onToggleFollow={toggleFollow} />
+        <ItemRows
+          key={g.iso}
+          group={g}
+          isToday={g.iso === today}
+          vlLanguage={vlLanguage}
+          onOpen={(i) => setOpenCode(i.code)}
+          onToggleFollow={toggleFollow}
+        />
       ))}
 
       <ItemSheet item={open} vlLanguage={vlLanguage} onClose={() => setOpenCode(null)} onToggleFollow={toggleFollow} />

@@ -12,14 +12,19 @@ import { CommitteeChip, ListState, Star } from "./badges";
 export function ItemRows({
   group,
   isToday,
+  vlLanguage,
   onOpen,
   onToggleFollow,
 }: {
   group: DayGroup;
   isToday: boolean;
+  vlLanguage: string;
   onOpen: (item: DisplayItem) => void;
   onToggleFollow: (item: DisplayItem) => void;
 }) {
+  // One file to carry into the chamber: every list the member follows that day.
+  const followedWithList = group.items.filter((i) => i.following && (i.officialVl || i.amCount > 0));
+
   return (
     <section className="mt-7">
       <div className="mb-2 flex items-baseline gap-2 px-1">
@@ -27,6 +32,15 @@ export function ItemRows({
         <span className="text-xs text-ink-300">{group.items.length} items</span>
         {isToday && (
           <span className="ml-1 rounded-full bg-gold-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-900">today</span>
+        )}
+        {followedWithList.length > 0 && group.iso && (
+          <a
+            href={`/api/annotated-vl/bundle?day=${group.iso}&lang=${vlLanguage}`}
+            className="press ml-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-semibold text-eu-900 hover:bg-eu-50"
+            title={`The ${followedWithList.length} list${followedWithList.length === 1 ? "" : "s"} you follow for this day, in one .docx — unverified`}
+          >
+            ↓ My lists for this day ({followedWithList.length})
+          </a>
         )}
       </div>
 
