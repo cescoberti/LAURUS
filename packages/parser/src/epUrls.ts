@@ -13,3 +13,12 @@ export function amendmentBlockUrl(identifier: string, language: string): string 
   const store = identifier.startsWith("B-") ? "reds_iPlRe_Amd" : "reds_iPlRp_Amd";
   return `${EP_BASE}/distribution/${store}/${identifier}/${identifier}_${language}.docx`;
 }
+
+/**
+ * DOCX of the text itself: a report (A-…) under `reds_iPlRp`, a motion for a
+ * resolution (B-…) under `reds_iPlRe`. Same split as the amendment stores.
+ */
+export function documentTextUrl(identifier: string, language: string): string {
+  const store = identifier.startsWith("B-") ? "reds_iPlRe" : "reds_iPlRp";
+  return `${EP_BASE}/distribution/${store}/${identifier}/${identifier}_${language.toLowerCase()}.docx`;
+}

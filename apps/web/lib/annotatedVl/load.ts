@@ -18,7 +18,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { parseIndicativeVotingList, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseMotionText, type MotionText } from "@laurus/parser/report-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
-import { EP_BASE } from "@laurus/parser";
+import { documentTextUrl } from "@laurus/parser";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { fillRemarks, type AmendmentText, type FillReport } from "@/lib/fillRemarks";
 import { buildVlFromAmendments, type DbAmendment } from "./fromDb";
@@ -57,12 +57,12 @@ function bytesOf(hex: string): Buffer {
   return Buffer.from(hex.startsWith("\\x") ? hex.slice(2) : hex, "hex");
 }
 
-/** The report's motion for a resolution in `lang`, from the EP distribution DOCX. */
+/** The motion for a resolution in `lang` — of a report (A-) or a motion (B-). */
 export async function motionFor(epWorkId: string | null, lang: string): Promise<MotionText | null> {
   const id = epWorkId?.split("/").pop();
   if (!id) return null;
   try {
-    const buf = await fetchBytesWithBackoff(`${EP_BASE}/distribution/reds_iPlRp/${id}/${id}_${lang.toLowerCase()}.docx`);
+    const buf = await fetchBytesWithBackoff(documentTextUrl(id, lang));
     return buf ? await parseMotionText(buf) : null;
   } catch {
     return null;

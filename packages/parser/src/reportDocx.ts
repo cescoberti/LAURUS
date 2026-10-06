@@ -46,7 +46,7 @@ export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer)
   const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
   const { value: html } = await mammoth.convertToHtml({ buffer: buf }, { styleMap: STYLE_MAP });
 
-  for (const section of html.split(/<h1>/i).slice(1)) {
+  const read = (section: string): MotionText => {
     const motion: MotionText = { citations: [], recitals: new Map(), paragraphs: new Map() };
     for (const m of section.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
       const text = plain(m[1] ?? "");
@@ -56,9 +56,18 @@ export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer)
       else if ((r = RECITAL_RE.exec(text))) motion.recitals.set(r[1]!, text);
       else if ((r = PARAGRAPH_RE.exec(text))) motion.paragraphs.set(Number(r[1]), text);
     }
+    return motion;
+  };
+
+  // A report carries its motion in a section of its own, after the explanatory
+  // statement and the annexes — take the first that reads as one.
+  for (const section of html.split(/<h1>/i).slice(1)) {
+    const motion = read(section);
     if (motion.citations.length && motion.paragraphs.size) return motion;
   }
-  return null;
+  // A motion for a resolution (B-…) IS the motion: no section to pick.
+  const whole = read(html);
+  return whole.citations.length && whole.paragraphs.size ? whole : null;
 }
 
 /**

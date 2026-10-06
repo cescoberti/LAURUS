@@ -620,10 +620,25 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
   const wwwHeaders = cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS;
   const entries = parseVotesPage(html).filter((e) => e.docxUrl);
 
-  const { data: items } = await supabase.from("items").select("id, code, vote_date").eq("session_id", s.id);
+  const { data: items } = await supabase.from("items").select("id, code, vote_date, family_key").eq("session_id", s.id);
   const byCode = new Map((items ?? []).map((i) => [i.code as string, i]));
-  const resolve = (code: string) =>
-    byCode.get(code) ?? (code.includes("/") ? undefined : (items ?? []).find((i) => (i.code as string).startsWith(`${code}/`)));
+  const byFamily = new Map<string, (typeof items)[number]>();
+  for (const i of items ?? []) {
+    const key = i.family_key as string | null;
+    if (key && !byFamily.has(key)) byFamily.set(key, i);
+  }
+  /**
+   * By code, else by prefix when the page gives no year, else by subject: the
+   * list of a wind-up debate is named after the motion the amendments sit on
+   * ("B10_0424_Islamist entryism.docx"), which is rarely the motion on the
+   * agenda — but every motion of the debate carries the same title.
+   */
+  const resolve = (e: { code: string; title: string | null }) => {
+    const byExact = byCode.get(e.code) ?? (e.code.includes("/") ? undefined : (items ?? []).find((i) => (i.code as string).startsWith(`${e.code}/`)));
+    if (byExact) return byExact;
+    const key = subjectKey(e.title);
+    return key ? byFamily.get(key) : undefined;
+  };
 
   const { data: stored } = await supabase
     .from("voting_lists")
@@ -637,7 +652,7 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
   let fetched = 0;
   let unchanged = 0;
   for (const e of entries) {
-    const item = resolve(e.code);
+    const item = resolve(e);
     if (!item) continue; // a file this session does not track (e.g. a C document)
     listed++;
 

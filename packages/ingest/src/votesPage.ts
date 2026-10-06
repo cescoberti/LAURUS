@@ -52,6 +52,19 @@ function isoDay(heading: string): string | null {
   return `${m[3]}-${String(month).padStart(2, "0")}-${m[1]!.padStart(2, "0")}`;
 }
 
+/**
+ * The code as it appears in the voting-list file name. The Tabling Service is
+ * not consistent about the separator — "(A10-0241_2026)_Sousa Silva.docx",
+ * "A10-0243_Stefanuta.docx", "B10_0424_Islamist entryism.docx" — so both "-"
+ * and "_" are accepted and the code is normalised to the hyphen form, with
+ * the year appended when the name carries it.
+ */
+function codeFromFileName(docxUrl: string): string | null {
+  const m = /\/votingList\/\(?([A-Z]+\d+)[-_](\d{4})(?:[-_](\d{4}))?/i.exec(docxUrl);
+  if (!m) return null;
+  return `${m[1]!.toUpperCase()}-${m[2]}${m[3] ? `/${m[3]}` : ""}`;
+}
+
 export function parseVotesPage(html: string): VotesPageEntry[] {
   const out: VotesPageEntry[] = [];
   // Walk the page in order: a day heading sets the current sitting; each
@@ -73,7 +86,7 @@ export function parseVotesPage(html: string): VotesPageEntry[] {
     const code =
       /<span class="reference">\s*(?:<span class="reference">)?\s*([A-Z]+\d+-\d+\/\d{4})/i.exec(block)?.[1] ??
       /<p class="rapporteurs">\s*([A-Z]+\d+-\d+\/\d{4})\s*<\/p>/i.exec(block)?.[1] ??
-      (docxUrl ? /\/votingList\/\(?([A-Z]+\d+-\d{4})(?:_(\d{4}))?/i.exec(docxUrl) : null)?.slice(1).filter(Boolean).join("/") ??
+      (docxUrl ? codeFromFileName(docxUrl) : null) ??
       null;
     if (!code) continue;
     const pdfUrl = /href="([^"]+\.pdf[^"]*)"/i.exec(block)?.[1]?.replace(/&amp;/g, "&") ?? null;
