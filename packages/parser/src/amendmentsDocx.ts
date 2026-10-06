@@ -215,7 +215,8 @@ function parseTokenBlocks(html: string, language: string): ParsedAmendment[] {
       language,
       kind: classifyKind(rawNum, headerText),
       target: target || undefined,
-      tabledBy: docAmend || undefined,
+      // "S&amp;D" comes straight out of the template token: decode it.
+      tabledBy: docAmend ? textOf(docAmend) : undefined,
       ...columns,
     });
   }

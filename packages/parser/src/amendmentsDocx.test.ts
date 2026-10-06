@@ -91,3 +91,22 @@ test("consolidates EN + IT of the same report by amendment number", async () => 
   assert.equal(one.target.it, "Articolo 135 – titolo");
   assert.match(one.amendedText.it ?? "", /agenzie e agli organismi dell'Unione/);
 });
+
+// Amendments to a MOTION FOR A RESOLUTION (B-document): same plenary template
+// as a report's, tabled by groups. Captured 2026-10-06 from B10-0424/2026
+// (Islamist entryism), the motion the whole family's amendments sit on.
+test("parses amendments tabled on a motion for a resolution", async () => {
+  const ams = await parseAmendmentsDocx(fixture("am-B-10-2026-0424-AM-009-011-en.docx"), "en");
+
+  assert.deepEqual(ams.map((a) => a.number), [9, 10, 11]);
+  const nine = ams[0]!;
+  assert.equal(nine.target, "Recital G a (new)");
+  assert.equal(nine.tabledBy, "ECR");
+  assert.equal(nine.originalText ?? "", ""); // a new recital has no present text
+  assert.match(nine.amendedText ?? "", /Council of European Muslims/);
+});
+
+test("an author written as an entity in the template is decoded", async () => {
+  const ams = await parseAmendmentsDocx(fixture("am-B-10-2026-0424-AM-009-011-en.docx"), "en");
+  for (const a of ams) assert.doesNotMatch(a.tabledBy ?? "", /&(amp|nbsp|quot);/);
+});

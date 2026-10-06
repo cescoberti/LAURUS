@@ -120,6 +120,22 @@ function sittingDays(s: Session): string[] {
 // 1. Agenda
 // ---------------------------------------------------------------------------
 
+/**
+ * Fill the family key of this session's items from the title they already
+ * have. Pure string work, no API call, idempotent.
+ */
+async function backfillFamilies(s: Session): Promise<void> {
+  const { data: rows } = await supabase
+    .from("items")
+    .select("id, title")
+    .eq("session_id", s.id)
+    .is("family_key", null);
+  for (const r of rows ?? []) {
+    const key = subjectKey((r.title as { en?: string } | null)?.en);
+    if (key) await supabase.from("items").update({ family_key: key }).eq("id", r.id as string);
+  }
+}
+
 async function syncAgenda(s: Session, days: string[]): Promise<number> {
   const seen = new Map<string, { identifier: string; code: string; title: { en: string; it: string } }>();
   for (const day of days) {
@@ -164,6 +180,8 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
     return { ...f, committee, rapporteur };
   });
 
+  await backfillFamilies(s);
+
   if (enriched.length) {
     const { error } = await supabase.from("items").upsert(
       enriched.map((e) => ({
@@ -174,6 +192,7 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
         rapporteur: e.rapporteur ?? null,
         committee: e.committee ?? null,
         committees: e.committee ? [e.committee] : null,
+        family_key: subjectKey(e.title.en),
       })),
       { onConflict: "session_id,code" },
     );
@@ -305,6 +324,75 @@ function blockPrefix(code: string): string | null {
   return `${prefix}-${term}-${year}-${num!.padStart(4, "0")}-AM-`;
 }
 
+/**
+ * The subject a motion is about, normalised — the only thing the motions of
+ * one debate share. (`based_on` is NOT it: that is the Rule they are tabled
+ * under, so Rule 136 would lump every wind-up debate of the week together.)
+ *   "MOTION FOR A RESOLUTION on the need for an EU strategy to counter …"
+ *   "The need for an EU strategy to counter …"                → same key
+ * Returns null for a title too short to identify a debate safely.
+ */
+function subjectKey(title: string | null | undefined): string | null {
+  if (!title) return null;
+  const key = title
+    .toLowerCase()
+    .replace(/^\s*(draft\s+)?(joint\s+)?(motion|proposal)\s+for\s+a\s+(joint\s+)?resolution\b/, "")
+    .replace(/^[\s:–-]*on\s+/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return key.length >= 25 ? key : null;
+}
+
+/** English title of an EP document record. */
+function titleOf(doc: unknown): string | undefined {
+  const t = (doc as { title_dcterms?: Record<string, string> } | undefined)?.title_dcterms;
+  return t?.en;
+}
+
+/** `B-10-2026-0424-AM-001-007` → `B-10-2026-0424` (the motion it amends). */
+function parentDocument(blockIdentifier: string): string | null {
+  const m = blockIdentifier.match(/^([A-Z]-\d+-\d{4}-\d{4})-AM-/);
+  return m ? m[1]! : null;
+}
+
+/**
+ * Motions of one debate that we have no item for still carry the family's
+ * amendments (each group tables its own motion; the amendments go on one of
+ * them, often not the one on the agenda). Resolve those blocks through the
+ * family key, so they reach the item the advisor actually sees. Bounded: only
+ * B- motions of this session's own numbering range are looked up, and each
+ * parent document is asked about once per run.
+ */
+async function familyOwners(
+  s: Session,
+  unmatched: string[],
+  itemsByFamily: Map<string, string>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>(); // block identifier → item id
+  if (itemsByFamily.size === 0) return out;
+
+  const numbers = [...new Set(unmatched.map(parentDocument).filter((x): x is string => !!x))];
+  const inRange = numbers.filter((id) => id.startsWith("B-"));
+  if (inRange.length === 0) return out;
+
+  const family = new Map<string, string | null>();
+  for (const id of inRange) {
+    try {
+      family.set(id, subjectKey(titleOf(await getDocument(id))));
+    } catch {
+      family.set(id, null);
+    }
+    await sleep(300);
+  }
+  for (const block of unmatched) {
+    const parent = parentDocument(block);
+    const key = parent ? family.get(parent) : null;
+    const itemId = key ? itemsByFamily.get(key) : undefined;
+    if (itemId) out.set(block, itemId);
+  }
+  return out;
+}
+
 async function listAmendmentBlocks(year: number): Promise<string[]> {
   const out: string[] = [];
   for (let offset = 0; offset < 6000; offset += 500) {
@@ -355,22 +443,42 @@ async function fetchBlock(identifier: string, lang: string): Promise<Buffer | nu
 }
 
 async function syncAmendments(s: Session): Promise<{ blocks: number; items: number }> {
-  const { data: items } = await supabase.from("items").select("id, code").eq("session_id", s.id);
+  const { data: items } = await supabase.from("items").select("id, code, family_key").eq("session_id", s.id);
   const prefixes = new Map<string, string>(); // prefix → item id
+  const itemsByFamily = new Map<string, string>(); // based_on → item id
   for (const it of items ?? []) {
     const p = blockPrefix(it.code as string);
     if (p) prefixes.set(p, it.id as string);
+    const key = it.family_key as string | null;
+    // First come, first served: the agenda lists one motion per debate.
+    if (key && !itemsByFamily.has(key)) itemsByFamily.set(key, it.id as string);
   }
   if (prefixes.size === 0) return { blocks: 0, items: 0 };
 
   const year = Number(s.start_date.slice(0, 4));
   const index = await listAmendmentBlocks(year);
-  const wanted = index
+  const matched = index
     .map((id) => {
       const p = [...prefixes.keys()].find((pre) => id.startsWith(pre));
       return p ? { id, itemId: prefixes.get(p)! } : null;
     })
     .filter((x): x is { id: string; itemId: string } => !!x);
+
+  // Amendments tabled on a sibling motion of the same debate.
+  const codes = new Set((items ?? []).map((it) => it.code as string));
+  const sessionB = [...codes].filter((c) => c.startsWith("B")).map((c) => Number(c.slice(4, 8)));
+  const lo = sessionB.length ? Math.min(...sessionB) - 40 : 0;
+  const hi = sessionB.length ? Math.max(...sessionB) + 40 : 0;
+  const unmatched = index.filter((id) => {
+    if (matched.some((m) => m.id === id)) return false;
+    const parent = parentDocument(id);
+    if (!parent?.startsWith("B-") || !parent.includes(`-${year}-`)) return false;
+    const n = Number(parent.slice(-4));
+    return n >= lo && n <= hi;
+  });
+  const adopted = await familyOwners(s, unmatched, itemsByFamily);
+  if (adopted.size) console.log(`  ${adopted.size} block(s) adopted through the motion family`);
+  const wanted = [...matched, ...[...adopted].map(([id, itemId]) => ({ id, itemId }))];
 
   const { data: doneRows } = await supabase
     .from("ingested_blocks")
