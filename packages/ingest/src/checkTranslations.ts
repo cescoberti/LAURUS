@@ -3,6 +3,7 @@
  *
  *   npm run check-translations -- B10-0423/2026 B10-0424/2026        # it
  *   npm run check-translations -- B10-0424/2026 fr                   # one language
+ *   npm run check-translations -- --any B10-0423/2026 B10-0424/2026  # first one ready wins
  *
  * Read-only, no database, no key: it enumerates the file's AMENDMENT_LIST
  * blocks from `/api/v2/documents` and asks each block's metadata which
@@ -10,8 +11,9 @@
  * missing has not been translated yet — the DOCX is simply not published, so
  * `syncAmendments` would 404 on it.
  *
- * Exit code 0 when every block of every file is there (useful in a watch
- * loop), 1 when something is still missing — so:
+ * Exit code 0 when every block of every file is there — or, with `--any`,
+ * as soon as ONE file is complete, which is what you want when either file
+ * being ready is enough to start working. 1 while nothing qualifies, so:
  *
  *   until npm run -s check-translations -- B10-0424/2026; do sleep 600; done
  */
@@ -21,11 +23,13 @@ const BASE = "https://data.europarl.europa.eu";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2).map((s) => s.trim()).filter(Boolean);
-const LANG = (args.find((a) => /^[a-z]{2}$/.test(a)) ?? "it").toLowerCase();
-const CODES = args.filter((a) => !/^[a-z]{2}$/.test(a));
+const ANY = args.includes("--any");
+const rest = args.filter((a) => a !== "--any");
+const LANG = (rest.find((a) => /^[a-z]{2}$/.test(a)) ?? "it").toLowerCase();
+const CODES = rest.filter((a) => !/^[a-z]{2}$/.test(a));
 
 if (!CODES.length) {
-  console.error("usage: check-translations <code…> [lang]   e.g. B10-0424/2026 it");
+  console.error("usage: check-translations [--any] <code…> [lang]   e.g. B10-0424/2026 it");
   process.exit(2);
 }
 
@@ -87,7 +91,8 @@ async function issuedIn(id: string, lang: string): Promise<string | null> {
   return null;
 }
 
-let complete = true;
+let allComplete = true;
+let oneComplete = false;
 
 for (const code of CODES) {
   const { stem, year } = stemOf(code);
@@ -107,12 +112,14 @@ for (const code of CODES) {
 
   const label = `${code} — ${done.length}/${blocks.length} blocks in ${LANG.toUpperCase()}`;
   if (missing.length) {
-    complete = false;
+    allComplete = false;
     console.log(`\n${label}\n  still missing: Am ${missing.join(", ")}`);
   } else {
+    oneComplete = true;
     console.log(`\n${label} — complete ✓`);
   }
 }
 
-console.log(complete ? "\nAll requested files are fully translated." : "\nStill waiting.");
-process.exit(complete ? 0 : 1);
+const done = ANY ? oneComplete : allComplete;
+console.log(done ? (ANY ? "\nOne file is ready." : "\nAll requested files are fully translated.") : "\nStill waiting.");
+process.exit(done ? 0 : 1);
