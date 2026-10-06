@@ -13,11 +13,17 @@ export const runtime = "nodejs";
  *
  * Called by the live-sync workflow after every tick during a plenary week.
  * For each item follow (subscriptions, scope='item') the file's current
- * state is fingerprinted — amendment count, which VOT languages exist, the
- * version of the EP's official voting list — and
+ * state is fingerprinted — amendment count, how many of those amendments
+ * exist in the follower's own voting-list language, which VOT languages
+ * exist, the version of the EP's official voting list — and
  * a message goes out only when that fingerprint has not been announced to
  * that subscription before (vl_alerts). So: one message per real change,
  * none for the ticks where nothing happened.
+ *
+ * The language count is in there because translation is what an advisor
+ * actually waits for: the amendment numbers appear in the original language
+ * hours before the Italian text the Remarks column needs, and a count-only
+ * fingerprint never moved when the translation landed.
  */
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
@@ -28,16 +34,39 @@ interface ItemState {
   rapporteur: string | null;
   title: { en?: string; it?: string };
   am_count: number;
+  /** Distinct amendment numbers present per language: {en: 137, it: 60}. */
+  amByLang: Record<string, number>;
   votLangs: string[];
   /** Version label of the latest official voting list, "" when none yet. */
   vlVersion: string;
 }
 
-function describe(it: ItemState, previous: { am: number; vot: string[]; vl: string } | null): string {
+/**
+ * What to say about the follower's language. `before` is null for a receipt
+ * written before the language dimension existed: the count is then unknown,
+ * not zero, so nothing is claimed about it.
+ */
+function translationBit(it: ItemState, lang: string, before: number | null): string | null {
+  const now = it.amByLang[lang] ?? 0;
+  const L = lang.toUpperCase();
+  if (now === 0 || now === before) return null;
+  if (it.am_count > 0 && now >= it.am_count) {
+    return before === null ? `all ${it.am_count} amendments available in ${L}` : `all ${it.am_count} amendments now in ${L}`;
+  }
+  return `${L}: ${now} of ${it.am_count} amendments translated`;
+}
+
+function describe(
+  it: ItemState,
+  previous: { am: number; vot: string[]; vl: string; inLang: number | null } | null,
+  lang: string,
+): string | null {
   const bits: string[] = [];
   if (!previous) {
     if (it.vlVersion) bits.push(`official voting list published (${it.vlVersion})`);
     if (it.am_count > 0) bits.push(`${it.am_count} amendment${it.am_count === 1 ? "" : "s"} loaded`);
+    const t = translationBit(it, lang, null);
+    if (t) bits.push(t);
     if (it.votLangs.length) bits.push("split/separate requests loaded");
   } else {
     if (it.vlVersion && it.vlVersion !== previous.vl) {
@@ -49,9 +78,13 @@ function describe(it: ItemState, previous: { am: number; vot: string[]; vl: stri
     } else if (it.am_count !== previous.am) {
       bits.push(`amendments now ${it.am_count}`);
     }
+    const t = translationBit(it, lang, previous.inLang);
+    if (t) bits.push(t);
     if (it.votLangs.length && !previous.vot.length) bits.push("split/separate requests loaded");
   }
-  return bits.join(" · ") || "voting-list material updated";
+  // Nothing worth a message: the fingerprint moved only because this receipt
+  // predates the language dimension. The caller records it and stays quiet.
+  return bits.length ? bits.join(" · ") : null;
 }
 
 export async function POST(request: Request) {
@@ -105,16 +138,23 @@ export async function POST(request: Request) {
   if (!subs.length) return NextResponse.json({ followed: 0, sent: 0 });
 
   const itemIds = [...new Set(subs.map((s) => s.target_id as string))];
-  const [{ data: items }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([
+  const [{ data: items }, { data: amLangs }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([
     admin.from("items").select("id, code, rapporteur, title, am_count").in("id", itemIds),
+    admin.from("amendment_language_counts").select("item_id, language, n").in("item_id", itemIds),
     admin.from("vot_requests").select("item_id, language").in("item_id", itemIds),
     admin.from("voting_lists").select("item_id, version_label, fetched_at").in("item_id", itemIds).order("fetched_at", { ascending: false }),
     admin
       .from("users")
-      .select("id, email, whatsapp_phone, wants_email, wants_whatsapp")
+      .select("id, email, whatsapp_phone, wants_email, wants_whatsapp, vl_language")
       .in("id", [...new Set(subs.map((s) => s.user_id as string))]),
   ]);
 
+  const amLangByItem = new Map<string, Record<string, number>>();
+  for (const a of amLangs ?? []) {
+    const byLang = amLangByItem.get(a.item_id as string) ?? {};
+    byLang[a.language as string] = a.n as number;
+    amLangByItem.set(a.item_id as string, byLang);
+  }
   const votByItem = new Map<string, string[]>();
   for (const v of vots ?? []) votByItem.set(v.item_id as string, [...(votByItem.get(v.item_id as string) ?? []), v.language as string].sort());
   const vlByItem = new Map<string, string>();
@@ -127,6 +167,7 @@ export async function POST(request: Request) {
       rapporteur: it.rapporteur as string | null,
       title: (it.title as ItemState["title"]) ?? {},
       am_count: (it.am_count as number) ?? 0,
+      amByLang: amLangByItem.get(it.id as string) ?? {},
       votLangs: votByItem.get(it.id as string) ?? [],
       vlVersion: vlByItem.get(it.id as string) ?? "",
     });
@@ -146,9 +187,16 @@ export async function POST(request: Request) {
     if (!lastBySub.has(k)) lastBySub.set(k, a.fingerprint as string);
     seen.add(`${k}|${a.fingerprint}`);
   }
+  // 'am:vot:vl' is the shape receipts had before the language count; a
+  // fingerprint with no fourth field means "unknown", never zero.
   const parseFp = (fp: string) => {
-    const [am, vot, vl] = fp.split(":");
-    return { am: Number(am ?? 0), vot: vot ? vot.split(",") : [], vl: vl ?? "" };
+    const [am, vot, vl, inLang] = fp.split(":");
+    return {
+      am: Number(am ?? 0),
+      vot: vot ? vot.split(",") : [],
+      vl: vl ?? "",
+      inLang: inLang === undefined || inLang === "" ? null : Number(inLang),
+    };
   };
 
   let sent = 0;
@@ -163,12 +211,20 @@ export async function POST(request: Request) {
     // Nothing to announce until there is something on the file.
     if (it.am_count === 0 && it.votLangs.length === 0 && !it.vlVersion) continue;
 
-    const fingerprint = `${it.am_count}:${it.votLangs.join(",")}:${it.vlVersion}`;
+    const lang = ((u.vl_language as string | null) ?? "it").toLowerCase();
+    const fingerprint = `${it.am_count}:${it.votLangs.join(",")}:${it.vlVersion}:${it.amByLang[lang] ?? 0}`;
     const key = `${sub.id}|${it.id}`;
     if (seen.has(`${key}|${fingerprint}`)) continue;
 
     const previous = lastBySub.has(key) ? parseFp(lastBySub.get(key)!) : null;
-    const what = describe(it, previous);
+    const what = describe(it, previous, lang);
+    if (what === null) {
+      // Only the fingerprint format moved. Record it so this state is settled,
+      // and send nothing.
+      await admin.from("vl_alerts").insert({ subscription_id: sub.id, item_id: it.id, fingerprint, channel: sub.channel });
+      seen.add(`${key}|${fingerprint}`);
+      continue;
+    }
     const who = rapporteurLabel(it.rapporteur) ?? it.code;
     const title = it.title.en || it.title.it || "";
     const link = `${SITE}/items/${encodeURIComponent(it.code)}`;
