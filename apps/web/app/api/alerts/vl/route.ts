@@ -42,9 +42,10 @@ interface ItemState {
 }
 
 /**
- * What to say about the follower's language. `before` is null for a receipt
- * written before the language dimension existed: the count is then unknown,
- * not zero, so nothing is claimed about it.
+ * What to say about the follower's language. `before` is null on a first
+ * message about a file, where the current state is the news; a receipt
+ * written before this dimension existed carries no count at all, and the
+ * caller says nothing rather than reporting an unknown as a change.
  */
 function translationBit(it: ItemState, lang: string, before: number | null): string | null {
   const now = it.amByLang[lang] ?? 0;
@@ -78,7 +79,9 @@ function describe(
     } else if (it.am_count !== previous.am) {
       bits.push(`amendments now ${it.am_count}`);
     }
-    const t = translationBit(it, lang, previous.inLang);
+    // previous.inLang === null: a receipt from before the language count.
+    // Whether the translation is news is unknowable, so it is not announced.
+    const t = previous.inLang === null ? null : translationBit(it, lang, previous.inLang);
     if (t) bits.push(t);
     if (it.votLangs.length && !previous.vot.length) bits.push("split/separate requests loaded");
   }
