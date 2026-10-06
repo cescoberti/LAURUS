@@ -51,7 +51,11 @@ export function ItemRows({
               <div className="text-[13.5px] font-bold uppercase leading-tight tracking-wide text-ink-900">
                 {rapporteurLabel(item.rapporteur) ?? <span className="font-normal normal-case text-ink-300">No rapporteur</span>}
               </div>
-              <div className="mt-0.5 truncate text-[13px] leading-snug text-ink-500">{item.title}</div>
+              {/* Two lines, not one: what tells budget files apart — "application
+                  EGF/2026/001 BE/Cora" — sits at the END of the title. */}
+              <div className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-500" title={item.title}>
+                {item.title}
+              </div>
               <div className="mt-0.5 font-mono text-[11px] text-eu-600">{item.code}</div>
             </div>
             <div className="w-[4.2rem] text-center">

@@ -1,8 +1,11 @@
 /**
- * Live sync for the part-session in progress — meant to run every few minutes
- * during plenary weeks (GitHub Actions cron), cheap enough to do so.
+ * Live sync for the part-session in progress — or, between sessions, for the
+ * next one once it is within reach, so an advisor preparing a file the week
+ * before finds its agenda and amendments already in. Meant to run every few
+ * minutes (GitHub Actions cron), cheap enough to do so.
  *
- *   npm run sync-live                 # the session running today, else exit 0
+ *   npm run sync-live                 # today's session, else the next one
+ *                                     # starting within LOOKAHEAD_DAYS
  *   npm run sync-live -- 2026-09-14   # force a session by its start date
  *
  * One pass does, for that session only:
@@ -68,12 +71,41 @@ interface Session {
   end_date: string;
 }
 
+/** How far ahead a part-session is worth filling: the EP publishes the draft
+ *  agenda about two weeks out, and advisors prepare their files the week
+ *  before, not the morning of the vote. */
+const LOOKAHEAD_DAYS = 16;
+
+/**
+ * The session to work on: the one running today, else the next one starting
+ * within the lookahead — so the files of the coming part-session (and their
+ * amendments) are already there when the advisor opens LAURUS to prepare.
+ */
 async function currentSession(): Promise<Session | null> {
-  const q = supabase.from("sessions").select("id, ep_meeting_id, month_label, start_date, end_date");
-  const { data } = FORCE_START
-    ? await q.eq("start_date", FORCE_START).maybeSingle()
-    : await q.lte("start_date", TODAY).gte("end_date", TODAY).maybeSingle();
-  return (data as Session | null) ?? null;
+  const cols = "id, ep_meeting_id, month_label, start_date, end_date";
+  if (FORCE_START) {
+    const { data } = await supabase.from("sessions").select(cols).eq("start_date", FORCE_START).maybeSingle();
+    return (data as Session | null) ?? null;
+  }
+  const { data: running } = await supabase
+    .from("sessions")
+    .select(cols)
+    .lte("start_date", TODAY)
+    .gte("end_date", TODAY)
+    .maybeSingle();
+  if (running) return running as Session;
+
+  const horizon = new Date(`${TODAY}T00:00:00Z`);
+  horizon.setUTCDate(horizon.getUTCDate() + LOOKAHEAD_DAYS);
+  const { data: next } = await supabase
+    .from("sessions")
+    .select(cols)
+    .gt("start_date", TODAY)
+    .lte("start_date", horizon.toISOString().slice(0, 10))
+    .order("start_date")
+    .limit(1)
+    .maybeSingle();
+  return (next as Session | null) ?? null;
 }
 
 function sittingDays(s: Session): string[] {
@@ -564,11 +596,34 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
 async function main() {
   const s = await currentSession();
   if (!s) {
-    console.log(`no part-session in progress on ${TODAY} — nothing to do`);
+    console.log(`no part-session in progress or within ${LOOKAHEAD_DAYS} days of ${TODAY} — nothing to do`);
     return;
   }
   const days = sittingDays(s);
-  console.log(`live sync · ${s.month_label} ${s.start_date}→${s.end_date} (${days.length} sitting days)`);
+  const ahead = s.start_date > TODAY;
+
+  // Out of session nothing moves minute to minute: a part-session still to
+  // come is worth one pass an hour, not one every five minutes. (The cron
+  // cannot be changed per week, and GitHub's scheduler drifts, so this is
+  // measured from the last pass rather than from the clock.)
+  if (ahead && !FORCE_START) {
+    const hourAgo = new Date(Date.now() - 55 * 60_000).toISOString();
+    const { data: recent } = await supabase
+      .from("ingestion_runs")
+      .select("started_at")
+      .eq("source", `ep-api:sync-live:${s.ep_meeting_id}`)
+      .gte("started_at", hourAgo)
+      .limit(1)
+      .maybeSingle();
+    if (recent) {
+      console.log(`${s.month_label} starts ${s.start_date}; last pass ${recent.started_at} — nothing to do this tick`);
+      return;
+    }
+  }
+
+  console.log(
+    `live sync · ${s.month_label} ${s.start_date}→${s.end_date} (${days.length} sitting days)${ahead ? " — upcoming: agenda and amendments only, the votes have not happened" : ""}`,
+  );
 
   const { data: run } = await supabase
     .from("ingestion_runs")

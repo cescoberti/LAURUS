@@ -19,7 +19,10 @@ export async function proxy(req: NextRequest) {
     // Vercel Cron calls this; the route checks CRON_SECRET itself.
     pathname === "/api/cron/notify" ||
     // The live-sync workflow posts here after each tick; CRON_SECRET-gated.
-    pathname === "/api/alerts/vl"
+    pathname === "/api/alerts/vl" ||
+    // Resend posts received mail here — no browser session. The route checks
+    // the Svix signature on the raw body and rejects anything else.
+    pathname === "/api/inbound"
   ) {
     return NextResponse.next();
   }

@@ -152,9 +152,14 @@ export async function foreseenActivities(meetingId: string): Promise<ForeseenAct
   for (let attempt = 0; ; attempt++) {
     try {
       const res = await fetch(url, { headers: { Accept: "application/ld+json", "User-Agent": UA } });
-      if (res.status === 404) return []; // agenda not published yet
+      // Not published yet: 404 on an unknown sitting, 204 + empty body on a
+      // sitting that exists but has no agenda. Never assume a body: this API
+      // answers 2xx-with-nothing more often than it 404s.
+      if (res.status === 404 || res.status === 204) return [];
       if (!res.ok) throw new Error(`foreseen-activities ${meetingId} ${res.status}`);
-      return ((await res.json()) as { data?: ForeseenActivity[] }).data ?? [];
+      const body = (await res.text()).trim();
+      if (!body) return [];
+      return (JSON.parse(body) as { data?: ForeseenActivity[] }).data ?? [];
     } catch (err) {
       if (attempt >= 3) throw err;
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
