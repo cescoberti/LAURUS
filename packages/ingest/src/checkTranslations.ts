@@ -6,10 +6,18 @@
  *   npm run check-translations -- --any B10-0423/2026 B10-0424/2026  # first one ready wins
  *
  * Read-only, no database, no key: it enumerates the file's AMENDMENT_LIST
- * blocks from `/api/v2/documents` and asks each block's metadata which
- * language Expressions exist. A block whose Expression for the language is
- * missing has not been translated yet — the DOCX is simply not published, so
- * `syncAmendments` would 404 on it.
+ * blocks from `/api/v2/documents`, then asks for each block's DOCX in the
+ * language — because that is the file the ingestion downloads, and the file
+ * is the only honest answer.
+ *
+ * Not the metadata. The API's language Expressions lag the distribution
+ * store by hours: on 2026-10-07 B-10-2026-0423-AM-005-008 listed no Italian
+ * Expression while `..._it.docx` served 54 KB of Italian, and the ingestion
+ * had already parsed all 14 amendments. Asking the metadata made this check
+ * say "still waiting" about a translation that was sitting there.
+ *
+ * The language goes in lowercase: `..._it.docx` is served, `..._IT.docx` is
+ * a 404.
  *
  * Exit code 0 when every block of every file is there — or, with `--any`,
  * as soon as ONE file is complete, which is what you want when either file
@@ -17,6 +25,7 @@
  *
  *   until npm run -s check-translations -- B10-0424/2026; do sleep 600; done
  */
+import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
 
 const BASE = "https://data.europarl.europa.eu";
@@ -78,17 +87,21 @@ function rangeOf(id: string): string {
   return from === to ? `${from}` : `${from}–${to}`;
 }
 
-/** When the language's DOCX was published, or null when there is none yet. */
-async function issuedIn(id: string, lang: string): Promise<string | null> {
-  const json = await getJson(`${BASE}/api/v2/documents/${id}?`);
-  const doc = json.data?.[0];
-  for (const expr of doc?.is_realized_by ?? []) {
-    if (!String(expr.id).endsWith(`/${lang}`)) continue;
-    for (const man of expr.is_embodied_by ?? []) {
-      if (String(man.id).endsWith("/docx")) return man.issued ?? "";
+/** Is this block's DOCX served in the language? One ranged GET, no body. */
+async function existsIn(id: string, lang: string): Promise<boolean> {
+  const url = amendmentBlockUrl(id, lang.toLowerCase());
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { status } = await fetchBytes(url, 5, { Range: "bytes=0-0" });
+      if (status === 200 || status === 206) return true;
+      if (status === 404) return false;
+      // 403/429/5xx: the host is rate-limiting, not answering about the file.
+      await sleep(5_000 * (attempt + 1));
+    } catch {
+      await sleep(5_000 * (attempt + 1)); // a timeout says nothing either
     }
   }
-  return null;
+  throw new Error(`cannot tell whether ${id} exists in ${lang}`);
 }
 
 let allComplete = true;
@@ -105,8 +118,8 @@ for (const code of CODES) {
   const missing: string[] = [];
   const done: string[] = [];
   for (const id of blocks) {
-    const issued = await issuedIn(id, LANG);
-    (issued === null ? missing : done).push(rangeOf(id));
+    const there = await existsIn(id, LANG);
+    (there ? done : missing).push(rangeOf(id));
     await sleep(300);
   }
 

@@ -1,0 +1,119 @@
+# A tick every five minutes that actually happens.
+#
+# `schedule` is a request, not a promise: GitHub throttles cron hard, and on
+# this repo a "*/5" asked for every five minutes delivered one run every three
+# to seven hours — 09:09, 02:29, 23:21, 19:51, 14:45. Fine for a quiet week,
+# useless on the day of a vote, when the Tabling Service republishes a list
+# and the translations land block by block.
+#
+# So this workflow does not ask GitHub to wake it up repeatedly. It is started
+# ONCE (by hand, or by live-sync when it notices a part-session) and then
+# stays up, ticking on its own clock inside a single job, until the window
+# closes. Actions minutes are free on a public repository; a job may run six
+# hours, so a long sitting is covered by chaining one more run at the end.
+#
+# Start it the evening before a sitting day:
+#   gh workflow run plenary-ticker.yml -f hours=12
+name: plenary-ticker
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "How long to keep ticking (max 5.5 per run; it chains itself beyond that)"
+        required: false
+        default: "5"
+      every:
+        description: "Minutes between ticks"
+        required: false
+        default: "5"
+      session_start:
+        description: "Force a part-session by start date (YYYY-MM-DD); blank = the one running today"
+        required: false
+
+# Never two tickers at once, and a new one replaces the one running: that is
+# how you stop it early (start a 0-hour run) and how a chained run takes over.
+concurrency:
+  group: plenary-ticker
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write      # to chain the next run
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EP_USER_AGENT: "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)"
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL || 'https://laurus-web-theta.vercel.app' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx --workspace @laurus/ingest playwright install --with-deps chromium
+
+      # One setup, many ticks. Each tick is the live-sync body; a tick that
+      # fails (the EP times out, the WAF sulks) is logged and the next one
+      # goes ahead — the loop is the retry.
+      - name: Tick
+        env:
+          EP_VOTES_PAGE_FILE: ${{ runner.temp }}/ep/votes.html
+          EP_WWW_COOKIE_FILE: ${{ runner.temp }}/ep/cookie.txt
+        run: |
+          every=$(( ${{ inputs.every || 5 }} * 60 ))
+          # Leave room for setup and for the chaining step inside the 6h cap.
+          deadline=$(( $(date +%s) + $(python3 -c "print(int(float('${{ inputs.hours || 5 }}') * 3600))") ))
+          [ "$deadline" -gt "$(( $(date +%s) + 19800 ))" ] && deadline=$(( $(date +%s) + 19800 ))
+          n=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            n=$(( n + 1 ))
+            started=$(date +%s)
+            echo "::group::tick $n — $(date -u +%H:%M:%SZ)"
+            npm run votes-page:ci --workspace @laurus/ingest -- "$EP_VOTES_PAGE_FILE" "$EP_WWW_COOKIE_FILE" || echo "votes page failed this tick"
+            npm run sync-live:ci --workspace @laurus/ingest -- "${{ inputs.session_start }}" || echo "sync failed this tick"
+            if [ -n "$CRON_SECRET" ]; then
+              curl -sS -X POST "$SITE_URL/api/alerts/vl" -H "Authorization: Bearer $CRON_SECRET" -w "\nHTTP %{http_code}\n" || true
+            fi
+            echo "::endgroup::"
+            # Sleep the remainder of the interval, not the whole of it: a tick
+            # that took four minutes must not push the next one to nine.
+            rest=$(( every - ( $(date +%s) - started ) ))
+            [ "$rest" -gt 0 ] && sleep "$rest"
+            # Don't start a tick we cannot finish.
+            [ "$(( $(date +%s) + 120 ))" -ge "$deadline" ] && break
+          done
+          echo "ticks=$n" >> "$GITHUB_OUTPUT"
+
+      # Beyond 5.5 hours the job would hit the Actions ceiling, so hand over
+      # to a fresh run with the time that is left.
+      - name: Chain the next run
+        if: ${{ success() && (inputs.hours || '5') != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          left=$(python3 -c "print(max(0, float('${{ inputs.hours || 5 }}') - 5.5))")
+          if [ "$(python3 -c "print(1 if $left > 0.1 else 0)")" = "1" ]; then
+            echo "chaining $left more hours"
+            gh workflow run plenary-ticker.yml \
+              -f hours="$left" -f every="${{ inputs.every || 5 }}" -f session_start="${{ inputs.session_start }}"
+          else
+            echo "window closed — not chaining"
+          fi
