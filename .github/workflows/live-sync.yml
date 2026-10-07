@@ -26,6 +26,10 @@ concurrency:
   group: live-sync
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: write      # to start the plenary ticker when a sitting opens
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -68,6 +72,31 @@ jobs:
 
       # Tell followers what changed. The route fingerprints each followed file
       # and only messages on a real change, so calling it every tick is free.
+      # GitHub honours this workflow's "*/5" about once every few hours, which
+      # is fine between part-sessions and useless during one. So when the
+      # agenda says a sitting is open (or opens tomorrow), hand over to
+      # plenary-ticker, which stays up and ticks on its own clock. Nobody has
+      # to remember to start it the night before; it stops itself at the end
+      # of the part-session.
+      - name: Start the plenary ticker if the agenda calls for one
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          hours=$(npm run -s session-window --workspace @laurus/ingest)
+          if [ "$hours" = "0" ]; then
+            echo "no sitting open — the schedule is enough"
+            exit 0
+          fi
+          running=$(gh run list --workflow=plenary-ticker.yml --status in_progress --json databaseId --jq 'length')
+          queued=$(gh run list --workflow=plenary-ticker.yml --status queued --json databaseId --jq 'length')
+          if [ "$(( running + queued ))" -gt 0 ]; then
+            echo "ticker already up — leaving it alone"
+          else
+            echo "sitting open and no ticker: starting one"
+            gh workflow run plenary-ticker.yml
+          fi
+
       - name: Alert followers
         if: always()
         env:

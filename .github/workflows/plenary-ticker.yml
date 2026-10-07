@@ -12,17 +12,19 @@
 # closes. Actions minutes are free on a public repository; a job may run six
 # hours, so a long sitting is covered by chaining one more run at the end.
 #
-# Start it the evening before a sitting day:
-#   gh workflow run plenary-ticker.yml -f hours=12
+# Nobody starts it by hand: live-sync does, when the agenda says a sitting is
+# about to open, and it chains itself for as long as the agenda says the
+# part-session is still on. `hours` is only how long ONE job stays alive, and
+# it defaults to what the agenda has left — not something a human decides.
 name: plenary-ticker
 
 on:
   workflow_dispatch:
     inputs:
       hours:
-        description: "How long to keep ticking (max 5.5 per run; it chains itself beyond that)"
+        description: "Hours for THIS job (blank = ask the agenda; it chains itself while the sitting lasts)"
         required: false
-        default: "5"
+        default: ""
       every:
         description: "Minutes between ticks"
         required: false
@@ -73,14 +75,27 @@ jobs:
       # One setup, many ticks. Each tick is the live-sync body; a tick that
       # fails (the EP times out, the WAF sulks) is logged and the next one
       # goes ahead — the loop is the retry.
+      - name: How long this job runs
+        id: window
+        run: |
+          given="${{ inputs.hours }}"
+          if [ -n "$given" ] && [ "$given" != "0" ]; then
+            echo "hours=$given" >> "$GITHUB_OUTPUT"
+          else
+            h=$(npm run -s session-window --workspace @laurus/ingest)
+            echo "the agenda gives $h hours"
+            echo "hours=$h" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Tick
+        if: ${{ steps.window.outputs.hours != '0' }}
         env:
           EP_VOTES_PAGE_FILE: ${{ runner.temp }}/ep/votes.html
           EP_WWW_COOKIE_FILE: ${{ runner.temp }}/ep/cookie.txt
         run: |
           every=$(( ${{ inputs.every || 5 }} * 60 ))
           # Leave room for setup and for the chaining step inside the 6h cap.
-          deadline=$(( $(date +%s) + $(python3 -c "print(int(float('${{ inputs.hours || 5 }}') * 3600))") ))
+          deadline=$(( $(date +%s) + $(python3 -c "print(int(float('${{ steps.window.outputs.hours }}') * 3600))") ))
           [ "$deadline" -gt "$(( $(date +%s) + 19800 ))" ] && deadline=$(( $(date +%s) + 19800 ))
           n=0
           while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -102,18 +117,18 @@ jobs:
           done
           echo "ticks=$n" >> "$GITHUB_OUTPUT"
 
-      # Beyond 5.5 hours the job would hit the Actions ceiling, so hand over
-      # to a fresh run with the time that is left.
+      # A job dies at the Actions ceiling; the sitting does not. Ask the agenda
+      # again and hand over to a fresh run while it still says yes. An explicit
+      # `hours` is a one-off (a test, a manual top-up) and never chains.
       - name: Chain the next run
-        if: ${{ success() && (inputs.hours || '5') != '0' }}
+        if: ${{ success() && inputs.hours == '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          left=$(python3 -c "print(max(0, float('${{ inputs.hours || 5 }}') - 5.5))")
-          if [ "$(python3 -c "print(1 if $left > 0.1 else 0)")" = "1" ]; then
-            echo "chaining $left more hours"
-            gh workflow run plenary-ticker.yml \
-              -f hours="$left" -f every="${{ inputs.every || 5 }}" -f session_start="${{ inputs.session_start }}"
+          left=$(npm run -s session-window --workspace @laurus/ingest)
+          if [ "$left" = "0" ]; then
+            echo "part-session over — stopping"
           else
-            echo "window closed — not chaining"
+            echo "sitting continues: chaining another $left hours"
+            gh workflow run plenary-ticker.yml -f every="${{ inputs.every || 5 }}" -f session_start="${{ inputs.session_start }}"
           fi
