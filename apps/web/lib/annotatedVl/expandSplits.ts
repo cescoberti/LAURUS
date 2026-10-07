@@ -29,6 +29,7 @@
 import mammoth from "mammoth";
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
+import { documentTextUrl } from "@laurus/parser";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
@@ -134,10 +135,18 @@ function epDocId(code: string): string | null {
   return `${prefix}-${term}-${year}-${num.padStart(4, "0")}`;
 }
 
+/**
+ * The text the splits cut on. `documentTextUrl` picks the store by document
+ * kind — a report (A-) lives under reds_iPlRp, a motion for a resolution (B-)
+ * under reds_iPlRe — and getting that wrong is silent: the wrong store 404s,
+ * this returns null, and every split row of the file is reported as
+ * OGGETTO_NON_RISOLTO, "report text not available". Which is what happened to
+ * all six splits of B10-0423/2026 on the eve of the vote.
+ */
 async function reportParagraphs(itemCode: string, lang: string): Promise<string[] | null> {
   const id = epDocId(itemCode);
   if (!id) return null;
-  const buf = await fetchBytesWithBackoff(`${BASE}/distribution/reds_iPlRp/${id}/${id}_${lang}.docx`);
+  const buf = await fetchBytesWithBackoff(documentTextUrl(id, lang));
   if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;
   const { value } = await mammoth.extractRawText({ buffer: buf });
   return value.split("\n").map((l) => norm(l)).filter(Boolean);
