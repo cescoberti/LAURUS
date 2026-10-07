@@ -31,6 +31,8 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.verce
 interface ItemState {
   id: string;
   code: string;
+  /** ISO day the file is voted; null when the agenda has not placed it. */
+  voteDate: string | null;
   rapporteur: string | null;
   title: { en?: string; it?: string };
   am_count: number;
@@ -142,7 +144,7 @@ export async function POST(request: Request) {
 
   const itemIds = [...new Set(subs.map((s) => s.target_id as string))];
   const [{ data: items }, { data: amLangs }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([
-    admin.from("items").select("id, code, rapporteur, title, am_count").in("id", itemIds),
+    admin.from("items").select("id, code, rapporteur, title, am_count, vote_date").in("id", itemIds),
     admin.from("amendment_language_counts").select("item_id, language, n").in("item_id", itemIds),
     admin.from("vot_requests").select("item_id, language").in("item_id", itemIds),
     admin.from("voting_lists").select("item_id, version_label, fetched_at").in("item_id", itemIds).order("fetched_at", { ascending: false }),
@@ -167,6 +169,7 @@ export async function POST(request: Request) {
     stateById.set(it.id as string, {
       id: it.id as string,
       code: it.code as string,
+      voteDate: (it.vote_date as string | null) ?? null,
       rapporteur: it.rapporteur as string | null,
       title: (it.title as ItemState["title"]) ?? {},
       am_count: (it.am_count as number) ?? 0,
@@ -202,6 +205,10 @@ export async function POST(request: Request) {
     };
   };
 
+  // The sitting day in Brussels, not UTC: a tick at 01:00 CEST is still the
+  // night before the vote, and must not write off the files voted that day.
+  const brusselsToday = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
+
   let sent = 0;
   const skipped: string[] = [];
   if (!emailConfigured()) skipped.push("email: RESEND_API_KEY missing");
@@ -211,6 +218,11 @@ export async function POST(request: Request) {
     const it = stateById.get(sub.target_id as string);
     const u = userById.get(sub.user_id as string);
     if (!it || !u) continue;
+    // The vote is over: whatever the EP publishes afterwards — a corrected
+    // list, a late translation — cannot change how anyone votes, and a
+    // message about it is noise in the middle of a part-session. The day of
+    // the vote itself still counts: the list moves until the show of hands.
+    if (it.voteDate && it.voteDate < brusselsToday) continue;
     // Nothing to announce until there is something on the file.
     if (it.am_count === 0 && it.votLangs.length === 0 && !it.vlVersion) continue;
 
