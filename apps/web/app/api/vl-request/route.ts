@@ -9,7 +9,7 @@ import { verifyVotingList, votingListFingerprint, type VlVerificationReport, typ
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
-import { EU_LANGUAGE_CODES } from "@/lib/languages";
+import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 
 /**
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const { code, lang: langRaw } = (await request.json().catch(() => ({}))) as { code?: string; lang?: string };
   if (!code) return NextResponse.json({ error: "missing code" }, { status: 400 });
   const langParam = (langRaw ?? "it").toLowerCase();
-  const lang = EU_LANGUAGE_CODES.has(langParam) ? langParam : "it";
+  const lang = documentLanguage(langParam);
 
   const { data: profile } = await supabase.from("users").select("email").eq("id", user.id).maybeSingle();
   const to = profile?.email ?? user.email;

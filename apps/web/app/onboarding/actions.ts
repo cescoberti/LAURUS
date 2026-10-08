@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { COMMITTEE_CODES } from "@/lib/committees";
-import { EU_LANGUAGE_CODES, DEFAULT_LANGUAGES } from "@/lib/languages";
+import { DEFAULT_LANGUAGES, documentLanguage } from "@/lib/languages";
 
 interface ValidInvite {
   id: string;
@@ -82,7 +82,7 @@ export async function completeOnboardingAction(_prev: OnboardingState | undefine
 
   const committees = formData.getAll("committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
   const rawLang = String(formData.get("vl_language") ?? "it");
-  const vlLanguage = EU_LANGUAGE_CODES.has(rawLang) ? rawLang : "it";
+  const vlLanguage = documentLanguage(rawLang);
   const languages = [...new Set([vlLanguage, ...DEFAULT_LANGUAGES])];
 
   const { error } = await supabase

@@ -75,7 +75,7 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
 const TABS = ["Amendments", "Split & Separate"] as const;
 type Tab = (typeof TABS)[number];
 
-const LANG_LABEL: Record<string, string> = { en: "EN", it: "IT", fr: "FR", de: "DE", es: "ES" };
+const LANG_LABEL: Record<string, string> = { it: "IT", en: "EN", nl: "NL" };
 
 export function ItemTabs({
   amendments,

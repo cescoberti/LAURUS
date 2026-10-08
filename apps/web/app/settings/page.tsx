@@ -1,6 +1,6 @@
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/server";
-import { EU_LANGUAGES, DEFAULT_LANGUAGES } from "@/lib/languages";
+import { DOCUMENT_LANGUAGES, DEFAULT_LANGUAGES } from "@/lib/languages";
 import { COMMITTEES } from "@/lib/committees";
 import { saveSettingsAction } from "./actions";
 
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
               defaultValue={defaultLang}
               className="mt-1 block w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 focus:border-eu-600 focus:outline-none"
             >
-              {[...EU_LANGUAGES].sort((a, b) => (a.code === "it" ? -1 : b.code === "it" ? 1 : a.code === "en" ? -1 : b.code === "en" ? 1 : 0)).map((l) => (
+              {DOCUMENT_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
                   {l.code.toUpperCase()} — {l.label}
                 </option>
@@ -112,7 +112,7 @@ export default async function SettingsPage() {
               Annotated VLs are prepared only in the selected languages (default: IT + EN).
             </p>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {EU_LANGUAGES.map((l) => (
+              {DOCUMENT_LANGUAGES.map((l) => (
                 <label key={l.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
                   <input
                     type="checkbox"

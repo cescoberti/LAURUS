@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { EU_LANGUAGE_CODES, DEFAULT_LANGUAGES } from "@/lib/languages";
+import { DOCUMENT_LANGUAGE_SET, DEFAULT_LANGUAGES, documentLanguage } from "@/lib/languages";
 import { COMMITTEE_CODES } from "@/lib/committees";
 
 export async function saveSettingsAction(formData: FormData): Promise<void> {
@@ -20,11 +20,11 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
   const langs = formData
     .getAll("languages")
     .map(String)
-    .filter((l) => EU_LANGUAGE_CODES.has(l));
+    .filter((l) => DOCUMENT_LANGUAGE_SET.has(l));
 
   const committees = formData.getAll("committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
   const rawVlLang = String(formData.get("vl_language") ?? "it");
-  const vlLanguage = EU_LANGUAGE_CODES.has(rawVlLang) ? rawVlLang : "it";
+  const vlLanguage = documentLanguage(rawVlLang);
   // The default VL language is always part of the working-language set.
   const languages = [...new Set([vlLanguage, ...(langs.length ? langs : DEFAULT_LANGUAGES)])];
 
