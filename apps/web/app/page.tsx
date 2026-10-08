@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { SessionBoard, type BoardFilter } from "@/components/SessionBoard";
+import { SessionSwitcher } from "@/components/SessionSwitcher";
 import { TodayBoard } from "@/components/TodayBoard";
 import { TopNav } from "@/components/TopNav";
 import { getSessions, getSessionItems, getOfficialVlByItem, getViewerContext, type SessionSummary } from "@/lib/data";
@@ -16,13 +16,6 @@ function pickDefault(sessions: SessionSummary[], today: string): SessionSummary 
     [...sessions].reverse().find((s) => s.end_date < today) ??
     sessions[0]
   );
-}
-
-function sessionSubtitle(s: SessionSummary): string {
-  const fmt = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDate();
-  const month = new Date(`${s.start_date}T12:00:00Z`).toLocaleDateString("en-GB", { month: "long" });
-  const place = s.location === "STR" ? "Strasbourg" : "Brussels";
-  return `Plenary ${fmt(s.start_date)}–${fmt(s.end_date)} ${month} · ${place}`;
 }
 
 export default async function Dashboard({
@@ -57,9 +50,6 @@ export default async function Dashboard({
     };
   });
 
-  const monthName = active
-    ? new Date(`${active.start_date}T12:00:00Z`).toLocaleDateString("en-GB", { month: "long" })
-    : "";
   const withList = items.filter((i) => i.officialVl).length;
   const followed = items.filter((i) => i.following).length;
   const initialFilter: BoardFilter = f === "followed" ? "followed" : f === "mine" ? "mine" : "all";
@@ -69,44 +59,19 @@ export default async function Dashboard({
       <TopNav active={initialFilter === "followed" ? "My files" : "Votes"} />
 
       <main className="mx-auto max-w-6xl px-6 py-7">
-        {/* Part-sessions: a segmented control, the active one lifted */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="scroll-x inline-flex max-w-full gap-0 rounded-xl bg-slate-100 p-[3px]">
-            {sessions.map((m) => (
-              <Link
-                key={m.id}
-                href={`/?s=${m.id}${f ? `&f=${f}` : ""}`}
-                className={`press whitespace-nowrap rounded-[9px] px-3.5 py-1.5 text-[13px] ${
-                  m.id === active?.id
-                    ? "bg-white font-semibold text-ink-900 shadow-[0_1px_3px_rgba(20,26,43,0.12)]"
-                    : "font-medium text-ink-500 hover:text-ink-900"
-                }`}
-              >
-                {m.month_label}
-              </Link>
-            ))}
-          </div>
-          {active && (
-            <span className="ml-auto text-[13px] text-ink-300">
-              {items.length} votes{followed ? ` · ${followed} followed` : ""}
-            </span>
-          )}
-        </div>
+        {/* One part-session at a time; the rest of the year is in the menu. */}
+        <SessionSwitcher sessions={sessions} active={active} today={today} filter={f} />
 
-        {/* Session header + today's files */}
         {active && (
-          <section className="mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr]">
-            <div>
-              <h1 className="display text-[clamp(1.9rem,3.4vw,2.6rem)] font-extrabold text-eu-900">
-                {monthName} {YEAR}
-              </h1>
-              <p className="mt-1 text-[15px] text-ink-500">{sessionSubtitle(active)}</p>
-              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
-                <Stat value={items.length} label="votes" accent />
-                <Stat value={withList} label="official lists" />
-                <Stat value={followed} label="followed" />
-                <Stat value={items.filter((i) => i.mine).length} label={viewer.committees.length ? viewer.committees.join(" · ") : "my committees"} />
-              </div>
+          <section className="mt-5 grid gap-4 md:grid-cols-[1.4fr_1fr]">
+            <div className="flex flex-wrap content-start gap-x-6 gap-y-2">
+              <Stat value={items.length} label="votes" accent />
+              <Stat value={withList} label="official lists" />
+              <Stat value={followed} label="followed" />
+              <Stat
+                value={items.filter((i) => i.mine).length}
+                label={viewer.committees.length ? viewer.committees.join(" · ") : "my committees"}
+              />
             </div>
             <TodayBoard items={items} today={today} sessionEnd={active.end_date} vlLanguage={viewer.vlLanguage} />
           </section>
