@@ -3,14 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { COMMITTEES, CONTACT_EMAIL } from "@/lib/committees";
-import { EU_LANGUAGES } from "@/lib/languages";
+import { DOCUMENT_LANGUAGES } from "@/lib/languages";
 import { completeOnboardingAction } from "@/app/onboarding/actions";
 
-const LANG_ORDER = (() => {
-  const top = ["it", "en"];
-  const rest = EU_LANGUAGES.filter((l) => !top.includes(l.code));
-  return [...EU_LANGUAGES.filter((l) => top.includes(l.code)).sort((a, b) => top.indexOf(a.code) - top.indexOf(b.code)), ...rest];
-})();
+const LANG_ORDER = DOCUMENT_LANGUAGES;
 
 const STEPS = ["Welcome", "Committees", "Language", "Fair use", "Contact"];
 

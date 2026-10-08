@@ -5,7 +5,7 @@ import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { splitRequestsFromNotes, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlBundle } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
-import { EU_LANGUAGE_CODES } from "@/lib/languages";
+import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit, DAILY_VL_LIMIT } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
 
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   const day = url.searchParams.get("day") ?? "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return page(400, "Which day?", "This link needs a sitting day.");
   const langParam = (url.searchParams.get("lang") ?? "it").toLowerCase();
-  const lang = EU_LANGUAGE_CODES.has(langParam) ? langParam : "it";
+  const lang = documentLanguage(langParam);
 
   // The member's followed files voted that day.
   const { data: subs } = await supabase.from("subscriptions").select("target_id").eq("user_id", user.id).eq("scope", "item");
