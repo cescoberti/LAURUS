@@ -49,9 +49,13 @@ body {
   transform: scale(0.97);
 }
 
-/* Thin, refined scrollbars inside scrollable tables. */
+/* Thin, refined scrollbars inside scrollable tables and long menus. */
 .scroll-x {
   overflow-x: auto;
+  scrollbar-width: thin;
+}
+.scroll-y {
+  overflow-y: auto;
   scrollbar-width: thin;
 }
 
