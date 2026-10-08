@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/app/login/actions";
+import { AdminMenu } from "./AdminMenu";
 import { Wordmark } from "./Logo";
 
 export type NavActive = "Votes" | "My files" | "Voting lists" | "Whip" | "admin";
@@ -12,8 +13,10 @@ const NAV: Array<{ label: NavActive; href: string }> = [
   { label: "Voting lists", href: "/vl-generator" },
 ];
 
+// Admin-only, and all behind one menu: five more links in the bar made the
+// four that every advisor uses harder to find.
 const ADMIN: Array<{ label: string; href: string }> = [
-  { label: "Admin", href: "/admin/users" },
+  { label: "Users", href: "/admin/users" },
   { label: "Inbox", href: "/admin/inbox" },
   { label: "Invites", href: "/admin/inviti" },
   { label: "Usage", href: "/admin/utilizzo" },
@@ -57,15 +60,7 @@ export async function TopNav({ active }: { active?: NavActive }) {
               Whip
             </Link>
           )}
-          <span title="Coming with the next milestones" className="cursor-default whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-ink-300">
-            Allocate
-          </span>
-          {profile?.role === "admin" &&
-            ADMIN.map((a) => (
-              <Link key={a.label} href={a.href} className={linkClass(active === "admin" && a.label === "Admin")}>
-                {a.label}
-              </Link>
-            ))}
+          {profile?.role === "admin" && <AdminMenu items={ADMIN} active={active === "admin"} />}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2 text-sm">
           {user && (
