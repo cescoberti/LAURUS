@@ -67,6 +67,26 @@ Vercel → Settings → Environment Variables). Never commit any of them.
 | `INBOX_ADDRESS`, `HELLO_ADDRESS` | the two addresses shown on `/admin/inbox` | defaults to `inbox@`/`hello@laurus.the361.eu` |
 | `TWILIO_*` | WhatsApp alerts | email only |
 
+## Signing in
+
+Three ways in, all of them behind the same invite gate — a Google account is
+not an invitation:
+
+| Method | What it needs |
+|---|---|
+| Email + password | nothing; the invite flow sets it |
+| **Google** | the Google provider enabled in Supabase → Authentication → Providers, with an OAuth client whose *Authorized redirect URI* is `https://<project>.supabase.co/auth/v1/callback` |
+| **Magic link** | nothing to configure, but Supabase's built-in mailer is capped at a few messages an hour — set a custom SMTP sender before real use |
+
+`NEXT_PUBLIC_SITE_URL` must be the deployed origin: it is the base of the
+`/auth/callback` URL that Google and the magic-link email come back to, and a
+wrong value sends members to the wrong host after a successful sign-in.
+
+`/auth/callback` decides membership, not identity: a person with no LAURUS
+profile gets in only while carrying a valid invite (the token cookie set
+before the redirect, or an open invite addressed to the same email), and is
+signed straight back out otherwise.
+
 ## Database
 
 ```bash
