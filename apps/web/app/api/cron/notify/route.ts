@@ -11,8 +11,14 @@ export const runtime = "nodejs";
  * Notification dispatcher — run by Vercel Cron (see vercel.json) or manually:
  *   curl -H "Authorization: Bearer $CRON_SECRET" /api/cron/notify
  *
- * 1. "Nuova VL" reminder: items whose plenary amendments were ingested in the
- *    last 25h → email/WhatsApp to members who opted in.
+ * 1. Daily digest: what actually changed on a file in the last 25h, which is
+ *    not the same as "a row was written". Three different things used to be
+ *    reported identically as "new annotated VL", including a translation
+ *    landing overnight — so on the morning of a vote the digest announced
+ *    four new voting lists when nothing had been tabled. Now: new amendments
+ *    are news, a translation is said to be a translation, a list confirmed
+ *    from indicative to final is said to be that, and a morning on which
+ *    nothing happened produces no mail at all.
  * 2. Clean-final: items voted in the last 25h → members with wants_clean_final
  *    get the link to the adopted-text page and the report files.
  * 3. Whip reminders: advisors with pending plenary notes, three weeks and two
@@ -34,22 +40,81 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const since = new Date(Date.now() - 25 * 3_600_000).toISOString();
 
-  // --- 1. Items with freshly ingested amendments -------------------------
+  // --- 1. What actually changed on a file in the window ------------------
   const { data: freshAms } = await supabase
     .from("amendments")
-    .select("item_id")
+    .select("item_id, number")
     .gte("created_at", since);
   const freshItemIds = [...new Set((freshAms ?? []).map((a) => a.item_id))];
 
-  let newVlItems: Array<{ code: string; am_count: number }> = [];
+  /** An amendment number is NEW only if nothing carried it before the window. */
+  const priorNumbers = new Map<string, Set<number>>();
+  if (freshItemIds.length) {
+    const { data: older } = await supabase
+      .from("amendments")
+      .select("item_id, number")
+      .in("item_id", freshItemIds)
+      .lt("created_at", since);
+    for (const a of older ?? []) {
+      const set = priorNumbers.get(a.item_id as string) ?? new Set<number>();
+      set.add(a.number as number);
+      priorNumbers.set(a.item_id as string, set);
+    }
+  }
+
+  const tabledNow = new Map<string, Set<number>>();
+  const touchedNow = new Map<string, Set<number>>();
+  for (const a of freshAms ?? []) {
+    const id = a.item_id as string, n = a.number as number;
+    touchedNow.set(id, (touchedNow.get(id) ?? new Set<number>()).add(n));
+    if (!priorNumbers.get(id)?.has(n)) tabledNow.set(id, (tabledNow.get(id) ?? new Set<number>()).add(n));
+  }
+
+  // A list the Tabling Service has confirmed: it was indicative when we last
+  // saw it and carries a FINAL label now. That is worth one line, not an
+  // alarm — nothing was added, the file is simply settled.
+  const confirmedFinal = new Set<string>();
+  if (freshItemIds.length) {
+    const { data: lists } = await supabase
+      .from("voting_lists")
+      .select("item_id, version_label, fetched_at")
+      .in("item_id", freshItemIds)
+      .order("fetched_at", { ascending: false });
+    const seen = new Map<string, string>();
+    for (const l of lists ?? []) {
+      const id = l.item_id as string;
+      const label = String(l.version_label ?? "");
+      if (!seen.has(id)) {
+        seen.set(id, label);
+        if (/final/i.test(label) && (l.fetched_at as string) >= since) confirmedFinal.add(id);
+      } else if (confirmedFinal.has(id) && /final/i.test(label)) {
+        confirmedFinal.delete(id); // it was already final before: no news
+      }
+    }
+  }
+
+  interface DigestLine { code: string; what: string }
+  const digest: DigestLine[] = [];
   if (freshItemIds.length) {
     const { data } = await supabase
       .from("items")
-      .select("code, am_count")
+      .select("id, code, am_count")
       .in("id", freshItemIds)
       .gt("am_count", 0);
-    newVlItems = data ?? [];
+    for (const it of data ?? []) {
+      const id = it.id as string;
+      const tabled = tabledNow.get(id)?.size ?? 0;
+      const touched = touchedNow.get(id)?.size ?? 0;
+      if (tabled > 0) {
+        digest.push({ code: it.code as string, what: `${tabled} new amendment${tabled === 1 ? "" : "s"} tabled (${it.am_count} in all)` });
+      } else if (confirmedFinal.has(id)) {
+        digest.push({ code: it.code as string, what: `voting list confirmed FINAL — no amendment added, ${touched} translated` });
+      } else if (touched > 0) {
+        digest.push({ code: it.code as string, what: `${touched} amendment${touched === 1 ? "" : "s"} translated — nothing new tabled` });
+      }
+    }
   }
+  const newVlItems = digest;
 
   // --- 2. Items voted in the window (clean final) ------------------------
   const { data: votedItems } = await supabase
@@ -67,20 +132,30 @@ export async function GET(request: Request) {
   if (!whatsappConfigured()) skipped.push("whatsapp: Twilio credentials missing");
 
   // --- New-VL reminders ---------------------------------------------------
+  // The subject says which of the three it is, because it is read on a phone
+  // on the way into the Chamber: "4 new annotated VLs" on the morning of a
+  // vote reads as four files one has not prepared.
+  const tabledCount = newVlItems.filter((d) => /tabled/.test(d.what)).length;
+  const subject = tabledCount
+    ? `LAURUS — new amendments on ${tabledCount} file${tabledCount === 1 ? "" : "s"}`
+    : newVlItems.some((d) => /confirmed FINAL/.test(d.what))
+      ? "LAURUS — voting lists confirmed final"
+      : "LAURUS — translations in, nothing new tabled";
+
   if (newVlItems.length) {
-    const list = newVlItems.map((i) => `• ${i.code} (${i.am_count} am.)`).join("\n");
+    const list = newVlItems.map((i) => `• ${i.code} — ${i.what}`).join("\n");
     const html =
-      `<p>New annotated voting lists available on <a href="${SITE}">LAURUS</a>:</p><ul>` +
-      newVlItems.map((i) => `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${i.am_count} amendments</li>`).join("") +
+      `<p>Overnight on <a href="${SITE}">LAURUS</a>:</p><ul>` +
+      newVlItems.map((i) => `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${i.what}</li>`).join("") +
       `</ul><p>Download the VLs with the Remarks already filled from each report's page.</p>`;
 
     for (const m of members ?? []) {
       if (m.wants_email && emailConfigured()) {
-        const r = await sendEmail({ to: m.email, subject: `LAURUS — ${newVlItems.length} new annotated VLs`, html });
+        const r = await sendEmail({ to: m.email, subject, html });
         if (r.ok) sent.email++;
       }
       if (m.wants_whatsapp && m.whatsapp_phone && whatsappConfigured()) {
-        const r = await sendWhatsApp(m.whatsapp_phone, `🌿 LAURUS — new annotated VLs:\n${list}\n\nSend *vl <code>* for the direct link.`);
+        const r = await sendWhatsApp(m.whatsapp_phone, `🌿 ${subject}\n${list}\n\nSend *vl <code>* for the direct link.`);
         if (r.ok) sent.whatsapp++;
       }
     }
@@ -108,10 +183,10 @@ export async function GET(request: Request) {
   const reminders = await sendDueReminders(supabase);
 
   void logEvent("cron_notify", {
-    meta: { newVlItems: newVlItems.length, voted: votedItems?.length ?? 0, sent, skipped, reminders },
+    meta: { digest: newVlItems, voted: votedItems?.length ?? 0, sent, skipped, reminders },
   });
   return NextResponse.json({
-    newVlItems: newVlItems.map((i) => i.code),
+    digest: newVlItems,
     voted: votedItems?.length ?? 0,
     sent,
     skipped,
