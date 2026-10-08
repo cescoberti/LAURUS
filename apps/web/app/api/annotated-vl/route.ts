@@ -5,7 +5,7 @@ import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
-import { EU_LANGUAGE_CODES } from "@/lib/languages";
+import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   if (!code) return NextResponse.json({ error: "missing code" }, { status: 400 });
   const langParam = (url.searchParams.get("lang") ?? "it").toLowerCase();
-  const lang = EU_LANGUAGE_CODES.has(langParam) ? langParam : "it";
+  const lang = documentLanguage(langParam);
 
   const loaded = await loadVotingList(supabase, code, lang);
   if (!loaded) return NextResponse.json({ error: "no amendments ingested for this item yet" }, { status: 404 });
