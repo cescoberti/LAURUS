@@ -15,6 +15,19 @@ export default async function LoginPage({
           <Wordmark />
         </div>
 
+        {error === "not-invited" && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            That account is not a LAURUS member yet. LAURUS is invite-only — ask an admin for an invite,
+            then sign in with the same address.
+          </div>
+        )}
+
+        {error === "oauth-failed" && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            Sign-in did not complete. Please try again.
+          </div>
+        )}
+
         {error === "invite-link-invalid" && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             This invite link is not valid or has expired. Ask an admin to re-invite you.

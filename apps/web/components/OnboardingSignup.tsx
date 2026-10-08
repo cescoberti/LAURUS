@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signupWithTokenAction, type SignupState } from "@/app/onboarding/actions";
+import { GoogleButton, OrDivider } from "./GoogleButton";
 
 /** Self-serve account creation from a valid invite link. */
 export function OnboardingSignup({ token, presetEmail }: { token: string; presetEmail: string | null }) {
@@ -15,7 +16,12 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
       <h1 className="text-xl font-bold text-ink-900">Welcome to LAURUS 👋</h1>
       <p className="mt-1 text-sm text-ink-500">Create your account to get started.</p>
 
-      <form action={action} className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4">
+        <GoogleButton token={token} label="Sign up with Google" />
+        <OrDivider>or with a password</OrDivider>
+      </div>
+
+      <form action={action} className="mt-4 space-y-4">
         <input type="hidden" name="token" value={token} />
         <div>
           <label className="text-sm font-medium text-ink-900">Email</label>
