@@ -182,3 +182,30 @@ export async function getItemOfficialVl(itemId: string): Promise<OfficialVlRow |
     .maybeSingle();
   return (data as OfficialVlRow | null) ?? null;
 }
+
+export interface ItemFile {
+  id: string;
+  type: "report" | "amendment" | "voting_list" | "split" | "rcv";
+  language: string;
+  version: number;
+  source_url: string;
+  byte_size: number | null;
+  published_at: string | null;
+}
+
+/**
+ * Every file the EP published for one item — the report, the amendment
+ * documents, the voting list — newest version first, so the file page can
+ * offer them one by one or all at once.
+ */
+export async function getItemFiles(itemId: string): Promise<ItemFile[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("documents")
+    .select("id, type, language, version, source_url, byte_size, published_at")
+    .eq("item_id", itemId)
+    .order("type")
+    .order("language")
+    .order("version", { ascending: false });
+  return (data as ItemFile[] | null) ?? [];
+}
