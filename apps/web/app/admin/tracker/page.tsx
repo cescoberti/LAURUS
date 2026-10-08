@@ -9,6 +9,8 @@ const TYPE_LABEL: Record<string, string> = {
   vl_generate: "VL Generator",
   wa_message: "WhatsApp msg",
   wa_vl_request: "VL request (WA)",
+  item_file_download: "EP file",
+  item_files_zip: "EP files (zip)",
 };
 
 /** Admin-only usage tracker: who is connected, which files were requested. */

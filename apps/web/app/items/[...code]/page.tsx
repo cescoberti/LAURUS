@@ -1,13 +1,15 @@
+import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { ItemTabs } from "@/components/ItemTabs";
+import { ItemFiles } from "@/components/ItemFiles";
 import { RequestVerifiedVl } from "@/components/RequestVerifiedVl";
 import { FollowButton } from "@/components/FollowButton";
 import { CommitteeChip } from "@/components/badges";
 import { rapporteurLabel } from "@/lib/rapporteur";
-import { getItemByCode, getItemAmendments, getItemVotRequests, getItemOfficialVl } from "@/lib/data";
+import { getItemByCode, getItemAmendments, getItemVotRequests, getItemOfficialVl, getItemFiles } from "@/lib/data";
 import { hasAnnotatedVl } from "@/lib/annotatedVl";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_LANGUAGES } from "@/lib/languages";
+import { DEFAULT_LANGUAGES, DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
     : { amendments: [], languages: [] };
   const votRequests = item ? await getItemVotRequests(item.id) : {};
   const officialVl = item ? await getItemOfficialVl(item.id) : null;
+  const files = item ? await getItemFiles(item.id) : [];
 
   // The member's working languages drive which VL downloads are offered.
   const supabase = await createClient();
@@ -29,7 +32,10 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
   const { data: profile } = user
     ? await supabase.from("users").select("languages").eq("id", user.id).single()
     : { data: null };
-  const userLangs: string[] = profile?.languages?.length ? profile.languages : DEFAULT_LANGUAGES;
+  const stored: string[] = profile?.languages?.length ? profile.languages : DEFAULT_LANGUAGES;
+  // Only what the interface offers today (IT · EN · NL), never an empty set.
+  const userLangs: string[] = stored.filter((l) => DOCUMENT_LANGUAGE_SET.has(l));
+  if (userLangs.length === 0) userLangs.push("it");
 
   // Is this member following the file, and on which channels?
   const { data: subs } =
@@ -38,8 +44,6 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
       : { data: null };
   const followChannels = (subs ?? []).map((s) => s.channel as string);
 
-  const reportEn = item?.documents.find((d) => d.type === "report" && d.language === "en");
-  const reportIt = item?.documents.find((d) => d.type === "report" && d.language === "it");
   // The EP's own list, or real amendments in DB → VL generated from EP data;
   // else static registry.
   const annotatedVlAvailable = officialVl !== null || amendments.length > 0 || hasAnnotatedVl(code);
@@ -49,6 +53,16 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
       <TopNav />
 
       <main className="mx-auto max-w-5xl px-6 py-8">
+        <Link
+          href="/"
+          className="press -ml-1 mb-4 inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-[13px] font-medium text-ink-500 hover:text-eu-900"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          All votes
+        </Link>
+
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
           {item?.rapporteur && (
@@ -69,16 +83,6 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
                   year: "numeric",
                 })}
               </span>
-            )}
-            {reportEn && (
-              <a href={reportEn.source_url} target="_blank" rel="noreferrer" className="font-medium text-eu-600 hover:underline">
-                Report (EN)
-              </a>
-            )}
-            {reportIt && (
-              <a href={reportIt.source_url} target="_blank" rel="noreferrer" className="font-medium text-eu-600 hover:underline">
-                Report (IT)
-              </a>
             )}
           </div>
           {/* Where the list comes from: the EP's own, with its version, or
@@ -133,6 +137,10 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
             </>
           )}
           </div>
+        </div>
+
+        <div className="mb-7">
+          <ItemFiles code={code} files={files} />
         </div>
 
         <ItemTabs amendments={amendments} languages={languages} votRequests={votRequests} />
