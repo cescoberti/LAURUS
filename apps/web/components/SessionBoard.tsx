@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import type { DisplayItem } from "@/lib/types";
 import { toggleFollowAction } from "@/app/items/actions";
 import { ItemRows } from "./ItemRows";
-import { ItemSheet } from "./ItemSheet";
 
 export type BoardFilter = "all" | "followed" | "mine";
 
@@ -15,8 +14,8 @@ function dayLabel(iso?: string): string {
 
 /**
  * The part-session board: one-touch filters (all / followed / my committees)
- * plus search, rows grouped by voting day, and a detail sheet that opens on
- * the row without leaving the list.
+ * plus search, and rows grouped by voting day. A row opens the file's own
+ * page, where its amendment files live.
  */
 export function SessionBoard({
   items: initial,
@@ -34,7 +33,6 @@ export function SessionBoard({
   const [items, setItems] = useState(initial);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<BoardFilter>(initialFilter);
-  const [openCode, setOpenCode] = useState<string | null>(null);
 
   // Follow from the row (star) or the sheet: optimistic, then the server.
   const toggleFollow = async (item: DisplayItem) => {
@@ -69,8 +67,6 @@ export function SessionBoard({
       .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
       .map(([iso, dayItems]) => ({ iso, day: dayLabel(iso), items: dayItems }));
   }, [items, query, filter]);
-
-  const open = openCode ? (items.find((i) => i.code === openCode) ?? null) : null;
 
   const chip = (on: boolean) =>
     `press whitespace-nowrap rounded-xl border px-3 py-2 text-[13px] font-medium ${
@@ -123,12 +119,9 @@ export function SessionBoard({
           group={g}
           isToday={g.iso === today}
           vlLanguage={vlLanguage}
-          onOpen={(i) => setOpenCode(i.code)}
           onToggleFollow={toggleFollow}
         />
       ))}
-
-      <ItemSheet item={open} vlLanguage={vlLanguage} onClose={() => setOpenCode(null)} onToggleFollow={toggleFollow} />
     </>
   );
 }

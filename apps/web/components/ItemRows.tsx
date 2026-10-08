@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { DayGroup, DisplayItem } from "@/lib/types";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { CommitteeChip, ListState, Star } from "./badges";
@@ -7,19 +8,18 @@ import { CommitteeChip, ListState, Star } from "./badges";
 /**
  * One voting day: rows in the site-wide hierarchy — MEP SURNAME / subject /
  * code — then committee, the state of the official list, amendments, and
- * the follow star. The row opens the detail sheet; the star is its own hit.
+ * the follow star. The row is a link to the file's own page; the star is its
+ * own hit, so following never navigates.
  */
 export function ItemRows({
   group,
   isToday,
   vlLanguage,
-  onOpen,
   onToggleFollow,
 }: {
   group: DayGroup;
   isToday: boolean;
   vlLanguage: string;
-  onOpen: (item: DisplayItem) => void;
   onToggleFollow: (item: DisplayItem) => void;
 }) {
   // One file to carry into the chamber: every list the member follows that day.
@@ -46,18 +46,10 @@ export function ItemRows({
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
         {group.items.map((item, i) => (
-          <div
+          <Link
             key={item.code}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(item)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen(item);
-              }
-            }}
-            className={`flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-eu-50 active:bg-eu-100 ${
+            href={`/items/${encodeURIComponent(item.code)}`}
+            className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-eu-50 active:bg-eu-100 ${
               i ? "border-t border-slate-100" : ""
             }`}
           >
@@ -91,12 +83,13 @@ export function ItemRows({
               <Star
                 on={item.following}
                 onToggle={(e) => {
+                  e.preventDefault(); // the star follows; it does not open the file
                   e.stopPropagation();
                   onToggleFollow(item);
                 }}
               />
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>
