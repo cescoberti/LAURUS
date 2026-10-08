@@ -110,7 +110,7 @@ export default async function WhipPage() {
 
   return (
     <div className="min-h-screen">
-      <TopNav />
+      <TopNav active="Whip" />
       <main className="mx-auto max-w-5xl px-6 py-8">
         <h1 className="text-2xl font-bold text-ink-900">Whip</h1>
         <p className="mt-1 text-sm text-ink-500">
