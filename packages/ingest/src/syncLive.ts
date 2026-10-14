@@ -620,7 +620,7 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
   const wwwHeaders = cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS;
   const entries = parseVotesPage(html).filter((e) => e.docxUrl);
 
-  const { data: items } = await supabase.from("items").select("id, code, vote_date, family_key").eq("session_id", s.id);
+  const { data: items } = await supabase.from("items").select("id, code, vote_date, family_key, rapporteur").eq("session_id", s.id);
   const byCode = new Map((items ?? []).map((i) => [i.code as string, i]));
   const byFamily = new Map<string, (typeof items)[number]>();
   for (const i of items ?? []) {
@@ -659,6 +659,17 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
     if (e.day && !item.vote_date) {
       await supabase.from("items").update({ vote_date: e.day }).eq("id", item.id);
       (item as { vote_date: string | null }).vote_date = e.day;
+    }
+
+    // The votes page prints the rapporteur next to the file, and it is the
+    // only source that has one BEFORE the vote: /documents/{id} is the
+    // rate-limited endpoint that leaves rows null in the first place, and the
+    // VOT XML backfill needs a sitting that has already been held. A row that
+    // came in without a name was never going to be asked about again, so it
+    // was still blank on the morning the advisor needed it.
+    if (e.rapporteur && !item.rapporteur) {
+      await supabase.from("items").update({ rapporteur: e.rapporteur }).eq("id", item.id);
+      (item as { rapporteur: string | null }).rapporteur = e.rapporteur;
     }
 
     const have = latest.get(item.id as string);
