@@ -53,6 +53,22 @@ function isoDay(heading: string): string | null {
 }
 
 /**
+ * The name printed next to the file. The same <p class="rapporteurs"> carries
+ * a document code instead of a name on motions and objections (see the code
+ * resolution above), and "A10-0241/2026" is not a rapporteur — a caller that
+ * trusted this field would write a code into items.rapporteur, which is how
+ * the dashboard would come to show a document number where a member expects
+ * an MEP.
+ */
+function rapporteurOf(block: string): string | null {
+  const raw = /<p class="rapporteurs">([\s\S]*?)<\/p>/i.exec(block)?.[1];
+  if (!raw) return null;
+  const name = text(raw);
+  if (!name) return null;
+  return /^[A-Z]+\d+-\d+(\/\d{4})?$/.test(name) ? null : name;
+}
+
+/**
  * The code as it appears in the voting-list file name. The Tabling Service is
  * not consistent about the separator — "(A10-0241_2026)_Sousa Silva.docx",
  * "A10-0243_Stefanuta.docx", "B10_0424_Islamist entryism.docx" — so both "-"
@@ -99,7 +115,7 @@ export function parseVotesPage(html: string): VotesPageEntry[] {
       (fromUrl ? decodeURIComponent(fromUrl.replace(/\+/g, " ")) : null);
     out.push({
       code,
-      rapporteur: /<p class="rapporteurs">([\s\S]*?)<\/p>/i.exec(block)?.[1] ? text(/<p class="rapporteurs">([\s\S]*?)<\/p>/i.exec(block)![1]!) || null : null,
+      rapporteur: rapporteurOf(block),
       title: /<p class="title bold">([\s\S]*?)<\/p>/i.exec(block)?.[1] ? text(/<p class="title bold">([\s\S]*?)<\/p>/i.exec(block)![1]!) || null : null,
       day,
       docxUrl,
