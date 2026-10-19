@@ -7,15 +7,9 @@ import type { DisplayItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const YEAR = 2026;
-
+/** The sitting in progress, else the next one — the list holds nothing else. */
 function pickDefault(sessions: SessionSummary[], today: string): SessionSummary | undefined {
-  return (
-    sessions.find((s) => s.start_date <= today && today <= s.end_date) ??
-    sessions.find((s) => s.start_date > today) ??
-    [...sessions].reverse().find((s) => s.end_date < today) ??
-    sessions[0]
-  );
+  return sessions.find((s) => s.start_date <= today && today <= s.end_date) ?? sessions[0];
 }
 
 export default async function Dashboard({
@@ -26,7 +20,7 @@ export default async function Dashboard({
   const { s, f } = await searchParams;
   // Brussels/Strasbourg day, not the server's.
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Brussels" });
-  const [sessions, viewer] = await Promise.all([getSessions(YEAR), getViewerContext()]);
+  const [sessions, viewer] = await Promise.all([getSessions(today), getViewerContext()]);
   const active = sessions.find((x) => x.id === s) ?? pickDefault(sessions, today);
   const rows = active ? await getSessionItems(active.id) : [];
   const officialVls = await getOfficialVlByItem(rows.map((r) => r.id));
@@ -59,8 +53,8 @@ export default async function Dashboard({
       <TopNav active={initialFilter === "followed" ? "My files" : "Votes"} />
 
       <main className="mx-auto max-w-6xl px-6 py-7">
-        {/* One part-session at a time; the rest of the year is in the menu. */}
-        <SessionSwitcher sessions={sessions} active={active} today={today} filter={f} />
+        {/* One part-session at a time; the ones still to come are in the menu. */}
+        <SessionSwitcher sessions={sessions} active={active} filter={f} />
 
         {active && (
           <section className="mt-5 grid gap-4 md:grid-cols-[1.4fr_1fr]">
