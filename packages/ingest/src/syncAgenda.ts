@@ -106,15 +106,31 @@ async function main() {
     console.log(`report details resolved: ${detailsOk}/${files.length}`);
 
     // 5. Upsert items. No vote_date — these have not been voted yet.
-    const itemRows = enriched.map((e) => ({
-      session_id: e.sessionId,
-      code: e.code,
-      ep_work_id: `eli/dl/doc/${e.identifier}`,
-      title: e.title,
-      rapporteur: e.rapporteur ?? null,
-      committee: e.committee ?? null,
-      committees: e.committee ? [e.committee] : null,
-    }));
+    //    A file whose details we failed to resolve this run (the EP publishes
+    //    the agenda days before the Open Data record carries its creator, and
+    //    /documents 504s under load) must not blank a name an earlier run got
+    //    right: fall back to what the row already holds.
+    const { data: priorRows } = await supabase
+      .from("items")
+      .select("session_id, code, committee, rapporteur")
+      .in("session_id", [...new Set(files.map((f) => f.sessionId))]);
+    const prior = new Map(
+      (priorRows ?? []).map((r) => [`${r.session_id}|${r.code}`, r as { committee: string | null; rapporteur: string | null }]),
+    );
+
+    const itemRows = enriched.map((e) => {
+      const had = prior.get(`${e.sessionId}|${e.code}`);
+      const committee = e.committee ?? had?.committee ?? null;
+      return {
+        session_id: e.sessionId,
+        code: e.code,
+        ep_work_id: `eli/dl/doc/${e.identifier}`,
+        title: e.title,
+        rapporteur: e.rapporteur ?? had?.rapporteur ?? null,
+        committee,
+        committees: committee ? [committee] : null,
+      };
+    });
     if (itemRows.length) {
       const { error: itemErr } = await supabase.from("items").upsert(itemRows, { onConflict: "session_id,code" });
       if (itemErr) throw new Error(`items upsert: ${itemErr.message}`);
