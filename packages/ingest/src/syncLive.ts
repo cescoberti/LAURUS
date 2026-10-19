@@ -136,6 +136,14 @@ async function backfillFamilies(s: Session): Promise<void> {
   }
 }
 
+/** The columns the agenda pass needs to decide whether a row is still bare. */
+interface ItemDetails {
+  id: string;
+  code: string;
+  committee: string | null;
+  rapporteur: string | null;
+}
+
 async function syncAgenda(s: Session, days: string[]): Promise<number> {
   const seen = new Map<string, { identifier: string; code: string; title: { en: string; it: string } }>();
   for (const day of days) {
@@ -159,11 +167,22 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
   }
   if (seen.size === 0) return 0;
 
-  // Only resolve committee/rapporteur for codes we don't have yet — the
-  // /documents endpoint is the rate-limited one.
-  const { data: existing } = await supabase.from("items").select("code").eq("session_id", s.id);
-  const known = new Set((existing ?? []).map((r) => r.code as string));
-  const fresh = [...seen.values()].filter((f) => !known.has(f.code));
+  // Resolve committee/rapporteur for codes we don't have yet, plus codes whose
+  // row still has neither — the /documents endpoint is the rate-limited one, so
+  // we ask it for as few files as possible, but "already in the table" is not
+  // the same as "already resolved". The agenda names a file days before the
+  // Open Data record carries its creator, so a row first seen in that window
+  // lands with both columns null; skipping it for ever is how A10-0263/2026 and
+  // A10-0265/2026 stayed nameless while the EP site had the rapporteur.
+  const { data: existing } = await supabase
+    .from("items")
+    .select("id, code, committee, rapporteur")
+    .eq("session_id", s.id);
+  const known = new Map((existing ?? []).map((r) => [r.code as string, r as ItemDetails]));
+  const fresh = [...seen.values()].filter((f) => {
+    const row = known.get(f.code);
+    return !row || !row.committee || !row.rapporteur;
+  });
 
   const enriched = await mapLimit(fresh, 3, async (f) => {
     let committee: string | undefined;
@@ -182,9 +201,13 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
 
   await backfillFamilies(s);
 
-  if (enriched.length) {
+  // New codes go in whole; rows we already had are only ever filled in, never
+  // blanked. A tick that reaches the API while the record is still incomplete
+  // (or that it 504s on) must leave yesterday's good name alone.
+  const added = enriched.filter((e) => !known.has(e.code));
+  if (added.length) {
     const { error } = await supabase.from("items").upsert(
-      enriched.map((e) => ({
+      added.map((e) => ({
         session_id: s.id,
         code: e.code,
         ep_work_id: `eli/dl/doc/${e.identifier}`,
@@ -198,7 +221,24 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
     );
     if (error) throw new Error(`items upsert: ${error.message}`);
   }
-  return enriched.length;
+
+  for (const e of enriched) {
+    const row = known.get(e.code);
+    if (!row) continue;
+    const patch: Record<string, unknown> = {};
+    if (e.rapporteur && !row.rapporteur) patch.rapporteur = e.rapporteur;
+    if (e.committee && !row.committee) {
+      patch.committee = e.committee;
+      patch.committees = [e.committee];
+    }
+    if (!Object.keys(patch).length) continue;
+    const { error } = await supabase.from("items").update(patch).eq("id", row.id);
+    if (error) throw new Error(`items detail fill ${e.code}: ${error.message}`);
+    console.log(`  filled ${e.code} → ${e.committee ?? "?"} / ${e.rapporteur ?? "?"}`);
+  }
+  // The caller logs this as "new file(s)", so count only the rows we created;
+  // the fills above announce themselves.
+  return added.length;
 }
 
 // ---------------------------------------------------------------------------
