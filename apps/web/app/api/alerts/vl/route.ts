@@ -24,6 +24,10 @@ export const runtime = "nodejs";
  * actually waits for: the amendment numbers appear in the original language
  * hours before the Italian text the Remarks column needs, and a count-only
  * fingerprint never moved when the translation landed.
+ *
+ * The fingerprint still tracks every block of that translation, because that
+ * is how the finished one is recognised — but only the finished one is sent.
+ * A tick that sees 59 of 125 records the state and says nothing.
  */
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
@@ -43,20 +47,38 @@ interface ItemState {
   vlVersion: string;
 }
 
+/** A line of the message. `news` says whether it alone is worth sending. */
+interface Bit {
+  text: string;
+  news: boolean;
+}
+
 /**
- * What to say about the follower's language. `before` is null on a first
- * message about a file, where the current state is the news; a receipt
- * written before this dimension existed carries no count at all, and the
- * caller says nothing rather than reporting an unknown as a change.
+ * What to say about the follower's language.
+ *
+ * Translation arrives block by block — 59 of 125, then 80, then 104 — and
+ * every block moves the fingerprint, so announcing each one meant three mails
+ * a day about a single file. Only the finished translation is news. A partial
+ * count still rides along in a message that some other change has earned
+ * (a new voting-list version is worth knowing the Italian is at 59 of 125),
+ * but it never sets one off by itself.
+ *
+ * `before` is null on a first message about a file, where the current state
+ * is the news; a receipt written before this dimension existed carries no
+ * count at all, and the caller says nothing rather than reporting an unknown
+ * as a change.
  */
-function translationBit(it: ItemState, lang: string, before: number | null): string | null {
+function translationBit(it: ItemState, lang: string, before: number | null): Bit | null {
   const now = it.amByLang[lang] ?? 0;
   const L = lang.toUpperCase();
   if (now === 0 || now === before) return null;
   if (it.am_count > 0 && now >= it.am_count) {
-    return before === null ? `all ${it.am_count} amendments available in ${L}` : `all ${it.am_count} amendments now in ${L}`;
+    return {
+      text: before === null ? `all ${it.am_count} amendments available in ${L}` : `all ${it.am_count} amendments now in ${L}`,
+      news: true,
+    };
   }
-  return `${L}: ${now} of ${it.am_count} amendments translated`;
+  return { text: `${L}: ${now} of ${it.am_count} amendments translated`, news: false };
 }
 
 function describe(
@@ -64,32 +86,34 @@ function describe(
   previous: { am: number; vot: string[]; vl: string; inLang: number | null } | null,
   lang: string,
 ): string | null {
-  const bits: string[] = [];
+  const bits: Bit[] = [];
+  const say = (text: string) => bits.push({ text, news: true });
   if (!previous) {
-    if (it.vlVersion) bits.push(`official voting list published (${it.vlVersion})`);
-    if (it.am_count > 0) bits.push(`${it.am_count} amendment${it.am_count === 1 ? "" : "s"} loaded`);
+    if (it.vlVersion) say(`official voting list published (${it.vlVersion})`);
+    if (it.am_count > 0) say(`${it.am_count} amendment${it.am_count === 1 ? "" : "s"} loaded`);
     const t = translationBit(it, lang, null);
     if (t) bits.push(t);
-    if (it.votLangs.length) bits.push("split/separate requests loaded");
+    if (it.votLangs.length) say("split/separate requests loaded");
   } else {
     if (it.vlVersion && it.vlVersion !== previous.vl) {
-      bits.push(previous.vl ? `new voting list version: ${it.vlVersion}` : `official voting list published (${it.vlVersion})`);
+      say(previous.vl ? `new voting list version: ${it.vlVersion}` : `official voting list published (${it.vlVersion})`);
     }
     if (it.am_count > previous.am) {
       const d = it.am_count - previous.am;
-      bits.push(`${d} new amendment${d === 1 ? "" : "s"} (now ${it.am_count})`);
+      say(`${d} new amendment${d === 1 ? "" : "s"} (now ${it.am_count})`);
     } else if (it.am_count !== previous.am) {
-      bits.push(`amendments now ${it.am_count}`);
+      say(`amendments now ${it.am_count}`);
     }
     // previous.inLang === null: a receipt from before the language count.
     // Whether the translation is news is unknowable, so it is not announced.
     const t = previous.inLang === null ? null : translationBit(it, lang, previous.inLang);
     if (t) bits.push(t);
-    if (it.votLangs.length && !previous.vot.length) bits.push("split/separate requests loaded");
+    if (it.votLangs.length && !previous.vot.length) say("split/separate requests loaded");
   }
-  // Nothing worth a message: the fingerprint moved only because this receipt
-  // predates the language dimension. The caller records it and stays quiet.
-  return bits.length ? bits.join(" · ") : null;
+  // Nothing worth a message: the fingerprint moved only because a translation
+  // advanced a block, or because this receipt predates the language dimension.
+  // The caller records the state and stays quiet.
+  return bits.some((b) => b.news) ? bits.map((b) => b.text).join(" · ") : null;
 }
 
 export async function POST(request: Request) {
