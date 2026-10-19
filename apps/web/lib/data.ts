@@ -26,13 +26,23 @@ export interface ItemRow {
   documents: Array<{ type: string; language: string; source_url: string }>;
 }
 
-export async function getSessions(year: number): Promise<SessionSummary[]> {
+/**
+ * Part-sessions still ahead, the one in progress included.
+ *
+ * LAURUS is a forward-looking tool: you open it to prepare a vote, never to
+ * look up one that already happened. So what is voted drops out of the UI and
+ * stays in the database — `items` and `votes` keep every past part-session, and
+ * a reader that needs them only has to lift the `end_date` bound here.
+ *
+ * Scoped by date rather than by calendar year, so the dashboard rolls into
+ * January on its own instead of emptying out every December.
+ */
+export async function getSessions(today: string): Promise<SessionSummary[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("sessions")
     .select("id, month_label, start_date, end_date, location, vote_count")
-    .gte("start_date", `${year}-01-01`)
-    .lte("start_date", `${year}-12-31`)
+    .gte("end_date", today)
     .order("start_date");
   return (data as SessionSummary[]) ?? [];
 }

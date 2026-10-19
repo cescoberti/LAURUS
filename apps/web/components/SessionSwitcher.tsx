@@ -27,16 +27,18 @@ function label(s: SessionSummary): string {
  * One part-session at a time. The arrows step to the one before and after;
  * everything else lives in the dropdown, so the whole year no longer has to
  * sit across the top of the page.
+ *
+ * `sessions` holds only what is still ahead (see `getSessions`), so the
+ * dropdown is a look forward, in calendar order, and disappears when the one
+ * on screen is the only one left.
  */
 export function SessionSwitcher({
   sessions,
   active,
-  today,
   filter,
 }: {
   sessions: SessionSummary[];
   active: SessionSummary | undefined;
-  today: string;
   filter?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -63,10 +65,6 @@ export function SessionSwitcher({
   const prev = i > 0 ? sessions[i - 1] : undefined;
   const next = i >= 0 && i < sessions.length - 1 ? sessions[i + 1] : undefined;
 
-  // Newest first in the list: what you reach for is the recent past, not January.
-  const listed = [...sessions].reverse();
-  const past = (s: SessionSummary) => s.end_date < today;
-
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
       <div className="min-w-0">
@@ -80,7 +78,7 @@ export function SessionSwitcher({
         {active && <p className="mt-1 pl-10 text-[15px] text-ink-500">{sessionSubtitle(active)}</p>}
       </div>
 
-      <div ref={ref} className="relative shrink-0">
+      <div ref={ref} className={`relative shrink-0 ${sessions.length > 1 ? "" : "hidden"}`}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -88,7 +86,7 @@ export function SessionSwitcher({
           aria-haspopup="menu"
           className="press flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-ink-700 shadow-card hover:bg-slate-50"
         >
-          Previous sessions
+          Coming up
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={open ? "rotate-180" : ""}>
             <path d="m6 9 6 6 6-6" />
           </svg>
@@ -99,7 +97,7 @@ export function SessionSwitcher({
             role="menu"
             className="scroll-y absolute right-0 top-full z-40 mt-1.5 max-h-[22rem] min-w-[14rem] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-sheet"
           >
-            {listed.map((s) => {
+            {sessions.map((s) => {
               const on = s.id === active?.id;
               return (
                 <Link
@@ -108,12 +106,12 @@ export function SessionSwitcher({
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-2 px-3.5 py-2 text-sm hover:bg-eu-50 ${
-                    on ? "bg-eu-50 font-semibold text-eu-900" : past(s) ? "text-ink-500" : "font-medium text-ink-900"
+                    on ? "bg-eu-50 font-semibold text-eu-900" : "font-medium text-ink-900"
                   }`}
                 >
                   <span
                     aria-hidden
-                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${on ? "bg-eu-700" : past(s) ? "bg-slate-200" : "bg-laurel-600"}`}
+                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${on ? "bg-eu-700" : "bg-laurel-600"}`}
                   />
                   <span className="truncate">{label(s)}</span>
                   <span className="ml-auto shrink-0 text-[11px] tabular-nums text-ink-300">{s.vote_count || ""}</span>

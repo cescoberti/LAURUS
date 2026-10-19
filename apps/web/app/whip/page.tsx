@@ -31,13 +31,16 @@ interface ItemRow {
 
 export default async function WhipPage() {
   const supabase = await createClient();
+  // Brussels/Strasbourg day, not the server's.
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Brussels" });
 
   const [{ data: sessions }, { data: advisors }] = await Promise.all([
     supabase
       .from("sessions")
       .select("id, month_label, start_date, end_date, location")
-      .gt("vote_count", 0) // skip future/empty part-sessions
-      .order("start_date", { ascending: false })
+      .gte("end_date", today) // a note for a sitting already held is nobody's job
+      .gt("vote_count", 0) // and one whose agenda has not landed yet has no files
+      .order("start_date")
       .limit(6),
     supabase.from("committee_advisors").select("code, advisor"),
   ]);
