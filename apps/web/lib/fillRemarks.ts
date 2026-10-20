@@ -35,6 +35,32 @@ export interface FillReport {
   }>;
 }
 
+/**
+ * A conditional-fall note the Tabling Service prints in the Remarks column:
+ * "adoption 4 = 2 falls" means that if am 4 carries, am 2 falls and is not
+ * put to the vote.
+ *
+ * It is the EP's annotation, not an advisor's, so the "never overwrite a
+ * written Remark" rule must not apply to it — and the advisor still has to
+ * read am 4 to decide how to vote on it. The note stays on top, the
+ * amendment text goes underneath, exactly as if the cell had been empty.
+ *
+ * Deliberately narrow: only this family is recognised. Any other text in
+ * Remarks is still treated as the advisor's and left alone.
+ */
+const FALL_NOTE = /^(?:if\s+)?adoption\s+(?:of\s+)?[^\n]*\bfalls?\b$/i;
+
+/** The Tabling Service note on this row, if that is what the Remarks hold. */
+function fallNote(remarks: string): string | null {
+  const r = remarks.trim();
+  return r && FALL_NOTE.test(r) ? r : null;
+}
+
+/** Keep the EP's note on top of the text LAURUS fills in beneath it. */
+function under(note: string | null, text: string): string {
+  return note ? `${note}\n\n${text}` : text;
+}
+
 /** "§ | original text" rows: a vote on the report's own paragraph, no amendment. */
 function isOriginalTextRow(row: AnnotatedVlRow): boolean {
   return /^original text$/i.test((row.author ?? "").trim()) || (row.amNo ?? "").trim() === "§";
@@ -55,24 +81,28 @@ export function fillRemarks(
   const rows = vl.rows.map((row): AnnotatedVlRow => {
     if (row.isFinalVote) return row;
 
+    const note = fallNote(row.remarks);
+
     if (isOriginalTextRow(row)) {
       if (!motion) return row;
       report.candidates++;
-      if (row.remarks.trim()) return row;
+      if (row.remarks.trim() && !note) return row;
       const text = originalTextFor(row.subject, motion);
       if (!text) {
         report.anomalies.push({ subject: row.subject, amNo: row.amNo, reason: "original_text_not_found" });
         return row;
       }
       report.filled++;
-      return { ...row, remarks: text };
+      return { ...row, remarks: under(note, text) };
     }
 
     const n = amendmentNumber(row);
     if (n === null) return row; // nothing to quote for a row without an amendment
     report.candidates++;
 
-    if (row.remarks.trim()) return row; // advisor already wrote something — keep it
+    // An advisor's own Remark is never overwritten; the EP's conditional-fall
+    // note is not one, and is kept above the text instead of blocking it.
+    if (row.remarks.trim() && !note) return row;
 
     const am = amendments.get(n);
     if (!am) {
@@ -114,10 +144,10 @@ export function fillRemarks(
           ),
         };
       }
-      return { ...row, remarks: text };
+      return { ...row, remarks: under(note, text) };
     }
 
-    return { ...row, remarks: text };
+    return { ...row, remarks: under(note, text) };
   });
 
   return { vl: { ...vl, rows }, report };
