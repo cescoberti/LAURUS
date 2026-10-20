@@ -52,7 +52,12 @@ function plain(html: string): string {
 const CITATION_RE = /^[–-]\s*(.+)$/;
 const RECITAL_RE = /^([A-Z]{1,2})\.\s*(.+)$/;
 const PARAGRAPH_RE = /^(\d+)\.\s*(.+)$/;
-const POINT_RE = /^\(([a-z])\)\s*(.+)$/;
+// The opening bracket is optional because the EP does not write the label the
+// same way in every language: the English report has "(a) Support to …", the
+// Italian the same point as "a) Sostegno alla …". The voting list names it
+// "§ 15, point f" in both, since the Tabling Service drafts lists in English,
+// so only the report side differs and only the closing bracket is reliable.
+const POINT_RE = /^\(?([a-z])\)\s*(.+)$/;
 // Lower-case roman only: a recital opens "A." / "AA." in capitals, so the two
 // never collide, and the sub-point is only read while a point is open anyway.
 const SUBPOINT_RE = /^([ivxl]+)\.\s*(.+)$/;
