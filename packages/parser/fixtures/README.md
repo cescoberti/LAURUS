@@ -56,3 +56,12 @@ each with roman sub-points naming the budget line.
 Its voting list votes on those points one at a time ("§ 15, point f",
 "§ 22, point b, sub-point i"), so this is the fixture that keeps
 `MotionText.points` honest: 50 paragraphs and 106 points.
+
+`rep-A-10-2026-0272-it.docx` — the same report in Italian, captured the same
+day, and the pair is the point of it. The EP does not label a point the same
+way in both: English writes "(a) Support to …", Italian writes "a) Sostegno
+alla …", closing bracket only. The voting list names it "§ 15, point f" in
+either language, because the Tabling Service drafts lists in English, so a
+parser that keys off the report's own label has to tolerate both. Same
+structure otherwise: 50 paragraphs and 106 points, which is also a check
+that the two language versions agree.

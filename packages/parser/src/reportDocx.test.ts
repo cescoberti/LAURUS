@@ -87,3 +87,32 @@ test("resolves a voting-list subject that votes on a point, not the paragraph", 
   // A point that does not exist is still null, never a near miss.
   assert.equal(originalTextFor("§ 15, point z", motion), null);
 });
+
+// The EP labels the same point differently per language — "(a) Support to …"
+// in English, "a) Sostegno alla …" in Italian — while the voting list names
+// it "§ 15, point f" in both, because lists are drafted in English. Reading
+// only the bracketed form left every Italian list with the same six empty
+// cells the English one had just stopped having.
+
+test("reads a point label in either language's bracketing", async () => {
+  const it = await parseMotionText(fixture("rep-A-10-2026-0272-it.docx"));
+  assert.ok(it, "the Italian motion should parse");
+  // Same document, same shape: the two language versions must agree.
+  assert.equal(it.paragraphs.size, 50);
+  assert.equal(it.points.size, 106);
+  assert.match(it.points.get("15.a")!, /^a\) Sostegno alla comunità turco-cipriota/);
+  assert.match(it.points.get("22.b.i")!, /^i\. linea di bilancio 11 02 01/);
+});
+
+test("the six subjects resolve in Italian too, from the English subject", async () => {
+  const it = await parseMotionText(fixture("rep-A-10-2026-0272-it.docx"));
+  assert.ok(it);
+  assert.match(originalTextFor("§ 15, point f", it)!, /^f\) Europa creativa/);
+  assert.match(originalTextFor("§ 15, point g", it)!, /^g\) Programma Cittadini/);
+  assert.match(originalTextFor("§ 21, point a", it)!, /^a\) Fondo europeo agricolo/);
+  assert.match(originalTextFor("§ 22, point a", it)!, /^a\) Fondo Asilo, migrazione/);
+  assert.match(originalTextFor("§ 27, point a", it)!, /^a\) NDICI-Europa globale/);
+  assert.match(originalTextFor("§ 49, point c", it)!, /^c\) incrementare le tabelle/);
+  assert.match(originalTextFor("§ 22, point b, sub-point i", it)!, /^i\. linea di bilancio 11 02 01/);
+  assert.match(originalTextFor("§ 15", it)!, /^15\. ripristina gli stanziamenti/);
+});
