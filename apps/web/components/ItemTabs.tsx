@@ -78,10 +78,12 @@ type Tab = (typeof TABS)[number];
 const LANG_LABEL: Record<string, string> = { it: "IT", en: "EN", nl: "NL" };
 
 export function ItemTabs({
+  code,
   amendments,
   languages,
   votRequests,
 }: {
+  code: string;
   amendments: ConsolidatedAmendment[];
   languages: string[];
   votRequests: Record<string, VotPayload>;
@@ -111,7 +113,7 @@ export function ItemTabs({
         ))}
       </div>
 
-      {tab === "Amendments" && <AmendmentsView amendments={amendments} languages={languages} />}
+      {tab === "Amendments" && <AmendmentsView code={code} amendments={amendments} languages={languages} />}
       {tab === "Split & Separate" && <SplitSeparateView votRequests={votRequests} />}
     </div>
   );
@@ -122,9 +124,11 @@ export function ItemTabs({
 // ---------------------------------------------------------------------------
 
 function AmendmentsView({
+  code,
   amendments,
   languages,
 }: {
+  code: string;
   amendments: ConsolidatedAmendment[];
   languages: string[];
 }) {
@@ -137,6 +141,20 @@ function AmendmentsView({
         <br />
         Amendments are extracted from the report DOCX via{" "}
         <code className="font-mono">npm run sync-amendments</code>.
+        {/* Nothing ingested here does not mean nothing published there: the
+            EP's own blocks are still worth offering, and this is the case
+            where they are most wanted. */}
+        <div className="mt-4 flex justify-center gap-2">
+          {(languages.length ? languages : ["it", "en"]).map((l) => (
+            <a
+              key={l}
+              href={`/api/item-amendments?code=${encodeURIComponent(code)}&lang=${l}`}
+              className="press rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
+            >
+              Try the EP files · {l.toUpperCase()}
+            </a>
+          ))}
+        </div>
       </div>
     );
   }
@@ -149,21 +167,37 @@ function AmendmentsView({
           <strong className="font-semibold">additions in bold</strong>,{" "}
           <s className="text-red-700/80">deletions struck through</s>.
         </p>
-        {languages.length > 1 && (
-          <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
-            {languages.map((l) => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  lang === l ? "bg-white text-eu-900 shadow-sm" : "text-ink-500 hover:text-ink-900"
-                }`}
-              >
-                {LANG_LABEL[l] ?? l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* The EP's own amendment DOCX, in the language on screen: what you
+              read the Remarks against when checking the list before a vote. */}
+          <a
+            href={`/api/item-amendments?code=${encodeURIComponent(code)}&lang=${lang}`}
+            className="press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
+            title={`Every amendment block the EP published for this report, in ${lang.toUpperCase()}`}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download all · {lang.toUpperCase()}
+          </a>
+          {languages.length > 1 && (
+            <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
+              {languages.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    lang === l ? "bg-white text-eu-900 shadow-sm" : "text-ink-500 hover:text-ink-900"
+                  }`}
+                >
+                  {LANG_LABEL[l] ?? l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">
