@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseMotionText, originalTextFor } from "./reportDocx.ts";
-import { parseIndicativeVotingList } from "./indicativeVotingList.ts";
+import { parseIndicativeVotingList, noteText } from "./indicativeVotingList.ts";
 
 const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url)));
 
@@ -40,6 +40,17 @@ test("the official list keeps its version label, original-text rows and footer n
   const original = vl.rows.filter((r) => r.author === "original text");
   assert.deepEqual(original.map((r) => r.subject), ["§ 2", "§ 4", "§ 10", "Citation 6", "Citation 7"]);
   assert.equal(vl.rows.filter((r) => r.voteType === "RCV").length, 12);
-  assert.equal(vl.notes[0], "Ams 2 and 14 were cancelled due to technical reasons");
+  // Notes keep the markup the EP printed them with — the writer reprints the
+  // block, so losing the italic lost the look of the list.
+  assert.equal(vl.notes[0], "<i>Ams 2 and 14 were cancelled due to technical reasons</i>");
+  assert.equal(noteText(vl.notes[0]!), "Ams 2 and 14 were cancelled due to technical reasons");
   assert.equal(vl.notes.length, 6);
+  // The "Requests for …" headings are underlined, and a group line is
+  // separated from its amendment numbers by a tab, not a space.
+  const heading = vl.notes.find((n) => /^requests? for /i.test(noteText(n)));
+  assert.ok(heading?.includes("<u>"), `heading should keep its underline: ${heading}`);
+  assert.ok(
+    vl.notes.some((n) => n.includes("\t")),
+    "a group line should keep the tab before its amendment numbers",
+  );
 });
