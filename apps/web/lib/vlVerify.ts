@@ -26,6 +26,7 @@ import { remarksFor, amendmentBlockUrl } from "@laurus/parser";
 import { createHash } from "node:crypto";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "@/lib/annotatedVl/fromDb";
+import { splitFallNote } from "@/lib/fillRemarks";
 
 const BASE = "https://data.europarl.europa.eu";
 const TERM = 10;
@@ -452,7 +453,10 @@ export async function verifyAgainstSource(
     }
     compared++;
     const expected = remarksFor(fresh.original ?? null, fresh.amended ?? null);
-    if (!same(expected, r.remarks)) {
+    // The cell may open with the EP's own "adoption 112 = 69 falls"; the
+    // amendment file has no such line, so compare what sits under it.
+    const { text: written } = splitFallNote(r.remarks);
+    if (!same(expected, written)) {
       issues.push(`am ${r.amNo}: Remarks differ from the published text`);
     }
   }
