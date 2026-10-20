@@ -55,9 +55,41 @@ export interface AnnotatedVotingList {
   /**
    * Paragraphs printed under the table, verbatim: "Ams 2 and 14 were
    * cancelled…", "Requests for roll-call votes", the per-group request lists.
-   * They are part of the list and are reproduced as they are.
+   * They are part of the list and are reproduced as they are — which means
+   * with their markup, so each carries the light HTML the DOCX writer reads
+   * (`<b>`, `<i>`, `<u>`, `<s>`) and keeps the tabs that align the group
+   * lines. Use `noteText` to match on the words.
    */
   notes: string[];
+}
+
+/**
+ * A paragraph printed under the table, kept as the light markup the DOCX
+ * writer understands (`<b>`, `<i>`, `<u>`, `<s>`) with its tabs intact.
+ *
+ * The block under the table is not prose, it is layout: "Requests for
+ * roll-call votes" is italic and underlined, and each group line is
+ * "Greens/ EFA:" then a TAB then the amendment numbers. Flattening it to
+ * plain text, which is what `cellText` does, reprinted it as two bare lines
+ * that no longer looked like the EP's list.
+ */
+function noteHtml(html: string): string {
+  return html
+    .replace(/<(\/?)(strong|em)>/gi, (_, slash: string, tag: string) => `<${slash}${tag.toLowerCase() === "strong" ? "b" : "i"}>`)
+    .replace(/<(\/?)(?:strike|del)>/gi, "<$1s>")
+    .replace(/<(?!\/?[bius]>)[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#39;|&rsquo;|&lsquo;/g, "’")
+    .replace(/&quot;|&ldquo;|&rdquo;/g, '"')
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/ {2,}/g, " ")
+    .replace(/^\s+|\s+$/g, "");
+}
+
+/** The words of a note, without the markup — for matching, never for printing. */
+export function noteText(note: string): string {
+  return note.replace(/<\/?[bius]>/g, "").replace(/\t/g, " ").replace(/ {2,}/g, " ").trim();
 }
 
 function cellText(html: string): string {
@@ -85,7 +117,10 @@ export async function parseIndicativeVotingList(
   buffer: Buffer | Uint8Array | ArrayBuffer,
 ): Promise<AnnotatedVotingList> {
   const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
-  const { value: html } = await mammoth.convertToHtml({ buffer: buf });
+  // mammoth drops underline unless asked: the Tabling Service underlines the
+  // "Requests for …" headings under the table, and that has to survive if the
+  // generated list is to reprint the block the way the EP printed it.
+  const { value: html } = await mammoth.convertToHtml({ buffer: buf }, { styleMap: ["u => u"] });
 
   const tableStart = html.indexOf("<table");
   const pre = tableStart >= 0 ? html.slice(0, tableStart) : html;
@@ -124,7 +159,7 @@ export async function parseIndicativeVotingList(
   const tableMatch = tableStart >= 0 ? /<table[\s\S]*?<\/table>/i.exec(html) : null;
   const table = tableMatch?.[0] ?? "";
   const post = tableMatch ? html.slice(tableMatch.index + table.length) : "";
-  const notes = [...post.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cellText(m[1] ?? "")).filter(Boolean);
+  const notes = [...post.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => noteHtml(m[1] ?? "")).filter((n) => noteText(n));
   const rows: AnnotatedVlRow[] = [];
   let current: AnnotatedVlRow | null = null;
   let lastSubject = "";
@@ -214,12 +249,14 @@ export interface SplitRequest {
  */
 export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
   const out: SplitRequest[] = [];
-  const start = notes.findIndex((n) => /^requests? for split votes?/i.test(n.trim()));
+  // The notes carry their markup now, so match on the words, not the HTML:
+  // the heading this looks for is the underlined one.
+  const start = notes.findIndex((n) => /^requests? for split votes?/i.test(noteText(n)));
   if (start < 0) return out;
   let group = "";
   let current: SplitRequest | null = null;
   for (const raw of notes.slice(start + 1)) {
-    const line = raw.trim();
+    const line = noteText(raw);
     if (!line) continue;
     if (/^requests? for /i.test(line)) break;
     const part = /^(\d+)(?:st|nd|rd|th)\s+part\s*:\s*(.*)$/i.exec(line);
