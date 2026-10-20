@@ -54,3 +54,36 @@ test("the official list keeps its version label, original-text rows and footer n
     "a group line should keep the tab before its amendment numbers",
   );
 });
+
+// Real report A10-0272/2026 (UŠAKOVS/HADJIPANTELA, BUDG) in English, captured
+// 2026-10-20. A budget report carries its figures in lettered points under a
+// paragraph, and its voting list votes on them one at a time.
+
+test("indexes the lettered points and roman sub-points under a paragraph", async () => {
+  const motion = await parseMotionText(fixture("rep-A-10-2026-0272-en.docx"));
+  assert.ok(motion, "the motion should parse");
+  assert.equal(motion.paragraphs.size, 50);
+  assert.equal(motion.points.size, 106);
+  // The chapeau still belongs to the paragraph, not to its first point.
+  assert.match(motion.paragraphs.get(15)!, /^15\. Restores the Council cuts/);
+  assert.match(motion.points.get("15.a")!, /^\(a\) Support to Turkish Cypriot Community/);
+  assert.match(motion.points.get("22.b.i")!, /^i\. budget line 11 02 01/);
+});
+
+test("resolves a voting-list subject that votes on a point, not the paragraph", async () => {
+  const motion = await parseMotionText(fixture("rep-A-10-2026-0272-en.docx"));
+  assert.ok(motion);
+  // The six subjects that came back "original text not found" on the EN list.
+  assert.match(originalTextFor("§ 15, point f", motion)!, /^\(f\) Creative Europe/);
+  assert.match(originalTextFor("§ 15, point g", motion)!, /^\(g\) The Citizens, Equality/);
+  assert.match(originalTextFor("§ 21, point a", motion)!, /^\(a\) The European Agriculture Guarantee Fund/);
+  assert.match(originalTextFor("§ 22, point a", motion)!, /^\(a\) The Asylum, Migration/);
+  assert.match(originalTextFor("§ 27, point a", motion)!, /^\(a\) NDICI-Global Europe/);
+  assert.match(originalTextFor("§ 49, point c", motion)!, /^\(c\) increase the establishment plans/);
+  // The longer shape must not be cut short by the shorter one.
+  assert.match(originalTextFor("§ 22, point b, sub-point i", motion)!, /^i\. budget line 11 02 01/);
+  // And the plain paragraph still resolves to the paragraph.
+  assert.match(originalTextFor("§ 15", motion)!, /^15\. Restores/);
+  // A point that does not exist is still null, never a near miss.
+  assert.equal(originalTextFor("§ 15, point z", motion), null);
+});

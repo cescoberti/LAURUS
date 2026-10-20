@@ -41,3 +41,18 @@ Still needed for M2: a real DOCX/PDF of a report with numbered `Am 12`-style
 rows populated in the "Am No" column (all items sampled on this date used
 provisional agreements or alternative motions instead), and the AM-NNN-NNN
 amendment DOCX itself, to validate the two-column amendment parser.
+
+`rep-A-10-2026-0272-en.docx` — the 2027 budget report (UŠAKOVS/HADJIPANTELA,
+BUDG, October II 2026 plenary) in English, captured 2026-10-20. A budget
+report is where the motion stops being a flat list of numbered paragraphs:
+§ 15 is one line of chapeau over a dozen lettered points carrying the figures,
+each with roman sub-points naming the budget line.
+
+  15. Restores the Council cuts of EUR 523 143 000 …
+  (a) Support to Turkish Cypriot Community by EUR 3 500 000;
+  i. budget line 05 04 01 – Financial support for encouraging …
+  (b) The Union Civil Protection Mechanism by EUR 80 000 000;
+
+Its voting list votes on those points one at a time ("§ 15, point f",
+"§ 22, point b, sub-point i"), so this is the fixture that keeps
+`MotionText.points` honest: 50 paragraphs and 106 points.

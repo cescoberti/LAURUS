@@ -22,6 +22,17 @@ export interface MotionText {
   recitals: Map<string, string>;
   /** Keyed by number. */
   paragraphs: Map<number, string>;
+  /**
+   * The lettered points under a paragraph, and the roman sub-points under
+   * those, each its own paragraph in the DOCX and each its own row in a
+   * voting list. Keyed "15.f" and "22.b.i".
+   *
+   * A budget report is mostly these: paragraph 15 of A10-0272/2026 is one
+   * line of chapeau over a dozen "(a) … (b) …" points carrying the actual
+   * figures. Indexing only the chapeau left every row that votes on a point
+   * with an empty Remarks column.
+   */
+  points: Map<string, string>;
 }
 
 const STYLE_MAP = ["p[style-name='PageHeading'] => h1:fresh"];
@@ -41,20 +52,36 @@ function plain(html: string): string {
 const CITATION_RE = /^[–-]\s*(.+)$/;
 const RECITAL_RE = /^([A-Z]{1,2})\.\s*(.+)$/;
 const PARAGRAPH_RE = /^(\d+)\.\s*(.+)$/;
+const POINT_RE = /^\(([a-z])\)\s*(.+)$/;
+// Lower-case roman only: a recital opens "A." / "AA." in capitals, so the two
+// never collide, and the sub-point is only read while a point is open anyway.
+const SUBPOINT_RE = /^([ivxl]+)\.\s*(.+)$/;
 
 export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer): Promise<MotionText | null> {
   const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
   const { value: html } = await mammoth.convertToHtml({ buffer: buf }, { styleMap: STYLE_MAP });
 
   const read = (section: string): MotionText => {
-    const motion: MotionText = { citations: [], recitals: new Map(), paragraphs: new Map() };
+    const motion: MotionText = { citations: [], recitals: new Map(), paragraphs: new Map(), points: new Map() };
+    // A point belongs to the paragraph above it and a sub-point to the point
+    // above that, so the reading carries both along.
+    let para: number | null = null;
+    let point: string | null = null;
     for (const m of section.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)) {
       const text = plain(m[1] ?? "");
       if (!text) continue;
       let r: RegExpExecArray | null;
       if ((r = CITATION_RE.exec(text))) motion.citations.push(r[1]!.trim());
-      else if ((r = RECITAL_RE.exec(text))) motion.recitals.set(r[1]!, text);
-      else if ((r = PARAGRAPH_RE.exec(text))) motion.paragraphs.set(Number(r[1]), text);
+      else if ((r = PARAGRAPH_RE.exec(text))) {
+        para = Number(r[1]);
+        point = null;
+        motion.paragraphs.set(para, text);
+      } else if (para !== null && (r = POINT_RE.exec(text))) {
+        point = r[1]!;
+        motion.points.set(`${para}.${point}`, text);
+      } else if (para !== null && point !== null && (r = SUBPOINT_RE.exec(text))) {
+        motion.points.set(`${para}.${point}.${r[1]!.toLowerCase()}`, text);
+      } else if ((r = RECITAL_RE.exec(text))) motion.recitals.set(r[1]!, text);
     }
     return motion;
   };
@@ -78,7 +105,16 @@ export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer)
 export function originalTextFor(subject: string, motion: MotionText): string | null {
   const s = subject.trim();
   let m: RegExpExecArray | null;
-  if ((m = /^(?:§|paragraph|paragrafo|par\.?)\s*(\d+)$/i.exec(s))) return motion.paragraphs.get(Number(m[1])) ?? null;
+  const P = "(?:§|paragraph|paragrafo|par\\.?)";
+  if ((m = new RegExp(`^${P}\\s*(\\d+)$`, "i").exec(s))) return motion.paragraphs.get(Number(m[1])) ?? null;
+  // "§ 22, point b, sub-point i" before "§ 15, point f": the longer shape
+  // would otherwise be cut short by the shorter one.
+  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z]),\\s*sub-?point\\s+([ivxl]+)$`, "i").exec(s))) {
+    return motion.points.get(`${Number(m[1])}.${m[2]!.toLowerCase()}.${m[3]!.toLowerCase()}`) ?? null;
+  }
+  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z])$`, "i").exec(s))) {
+    return motion.points.get(`${Number(m[1])}.${m[2]!.toLowerCase()}`) ?? null;
+  }
   if ((m = /^citation\s*(\d+)$/i.exec(s))) return motion.citations[Number(m[1]) - 1] ?? null;
   if ((m = /^(?:recital|considerando)\s*([A-Z]{1,2})$/i.exec(s))) return motion.recitals.get(m[1]!.toUpperCase()) ?? null;
   return null;
