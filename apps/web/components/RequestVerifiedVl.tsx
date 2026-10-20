@@ -7,7 +7,18 @@ import { useState } from "react";
  * passes and emails it with the report. The request comes back immediately —
  * the checking continues server-side, so nobody watches a spinner.
  */
-export function RequestVerifiedVl({ code, lang, block }: { code: string; lang: string; block?: boolean }) {
+export function RequestVerifiedVl({
+  code,
+  lang,
+  block,
+  secondary,
+}: {
+  code: string;
+  lang: string;
+  block?: boolean;
+  /** A second language offered beside the member's own: same action, quieter. */
+  secondary?: boolean;
+}) {
   const [state, setState] = useState<"idle" | "working" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -41,9 +52,11 @@ export function RequestVerifiedVl({ code, lang, block }: { code: string; lang: s
       <button
         onClick={request}
         disabled={state === "working" || state === "done"}
-        className={`press inline-flex items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white shadow-sm disabled:cursor-default disabled:opacity-80 ${
-          state === "done" ? "bg-laurel-700" : "bg-eu-900 hover:bg-eu-800"
-        } ${block ? "w-full justify-between py-3" : "py-2.5"}`}
+        className={`press inline-flex items-center gap-2 rounded-xl px-4 font-semibold shadow-sm disabled:cursor-default disabled:opacity-80 ${
+          secondary
+            ? `border text-sm ${state === "done" ? "border-laurel-200 bg-white text-laurel-700" : "border-eu-200 bg-white text-eu-900 hover:bg-eu-50"}`
+            : `text-sm text-white ${state === "done" ? "bg-laurel-700" : "bg-eu-900 hover:bg-eu-800"}`
+        } ${block ? "w-full justify-between py-3" : secondary ? "py-1.5" : "py-2.5"}`}
       >
         <span className="inline-flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

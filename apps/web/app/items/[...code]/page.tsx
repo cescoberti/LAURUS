@@ -36,6 +36,10 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
   // Only what the interface offers today (IT · EN · NL), never an empty set.
   const userLangs: string[] = stored.filter((l) => DOCUMENT_LANGUAGE_SET.has(l));
   if (userLangs.length === 0) userLangs.push("it");
+  // English is always on offer for the verified list, whatever the member set
+  // as their own: it is the language the amendments are tabled in, so it is
+  // the one you reach for to check a wording against the original.
+  const vlLangs: string[] = [...new Set([...userLangs, "en"])];
 
   // Is this member following the file, and on which channels?
   const { data: subs } =
@@ -113,7 +117,10 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
             )}
           {annotatedVlAvailable && (
             <>
-              <RequestVerifiedVl code={code} lang={userLangs[0] ?? "it"} />
+              <RequestVerifiedVl code={code} lang={vlLangs[0] ?? "it"} />
+              {vlLangs.slice(1).map((l) => (
+                <RequestVerifiedVl key={l} code={code} lang={l} secondary />
+              ))}
 
               {/* The instant file skips both verification passes, so it is
                   offered as a draft and labelled as one, in the filename too. */}
@@ -143,7 +150,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           <ItemFiles code={code} files={files} />
         </div>
 
-        <ItemTabs amendments={amendments} languages={languages} votRequests={votRequests} />
+        <ItemTabs code={code} amendments={amendments} languages={languages} votRequests={votRequests} />
       </main>
     </div>
   );

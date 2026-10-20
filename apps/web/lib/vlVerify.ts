@@ -233,7 +233,7 @@ function epDocId(code: string): string | null {
  * can hand in a cached copy (`index`) and get zero network calls; when it has
  * to be fetched, the fresh index comes back so the caller can store it.
  */
-async function amendmentBlockIds(
+export async function amendmentBlockIds(
   code: string,
   year: number,
   index: string[] | null,
