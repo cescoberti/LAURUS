@@ -5,6 +5,7 @@ import { ItemFiles } from "@/components/ItemFiles";
 import { RequestVerifiedVl } from "@/components/RequestVerifiedVl";
 import { FollowButton } from "@/components/FollowButton";
 import { CommitteeChip } from "@/components/badges";
+import { plenaryFileUrl } from "@laurus/parser";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { getItemByCode, getItemAmendments, getItemVotRequests, getItemOfficialVl, getItemFiles } from "@/lib/data";
 import { hasAnnotatedVl } from "@/lib/annotatedVl";
@@ -40,6 +41,8 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
   // as their own: it is the language the amendments are tabled in, so it is
   // the one you reach for to check a wording against the original.
   const vlLangs: string[] = [...new Set([...userLangs, "en"])];
+  // The EP's own page for this file, in the reader's language.
+  const epFileUrl = plenaryFileUrl(code, userLangs[0] ?? "en");
 
   // Is this member following the file, and on which channels?
   const { data: subs } =
@@ -76,7 +79,25 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
             {item?.title.en || item?.title.it || "Item not found"}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-500">
-            <span className="font-mono text-eu-700">{code}</span>
+            {/* The code is the handle people already read, so it is the thing
+                to make clickable: the EP's own page for the file, where the
+                text and the amendments sit together. */}
+            {epFileUrl ? (
+              <a
+                href={epFileUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={`Open ${code} on europarl.europa.eu — text and amendments`}
+                className="group inline-flex items-center gap-1 font-mono text-eu-700 hover:text-eu-900"
+              >
+                <span className="group-hover:underline">{code}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="opacity-50 group-hover:opacity-100">
+                  <path d="M7 17 17 7M9 7h8v8" />
+                </svg>
+              </a>
+            ) : (
+              <span className="font-mono text-eu-700">{code}</span>
+            )}
             {item?.committee && <CommitteeChip code={item.committee} />}
             {item?.vote_date && (
               <span>

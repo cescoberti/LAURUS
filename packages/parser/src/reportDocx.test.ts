@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseMotionText, originalTextFor } from "./reportDocx.ts";
 import { parseIndicativeVotingList, noteText } from "./indicativeVotingList.ts";
+import { plenaryFileUrl } from "./epUrls.ts";
 
 const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url)));
 
@@ -115,4 +116,26 @@ test("the six subjects resolve in Italian too, from the English subject", async 
   assert.match(originalTextFor("§ 49, point c", it)!, /^c\) incrementare le tabelle/);
   assert.match(originalTextFor("§ 22, point b, sub-point i", it)!, /^i\. linea di bilancio 11 02 01/);
   assert.match(originalTextFor("§ 15", it)!, /^15\. ripristina gli stanziamenti/);
+});
+
+// The EP's own page for a file, for a person to read. Both shapes verified
+// against www.europarl.europa.eu on 2026-10-20.
+
+test("links a report to its EP page and a motion to its DOCEO document", () => {
+  // A committee report: the page that carries text and amendments together.
+  assert.equal(
+    plenaryFileUrl("A10-0272/2026"),
+    "https://www.europarl.europa.eu/plenary/en/report-details.html?reference=A10-0272-2026",
+  );
+  assert.equal(
+    plenaryFileUrl("A10-0272/2026", "it"),
+    "https://www.europarl.europa.eu/plenary/it/report-details.html?reference=A10-0272-2026",
+  );
+  // A motion for a resolution has no report-details page — that URL 301s to a
+  // legacy one that 404s — so it goes to the document itself, number padded.
+  assert.equal(
+    plenaryFileUrl("B10-0468/2026"),
+    "https://www.europarl.europa.eu/doceo/document/B-10-2026-0468_EN.html",
+  );
+  assert.equal(plenaryFileUrl("not a code"), null);
 });
