@@ -61,6 +61,17 @@ function under(note: string | null, text: string): string {
   return note ? `${note}\n\n${text}` : text;
 }
 
+/**
+ * A filled cell split back into the EP's note and the text LAURUS put under
+ * it. Anything that re-reads a Remark against its source has to take the note
+ * off first, or every row carrying one reads as a mismatch.
+ */
+export function splitFallNote(remarks: string): { note: string | null; text: string } {
+  const [head, ...rest] = remarks.split("\n\n");
+  const note = head === undefined ? null : fallNote(head);
+  return note ? { note, text: rest.join("\n\n").trim() } : { note: null, text: remarks };
+}
+
 /** "§ | original text" rows: a vote on the report's own paragraph, no amendment. */
 function isOriginalTextRow(row: AnnotatedVlRow): boolean {
   return /^original text$/i.test((row.author ?? "").trim()) || (row.amNo ?? "").trim() === "§";
