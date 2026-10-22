@@ -4,6 +4,7 @@ import { sendEmail, emailConfigured } from "@/lib/notify/email";
 import { sendWhatsApp, whatsappConfigured } from "@/lib/notify/whatsapp";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { logEvent } from "@/lib/track";
+import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
 
@@ -29,8 +30,6 @@ export const runtime = "nodejs";
  * is how the finished one is recognised — but only the finished one is sent.
  * A tick that sees 59 of 125 records the state and says nothing.
  */
-
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
 
 interface ItemState {
   id: string;

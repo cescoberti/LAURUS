@@ -5,6 +5,7 @@ import { sendWhatsApp, whatsappConfigured } from "@/lib/notify/whatsapp";
 import { sendDueReminders } from "@/lib/notify/whipReminder";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { logEvent } from "@/lib/track";
+import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
 
@@ -28,8 +29,6 @@ export const runtime = "nodejs";
  * Every send is recorded in laurus.notifications-like events, and the whole
  * run no-ops gracefully while the provider keys are not configured.
  */
-
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

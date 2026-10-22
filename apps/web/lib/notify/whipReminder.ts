@@ -14,10 +14,10 @@
 import { sendEmail, emailConfigured } from "./email";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { SITE } from "@/lib/site";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
 const BRAND = "#1f5138";
 const DAY = 86_400_000;
 

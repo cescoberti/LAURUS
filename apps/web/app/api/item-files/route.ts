@@ -5,6 +5,7 @@ import { getItemByCode, getItemFiles, type ItemFile } from "@/lib/data";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
 import { logEvent } from "@/lib/track";
+import { errorPage } from "@/lib/site";
 
 // A zip of a dozen EP documents is a dozen sequential fetches behind a WAF
 // that wants to be asked slowly.
@@ -30,16 +31,6 @@ function nameFor(code: string, f: ItemFile): string {
   const safeCode = code.replace(/[^\w.-]+/g, "-");
   const version = f.version > 1 ? `-v${f.version}` : "";
   return `${safeCode}_${TYPE_SLUG[f.type]}_${f.language.toUpperCase()}${version}.${extensionOf(f.source_url)}`;
-}
-
-function page(status: number, title: string, body: string): NextResponse {
-  return new NextResponse(
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<div style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.5rem;color:#141a2b">
-<h1 style="color:#003399;font-size:1.25rem">${title}</h1><p>${body}</p>
-<p><a href="javascript:history.back()" style="color:#5d667a">← Go back</a></p></div>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
 }
 
 const MIME: Record<string, string> = {
@@ -68,24 +59,24 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code") ?? "";
-  if (!code) return page(400, "Which file?", "This link needs a report code.");
+  if (!code) return errorPage(400, "Which file?", "This link needs a report code.");
 
   const item = await getItemByCode(code);
-  if (!item) return page(404, "Not found", `No file with code ${code}.`);
+  if (!item) return errorPage(404, "Not found", `No file with code ${code}.`);
 
   const all = await getItemFiles(item.id);
   if (all.length === 0) {
-    return page(404, "Nothing published yet", "The EP has published no document for this file so far.");
+    return errorPage(404, "Nothing published yet", "The EP has published no document for this file so far.");
   }
 
   // ---- one document -------------------------------------------------------
   const docId = url.searchParams.get("doc");
   if (docId) {
     const file = all.find((f) => f.id === docId);
-    if (!file) return page(404, "Not found", "That document does not belong to this file.");
+    if (!file) return errorPage(404, "Not found", "That document does not belong to this file.");
     const bytes = await fetchBytesWithBackoff(file.source_url);
     if (!bytes) {
-      return page(
+      return errorPage(
         502,
         "The EP did not serve it",
         `The document is listed but its host did not return it. <a href="${file.source_url}" style="color:#003399">Try the EP site directly</a>.`,
@@ -117,7 +108,7 @@ export async function GET(request: Request) {
     return true;
   });
   if (wanted.length === 0) {
-    return page(404, "Nothing in that language", "The EP has not published these documents in that language yet.");
+    return errorPage(404, "Nothing in that language", "The EP has not published these documents in that language yet.");
   }
 
   const zip = new JSZip();
@@ -133,7 +124,7 @@ export async function GET(request: Request) {
     packed++;
   }
   if (packed === 0) {
-    return page(502, "The EP did not serve them", "None of the documents came back from the EP host. Try again in a minute.");
+    return errorPage(502, "The EP did not serve them", "None of the documents came back from the EP host. Try again in a minute.");
   }
   // Say out loud what is not in the envelope, rather than letting it be missed.
   if (missing.length > 0) {

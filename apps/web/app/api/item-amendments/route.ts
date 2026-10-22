@@ -8,6 +8,7 @@ import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
 import { amendmentBlockIds } from "@/lib/vlVerify";
 import { logEvent } from "@/lib/track";
 import { fileStem } from "@/lib/rapporteur";
+import { errorPage } from "@/lib/site";
 
 export const runtime = "nodejs";
 // A report's amendments come in blocks of five, each a separate fetch from a
@@ -27,15 +28,6 @@ export const maxDuration = 60;
  * resolved from the EP's AMENDMENT_LIST index instead, the same way the
  * voting-list verifier resolves them.
  */
-function page(status: number, title: string, body: string): NextResponse {
-  return new NextResponse(
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<div style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.5rem;color:#141a2b">
-<h1 style="color:#003399;font-size:1.25rem">${title}</h1><p>${body}</p>
-<p><a href="javascript:history.back()" style="color:#5d667a">← Go back</a></p></div>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
-}
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -46,23 +38,23 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code") ?? "";
-  if (!code) return page(400, "Which file?", "This link needs a report code.");
+  if (!code) return errorPage(400, "Which file?", "This link needs a report code.");
 
   const lang = (url.searchParams.get("lang") ?? "it").toLowerCase();
-  if (!DOCUMENT_LANGUAGE_SET.has(lang)) return page(400, "Which language?", `LAURUS does not offer ${lang.toUpperCase()}.`);
+  if (!DOCUMENT_LANGUAGE_SET.has(lang)) return errorPage(400, "Which language?", `LAURUS does not offer ${lang.toUpperCase()}.`);
 
   const item = await getItemByCode(code);
-  if (!item) return page(404, "Not found", `No file with code ${code}.`);
+  if (!item) return errorPage(404, "Not found", `No file with code ${code}.`);
 
   const year = Number(code.slice(-4));
   let blocks: string[] | null = null;
   try {
     ({ blocks } = await amendmentBlockIds(code, year, null));
   } catch (err) {
-    return page(502, "The EP index did not answer", (err as Error).message);
+    return errorPage(502, "The EP index did not answer", (err as Error).message);
   }
   if (!blocks || blocks.length === 0) {
-    return page(404, "No amendment blocks", "The EP has published no amendments for this report yet.");
+    return errorPage(404, "No amendment blocks", "The EP has published no amendments for this report yet.");
   }
 
   const zip = new JSZip();
@@ -83,7 +75,7 @@ export async function GET(request: Request) {
   }
 
   if (packed === 0) {
-    return page(
+    return errorPage(
       404,
       `Nothing in ${lang.toUpperCase()} yet`,
       `The EP lists ${blocks.length} amendment block${blocks.length === 1 ? "" : "s"} for this report, but none of them is published in ${lang.toUpperCase()} so far.`,

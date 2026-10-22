@@ -8,21 +8,13 @@ import { logEvent } from "@/lib/track";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit, DAILY_VL_LIMIT } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
+import { errorPage } from "@/lib/site";
 
 // Several lists, each a report fetch plus a parse; well inside the budget but
 // not instant.
 export const maxDuration = 60;
 
 /** A readable page, since this is opened by a plain link. */
-function page(status: number, title: string, body: string): NextResponse {
-  return new NextResponse(
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<div style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.5rem;color:#141a2b">
-<h1 style="color:#003399;font-size:1.25rem">${title}</h1><p>${body}</p>
-<p><a href="javascript:history.back()" style="color:#5d667a">← Go back</a></p></div>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
-}
 
 /**
  * Every voting list the member follows for one sitting day, in one .docx —
@@ -42,7 +34,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const day = url.searchParams.get("day") ?? "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return page(400, "Which day?", "This link needs a sitting day.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return errorPage(400, "Which day?", "This link needs a sitting day.");
   const langParam = (url.searchParams.get("lang") ?? "it").toLowerCase();
   const lang = documentLanguage(langParam);
 
@@ -50,7 +42,7 @@ export async function GET(request: Request) {
   const { data: subs } = await supabase.from("subscriptions").select("target_id").eq("user_id", user.id).eq("scope", "item");
   const followed = [...new Set((subs ?? []).map((s) => s.target_id as string))];
   if (followed.length === 0) {
-    return page(404, "No files followed", "Press the star on the files you follow, then come back for their lists.");
+    return errorPage(404, "No files followed", "Press the star on the files you follow, then come back for their lists.");
   }
   const { data: items } = await supabase
     .from("items")
@@ -60,12 +52,12 @@ export async function GET(request: Request) {
     .order("code");
   const codes = (items ?? []).map((i) => i.code as string);
   if (codes.length === 0) {
-    return page(404, "Nothing on that day", "None of the files you follow is voted on this day.");
+    return errorPage(404, "Nothing on that day", "None of the files you follow is voted on this day.");
   }
 
   const limit = await checkVlRateLimit(user.id);
   if (!limit.allowed) {
-    return page(
+    return errorPage(
       429,
       "Daily limit reached",
       `You've reached the limit of ${DAILY_VL_LIMIT} voting lists for today. Come back tomorrow, or email <a href="mailto:${CONTACT_EMAIL}" style="color:#003399">${CONTACT_EMAIL}</a> if you have a specific need.`,
@@ -88,7 +80,7 @@ export async function GET(request: Request) {
     void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, bundle: day } });
   }
   if (lists.length === 0) {
-    return page(404, "No list material yet", `Nothing has been published yet for ${missing.join(", ")}.`);
+    return errorPage(404, "No list material yet", `Nothing has been published yet for ${missing.join(", ")}.`);
   }
 
   const buffer = await renderAnnotatedVlBundle(lists, `Voting lists ${day}`);
