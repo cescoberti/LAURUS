@@ -27,9 +27,9 @@
  */
 import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
+import { sleep } from "./epShared.ts";
 
 const BASE = "https://data.europarl.europa.eu";
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const args = process.argv.slice(2).map((s) => s.trim()).filter(Boolean);
 const ANY = args.includes("--any");

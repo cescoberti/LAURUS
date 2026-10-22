@@ -49,6 +49,7 @@ import {
   mapLimit,
   foreseenActivities,
   reportRef,
+  sleep,
 } from "./epShared.ts";
 
 const TERM = 10;
@@ -57,7 +58,6 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const FORCE_START = process.argv[2];
 
 const supabase = makeAdminClient();
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
 // Session in progress

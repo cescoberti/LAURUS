@@ -16,21 +16,16 @@
  * (missing days → 404 → skipped). Items are matched by the report code(s)
  * cited in each <vote> label. Idempotent: upsert on (item_id, language).
  */
-import { createClient } from "@supabase/supabase-js";
 import { parseVotXml } from "@laurus/parser/vot-xml";
 import { fetchBytes } from "./httpFetch.ts";
+import { makeAdminClient, sleep } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const LANGS_ARG = (process.argv[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const BASE = "https://data.europarl.europa.eu";
 const TERM = 10;
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  db: { schema: "laurus" },
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const supabase = makeAdminClient();
 
 // The XML shapes and the extraction live in @laurus/parser/vot-xml so the
 // voting-list verifier can re-derive the same requests from the same source.

@@ -11,19 +11,14 @@
  *
  * Only fills rows where rapporteur IS NULL; never overwrites existing values.
  */
-import { createClient } from "@supabase/supabase-js";
 import { fetchBytes } from "./httpFetch.ts";
+import { makeAdminClient, sleep } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const BASE = "https://data.europarl.europa.eu";
 const TERM = 10;
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  db: { schema: "laurus" },
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const supabase = makeAdminClient();
 
 // "Report:"/"Relazione:"/"Rapport:" <name> "(" <code> ")"
 const LABEL_RE = /<label>(?:Relazione|Report|Rapport|Bericht|Informe)\s*:\s*([^(<]+?)\s*\(([A-Z]+\d+-\d+\/\d{4})\)/g;
