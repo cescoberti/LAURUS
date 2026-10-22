@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailConfigured } from "@/lib/notify/email";
 import { sendWhatsApp, whatsappConfigured } from "@/lib/notify/whatsapp";
 import { sendDueReminders } from "@/lib/notify/whipReminder";
+import { rapporteurLabel } from "@/lib/rapporteur";
 import { logEvent } from "@/lib/track";
 
 export const runtime = "nodejs";
@@ -29,6 +30,17 @@ export const runtime = "nodejs";
  */
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** "21 Oct" — the day is what tells you whether a file is urgent. */
+function voteDay(date: string | null | undefined): string | null {
+  if (!date) return null;
+  const d = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+}
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -93,24 +105,36 @@ export async function GET(request: Request) {
     }
   }
 
-  interface DigestLine { code: string; what: string }
+  // A code on its own ("B10-0468/2026 — 29 amendments translated") does not say
+  // which file it is: nobody reads a digest holding the register of codes. So
+  // each line carries what the site shows — rapporteur, subject, committee and
+  // the day of the vote — in the same hierarchy as the per-file alert.
+  interface DigestLine { code: string; who: string | null; title: string; committee: string | null; voteDate: string | null; what: string }
   const digest: DigestLine[] = [];
   if (freshItemIds.length) {
     const { data } = await supabase
       .from("items")
-      .select("id, code, am_count")
+      .select("id, code, am_count, rapporteur, title, committee, vote_date")
       .in("id", freshItemIds)
       .gt("am_count", 0);
     for (const it of data ?? []) {
       const id = it.id as string;
       const tabled = tabledNow.get(id)?.size ?? 0;
       const touched = touchedNow.get(id)?.size ?? 0;
+      const t = (it.title ?? {}) as { en?: string; it?: string };
+      const about = {
+        code: it.code as string,
+        who: rapporteurLabel(it.rapporteur as string | null),
+        title: t.en || t.it || "",
+        committee: (it.committee as string | null) ?? null,
+        voteDate: voteDay(it.vote_date as string | null),
+      };
       if (tabled > 0) {
-        digest.push({ code: it.code as string, what: `${tabled} new amendment${tabled === 1 ? "" : "s"} tabled (${it.am_count} in all)` });
+        digest.push({ ...about, what: `${tabled} new amendment${tabled === 1 ? "" : "s"} tabled (${it.am_count} in all)` });
       } else if (confirmedFinal.has(id)) {
-        digest.push({ code: it.code as string, what: `voting list confirmed FINAL — no amendment added, ${touched} translated` });
+        digest.push({ ...about, what: `voting list confirmed FINAL — no amendment added, ${touched} translated` });
       } else if (touched > 0) {
-        digest.push({ code: it.code as string, what: `${touched} amendment${touched === 1 ? "" : "s"} translated — nothing new tabled` });
+        digest.push({ ...about, what: `${touched} amendment${touched === 1 ? "" : "s"} translated — nothing new tabled` });
       }
     }
   }
@@ -119,7 +143,7 @@ export async function GET(request: Request) {
   // --- 2. Items voted in the window (clean final) ------------------------
   const { data: votedItems } = await supabase
     .from("items")
-    .select("code, title, vote_date")
+    .select("code, title, vote_date, rapporteur")
     .gte("vote_date", since.slice(0, 10));
 
   const { data: members } = await supabase
@@ -143,10 +167,26 @@ export async function GET(request: Request) {
       : "LAURUS — translations in, nothing new tabled";
 
   if (newVlItems.length) {
-    const list = newVlItems.map((i) => `• ${i.code} — ${i.what}`).join("\n");
+    const list = newVlItems
+      .map((i) => `• ${i.who ?? i.code} — ${i.what}\n  ${i.code}${i.voteDate ? ` · vote ${i.voteDate}` : ""}`)
+      .join("\n");
     const html =
       `<p>Overnight on <a href="${SITE}">LAURUS</a>:</p><ul>` +
-      newVlItems.map((i) => `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${i.what}</li>`).join("") +
+      newVlItems
+        .map((i) => {
+          const head = i.who ? `<strong>${esc(i.who)}</strong>` : `<strong>${esc(i.code)}</strong>`;
+          const meta = [esc(i.code), i.committee ? esc(i.committee) : null, i.voteDate ? `vote ${i.voteDate}` : null]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            `<li style="margin-bottom:10px">` +
+            `<a href="${SITE}/items/${encodeURIComponent(i.code)}" style="text-decoration:none;color:#1f5138">${head}</a> — ${esc(i.what)}` +
+            (i.title ? `<br><span style="color:#4a5a52">${esc(i.title)}</span>` : "") +
+            `<br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#7a8a82">${meta}</span>` +
+            `</li>`
+          );
+        })
+        .join("") +
       `</ul><p>Download the VLs with the Remarks already filled from each report's page.</p>`;
 
     for (const m of members ?? []) {
@@ -168,10 +208,18 @@ export async function GET(request: Request) {
       const html =
         `<p>Texts voted in plenary — final version:</p><ul>` +
         votedItems
-          .map(
-            (i) =>
-              `<li><a href="${SITE}/items/${i.code}">${i.code}</a> — ${(i.title as { en?: string }).en ?? ""} (voted ${i.vote_date})</li>`,
-          )
+          .map((i) => {
+            const t = (i.title ?? {}) as { en?: string; it?: string };
+            const who = rapporteurLabel(i.rapporteur as string | null);
+            const head = who ? esc(who) : esc(i.code as string);
+            return (
+              `<li style="margin-bottom:8px">` +
+              `<a href="${SITE}/items/${encodeURIComponent(i.code as string)}" style="text-decoration:none;color:#1f5138"><strong>${head}</strong></a>` +
+              (t.en || t.it ? ` — ${esc(t.en || t.it || "")}` : "") +
+              `<br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#7a8a82">${esc(i.code as string)} · voted ${voteDay(i.vote_date as string | null) ?? i.vote_date}</span>` +
+              `</li>`
+            );
+          })
           .join("") +
         `</ul><p>The official adopted texts are published by the EP under "Texts adopted".</p>`;
       const r = await sendEmail({ to: m.email, subject: `LAURUS — final post-vote texts (${votedItems.length})`, html });
