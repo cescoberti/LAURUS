@@ -5,6 +5,7 @@ import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
 import { motionFor } from "@/lib/annotatedVl/load";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
 
@@ -90,7 +91,8 @@ export async function POST(request: Request) {
     itemCode: vl.reportCode,
     meta: { filled: report.filled, candidates: report.candidates },
   });
-  const filename = `annotated-vl-${(vl.rapporteur ?? vl.reportCode).replace(/[^A-Za-z0-9]+/g, "-")}.docx`;
+  // Built by LAURUS from an uploaded indicative list, Remarks filled in Italian.
+  const filename = `${fileStem(vl.rapporteur, "it", vl.reportCode)} (draft).docx`;
 
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,

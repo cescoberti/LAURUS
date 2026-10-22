@@ -7,6 +7,7 @@ import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
 import { amendmentBlockIds } from "@/lib/vlVerify";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 
 export const runtime = "nodejs";
 // A report's amendments come in blocks of five, each a separate fetch from a
@@ -106,7 +107,7 @@ export async function GET(request: Request) {
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${safeCode}_amendments_${lang.toUpperCase()}.zip"`,
+      "Content-Disposition": `attachment; filename="${fileStem(item.rapporteur, lang, code)} (EP amendments).zip"`,
       "Cache-Control": "private, max-age=600",
     },
   });

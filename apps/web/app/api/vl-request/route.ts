@@ -9,6 +9,7 @@ import { verifyVotingList, votingListFingerprint, type VlVerificationReport, typ
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 
@@ -208,8 +209,10 @@ export async function POST(request: Request) {
       }
 
       const docx = await renderAnnotatedVlDocx(loaded.vl);
-      const stamp = report.verified ? "VERIFIED" : "UNVERIFIED";
-      const filename = `annotated-vl-${stamp}-${(loaded.vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}-${lang.toUpperCase()}.docx`;
+      // The verified list is the one that circulates, so it carries the plain
+      // name; anything that did not pass both passes says so in the name.
+      const stem = fileStem(loaded.vl.rapporteur, lang, code);
+      const filename = report.verified ? `${stem}.docx` : `${stem} (unverified).docx`;
 
       const sent = await sendVlEmail({ to, report, filename, docx });
       if (!sent.ok) {

@@ -5,6 +5,7 @@ import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
@@ -59,10 +60,8 @@ export async function GET(request: Request) {
   // header keeps the EP's version label, so the file name carries the caveat;
   // a list LAURUS built itself is a draft and is named as one.
   const buffer = await renderAnnotatedVlDocx(vl);
-  const who = (vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-");
-  const filename = loaded.official
-    ? `VL-${who}-${lang.toUpperCase()}-unverified.docx`
-    : `annotated-vl-DRAFT-${who}-${lang.toUpperCase()}.docx`;
+  const stem = fileStem(vl.rapporteur, lang, code);
+  const filename = loaded.official ? `${stem} (unverified).docx` : `${stem} (draft).docx`;
   void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang } });
 
   return new NextResponse(new Uint8Array(buffer), {
