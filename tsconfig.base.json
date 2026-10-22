@@ -10,6 +10,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "composite": true
+    "composite": true,
+    // These packages run under `node --experimental-strip-types`, which resolves
+    // the exact specifier and so needs the `.ts` on every intra-package import.
+    // Without this flag `tsc -b` rejected all 43 of them, which is most of why
+    // `npm run typecheck` was red and unusable as a gate. Nothing consumes the
+    // emitted JS — @laurus/parser is imported from `src` and nothing imports
+    // @laurus/ingest at all — so declarations are all this needs to emit.
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   }
 }
