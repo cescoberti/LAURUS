@@ -1,8 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadVotingList } from "@/lib/annotatedVl/load";
-import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
+import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { verifyVotingList, votingListFingerprint, type VlVerificationReport, type VlCheck } from "@/lib/vlVerify";
@@ -98,9 +97,7 @@ export async function POST(request: Request) {
       // their official notation and are listed in the report.
       // Before the vote the split requests are only in the official list's
       // footer notes (English); after it, in the VOT.
-      const votEn =
-        loaded.votEn ??
-        (loaded.official ? { splitVotes: splitRequestsFromNotes(loaded.vl.notes), separateVotes: [], rollCalls: [] } : null);
+      const votEn = votEnFor(loaded);
       const expansionNotes = await expandSplitRows(loaded.vl, {
         itemCode: code,
         language: lang,

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
-import { loadVotingList } from "@/lib/annotatedVl/load";
+import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
-import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { fileStem } from "@/lib/rapporteur";
@@ -48,8 +47,7 @@ export async function GET(request: Request) {
   // Split rows: parent emptied, part 1 = paragraph with the split-off words
   // struck, later parts = those words. Before the vote the requests are the
   // official list's own footer notes.
-  const votEn =
-    loaded.votEn ?? (loaded.official ? { splitVotes: splitRequestsFromNotes(vl.notes), separateVotes: [], rollCalls: [] } : null);
+  const votEn = votEnFor(loaded);
   await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments });
 
   // This is the UNVERIFIED route — the verified list goes out by email from

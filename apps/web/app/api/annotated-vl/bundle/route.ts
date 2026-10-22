@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
-import { loadVotingList } from "@/lib/annotatedVl/load";
+import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
-import { splitRequestsFromNotes, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlBundle } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { documentLanguage } from "@/lib/languages";
@@ -70,8 +70,7 @@ export async function GET(request: Request) {
       continue;
     }
     const { vl } = loaded;
-    const votEn =
-      loaded.votEn ?? (loaded.official ? { splitVotes: splitRequestsFromNotes(vl.notes), separateVotes: [], rollCalls: [] } : null);
+    const votEn = votEnFor(loaded);
     await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments });
     lists.push(vl);
     void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, bundle: day } });
