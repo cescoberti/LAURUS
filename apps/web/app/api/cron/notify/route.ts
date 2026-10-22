@@ -50,6 +50,10 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const since = new Date(Date.now() - 25 * 3_600_000).toISOString();
+  // The run is at 07:00, before the day's votes: today's files are still ahead,
+  // yesterday's are the ones that have just closed.
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 24 * 3_600_000).toISOString().slice(0, 10);
 
   // --- 1. What actually changed on a file in the window ------------------
   const { data: freshAms } = await supabase
@@ -111,11 +115,16 @@ export async function GET(request: Request) {
   interface DigestLine { code: string; who: string | null; title: string; committee: string | null; voteDate: string | null; what: string }
   const digest: DigestLine[] = [];
   if (freshItemIds.length) {
+    // Only files still to be voted. A translation landing overnight on a file
+    // voted yesterday is not news — there is nothing left to prepare for — and
+    // reporting it is what made the digest read as noise. A file voted later
+    // today is the opposite: it stays, it is the most urgent line in the mail.
     const { data } = await supabase
       .from("items")
       .select("id, code, am_count, rapporteur, title, committee, vote_date")
       .in("id", freshItemIds)
-      .gt("am_count", 0);
+      .gt("am_count", 0)
+      .or(`vote_date.is.null,vote_date.gte.${today}`);
     for (const it of data ?? []) {
       const id = it.id as string;
       const tabled = tabledNow.get(id)?.size ?? 0;
@@ -140,10 +149,15 @@ export async function GET(request: Request) {
   const newVlItems = digest;
 
   // --- 2. Items voted in the window (clean final) ------------------------
+  // The window that has closed, and only that. `gte(since)` had no upper bound,
+  // so "texts voted in plenary — final version" also listed every file whose
+  // vote is still weeks away, and listed it again every morning until the day
+  // came. On a date column, gte(yesterday) + lt(today) is yesterday alone.
   const { data: votedItems } = await supabase
     .from("items")
     .select("code, title, vote_date, rapporteur")
-    .gte("vote_date", since.slice(0, 10));
+    .gte("vote_date", yesterday)
+    .lt("vote_date", today);
 
   const { data: members } = await supabase
     .from("users")
