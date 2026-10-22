@@ -1,6 +1,5 @@
-import Link from "next/link";
 import type { MouseEvent } from "react";
-import type { DisplayItem, VlStatus } from "@/lib/types";
+import type { DisplayItem } from "@/lib/types";
 
 /** Committee code; the member's own committees read in EU blue. */
 export function CommitteeChip({ code, mine }: { code: string; mine?: boolean }) {
@@ -62,67 +61,5 @@ export function Star({ on, onToggle }: { on: boolean; onToggle: (e: MouseEvent<H
     >
       {on ? "★" : "☆"}
     </button>
-  );
-}
-
-/** Member-facing VL state, kept for the file page. */
-export function VlBadge({ status, amCount = 0 }: { status: VlStatus; amCount?: number }) {
-  if (status === "none" && amCount > 0) {
-    return (
-      <span
-        title={`${amCount} amendment${amCount === 1 ? "" : "s"} loaded — VL ready to generate`}
-        className="inline-flex items-center gap-1 rounded-md bg-eu-50 px-2 py-0.5 text-xs font-semibold text-eu-900 ring-1 ring-inset ring-eu-200"
-      >
-        {amCount} AM
-      </span>
-    );
-  }
-  if (status === "final") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-laurel-700 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
-        <span className="h-1.5 w-1.5 rounded-full bg-gold-300" />
-        Final
-      </span>
-    );
-  }
-  if (status === "draft") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-gold-500/10 px-2 py-0.5 text-xs font-semibold text-gold-600 ring-1 ring-inset ring-gold-500/30">
-        Draft
-      </span>
-    );
-  }
-  return <span className="text-sm text-ink-300">–</span>;
-}
-
-export function DocLinks({ item }: { item: DisplayItem }) {
-  return (
-    <div className="flex items-center gap-2">
-      {item.fileUrl ? (
-        <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-eu-600 transition-colors hover:text-eu-900 hover:underline">
-          File
-        </a>
-      ) : (
-        <span className="cursor-default text-xs font-medium text-ink-300">File</span>
-      )}
-      {item.amCount > 0 ? (
-        <Link href={`/items/${item.code}`} title="Amendments loaded — request the VL from the file page" className="text-xs font-medium text-eu-600 transition-colors hover:text-eu-900 hover:underline">
-          VL
-        </Link>
-      ) : (
-        <span title="No amendments published yet" className="cursor-default text-xs font-medium text-ink-300">
-          VL
-        </span>
-      )}
-    </div>
-  );
-}
-
-export function StaffAvatar({ initials }: { initials?: string }) {
-  if (!initials) return <span className="text-sm text-ink-300">–</span>;
-  return (
-    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-eu-900 text-[11px] font-semibold text-white ring-2 ring-white shadow-sm">
-      {initials}
-    </span>
   );
 }
