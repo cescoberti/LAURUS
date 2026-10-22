@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
@@ -20,10 +20,7 @@ import { CONTACT_EMAIL } from "@/lib/committees";
  * ground-truth capture) is served instead. Requires an authenticated advisor.
  */
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);

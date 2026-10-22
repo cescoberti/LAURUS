@@ -2,6 +2,22 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
 /**
+ * Who is asking, and the client that read them — the four lines every download
+ * route opened with, written once.
+ *
+ * It deliberately stops there. The `if (!user) return 401` stays at each call
+ * site: a route that decides who may download a voting list should say so in
+ * its own body, not inherit the decision from a helper it imports.
+ */
+export async function sessionUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return { supabase, user };
+}
+
+/**
  * Server Component / Server Action client — reads and writes the auth cookie
  * via Next's cookie jar, subject to RLS as the signed-in user.
  */

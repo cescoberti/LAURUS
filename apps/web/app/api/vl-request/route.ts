@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadVotingList } from "@/lib/annotatedVl/load";
 import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
@@ -38,10 +38,7 @@ const VERIFICATION_MAX_AGE_DAYS = 30;
 const DAY = 86_400_000;
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);

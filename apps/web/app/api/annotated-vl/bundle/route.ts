@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { splitRequestsFromNotes, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
@@ -26,10 +26,7 @@ export const maxDuration = 60;
  * the checked version goes out by email from /api/vl-request.
  */
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);

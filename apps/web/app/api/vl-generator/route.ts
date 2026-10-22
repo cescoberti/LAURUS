@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
 import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
 import { motionFor } from "@/lib/annotatedVl/load";
@@ -17,10 +17,7 @@ export const runtime = "nodejs"; // mammoth + docx need Node, not edge
  * amendments (Italian first, English fallback) already ingested in Supabase.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { getItemByCode, getItemFiles, type ItemFile } from "@/lib/data";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
@@ -51,10 +51,7 @@ const MIME: Record<string, string> = {
  *   GET /api/item-files?code=A10-0241/2026              every file, zipped
  */
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { amendmentBlockUrl } from "@laurus/parser";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { getItemByCode } from "@/lib/data";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
@@ -30,10 +30,7 @@ export const maxDuration = 60;
  */
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
