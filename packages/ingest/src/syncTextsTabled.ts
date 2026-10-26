@@ -40,7 +40,18 @@ async function pageHtml(from: string): Promise<string> {
   // its www host answers a datacenter client with an empty 202 before serving
   // the page, so the retry-with-cookies helper is the one to use.
   const res = await fetchBytesPatiently(from, { Accept: "text/html" });
-  if (res.status !== 200) throw new Error(`${res.status} for ${from}`);
+  if (res.status !== 200) {
+    // Checked from a residential address and from a datacenter one: the www
+    // host does not serve this page to an HTTP client, only to a browser.
+    // Until this script is pointed at the browser helper the way
+    // votesPageBrowser.ts is, the page has to come in by hand.
+    throw new Error(
+      `${res.status} for ${from}\n\n` +
+        `  The EP does not serve this page to an HTTP client. Open it in a browser,\n` +
+        `  save it (⌘S), and pass the file instead:\n\n` +
+        `    npm run sync-texts-tabled --workspace @laurus/ingest -- ~/Downloads/texts-submitted.html\n`,
+    );
+  }
   return res.body.toString("utf8");
 }
 
