@@ -1,5 +1,11 @@
 /**
- * Backfill items.rapporteur from the per-sitting VOT XML.
+ * HISTORICAL BACKFILL ONLY — not the source of items.rapporteur.
+ *
+ * The VOT XML is published AFTER the sitting, and LAURUS prepares voting lists
+ * BEFORE the vote: a file in the week ahead has no VOT, so this script can say
+ * nothing about exactly the files that matter. Use `sync-pdoj`, which reads the
+ * final draft agenda the EP publishes before the sitting. This one is for
+ * filling in past part-sessions, and must not become the only source again.
  *
  *   npm run sync-rapporteurs -- 2026
  *

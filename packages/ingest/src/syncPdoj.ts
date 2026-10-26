@@ -1,6 +1,11 @@
 /**
- * Fill items.rapporteur and items.committee from the synoptic final draft
- * agenda (PDOJ) the Plenary Sittings Directorate publishes before a sitting.
+ * THE source of items.rapporteur and items.committee for the week ahead.
+ *
+ * Fills them from the synoptic final draft agenda (PDOJ) the Plenary Sittings
+ * Directorate publishes before a sitting — the only document that names the
+ * rapporteur while there is still time to prepare the list, which is what
+ * LAURUS is for. `sync-rapporteurs`, reading the post-vote VOT XML, is a
+ * backfill for past sittings and nothing more.
  *
  *   npm run sync-pdoj -- ~/Downloads/pdoj.txt            # shows what it would do
  *   npm run sync-pdoj -- ~/Downloads/pdoj.txt --write    # writes it
