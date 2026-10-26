@@ -19,12 +19,14 @@
     "session-window": "node --experimental-strip-types src/sessionWindow.ts",
     "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",
     "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts",
-    "sync-pdoj": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncPdoj.ts"
+    "sync-pdoj": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncPdoj.ts",
+    "sync-texts-tabled": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncTextsTabled.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
     "@supabase/supabase-js": "^2.58.0",
-    "fast-xml-parser": "^5.10.1"
+    "fast-xml-parser": "^5.10.1",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "playwright": "^1.55.0"

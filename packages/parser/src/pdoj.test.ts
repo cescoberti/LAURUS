@@ -83,10 +83,11 @@ test("reads the procedure marker and the deadline flag", () => {
 test("takes the title from the line under the entry, note and all", () => {
   const byCode = new Map(parsePdoj(PDOJ).map((e) => [e.code, e]));
   assert.equal(byCode.get("A10-0261/2026")?.title, "Europe’s Beating Cancer Plan");
-  assert.equal(
-    byCode.get("A10-0093/2026")?.title,
-    "European Chemicals Agency and amending regulations(Vote: 29/04/2026)",
-  );
+  // The two extractors differ by one space here — pypdf glues the note to the
+  // title, unpdf separates it — so what matters is that the note survives.
+  const chemicals = byCode.get("A10-0093/2026")?.title ?? "";
+  assert.ok(chemicals.startsWith("European Chemicals Agency and amending regulations"));
+  assert.ok(chemicals.includes("(Vote: 29/04/2026)"));
 });
 
 test("an agenda with no file entries yields nothing, not a crash", () => {

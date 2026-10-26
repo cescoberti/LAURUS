@@ -11,7 +11,8 @@
     "./voting-list-docx": "./src/indicativeVotingList.ts",
     "./vot-xml": "./src/votXml.ts",
     "./report-docx": "./src/reportDocx.ts",
-    "./pdoj": "./src/pdoj.ts"
+    "./pdoj": "./src/pdoj.ts",
+    "./texts-tabled": "./src/textsTabled.ts"
   },
   "scripts": {
     "build": "tsc -b",

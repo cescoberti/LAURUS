@@ -7,8 +7,10 @@
  * LAURUS is for. `sync-rapporteurs`, reading the post-vote VOT XML, is a
  * backfill for past sittings and nothing more.
  *
- *   npm run sync-pdoj -- ~/Downloads/pdoj.txt            # shows what it would do
- *   npm run sync-pdoj -- ~/Downloads/pdoj.txt --write    # writes it
+ *   npm run sync-pdoj -- "https://www.europarl.europa.eu/sedcms/…_EN.pdf"
+ *   npm run sync-pdoj -- ~/Downloads/pdoj.pdf --write
+ *
+ * Takes the agenda's URL, a local PDF, or text already extracted from one.
  *
  * Why this exists: syncRapporteurs reads the per-sitting VOT XML, which the EP
  * publishes AFTER the vote. A file that has not been voted yet therefore has no
@@ -17,18 +19,18 @@
  * on the week's agenda. The PDOJ names both, in advance, and is the document
  * the Conference of Presidents has approved.
  *
- * It takes TEXT, not the PDF: the agenda is published as PDF only (no DOCX or
- * XML sibling at the same path), and nothing in this monorepo can read a PDF.
- * Extract it first, with whatever is at hand:
- *
- *   pdftotext -layout pdoj.pdf pdoj.txt        # poppler
- *   python3 -c "from pypdf import PdfReader; ..."
+ * The agenda is published as PDF alone — no DOCX or XML sibling at the same
+ * path — so the text comes out of it with unpdf. The two extractors tried
+ * against the November I agenda, unpdf and pypdf, read the same 11 entries with
+ * the same codes, rapporteurs, committees and procedure markers, so the parser
+ * is not relying on one of them behaving a particular way.
  *
  * Writes only where the column is NULL — a name already in the database, which
  * came from the VOT after a vote, is the more authoritative one and is kept.
  * Nothing is written without --write.
  */
 import { readFileSync } from "node:fs";
+import { extractText } from "unpdf";
 import { parsePdoj } from "@laurus/parser/pdoj";
 import { makeAdminClient } from "./epShared.ts";
 
@@ -36,18 +38,35 @@ const path = process.argv[2];
 const WRITE = process.argv.includes("--write");
 
 if (!path || path.startsWith("--")) {
-  console.error("usage: sync-pdoj -- <pdoj.txt> [--write]");
+  console.error("usage: sync-pdoj -- <agenda URL | pdoj.pdf | pdoj.txt> [--write]");
   process.exit(2);
 }
 
-const supabase = makeAdminClient();
+/** The agenda as text, from its URL, a local PDF, or a text file. */
+async function agendaText(source: string): Promise<string> {
+  if (/^https?:\/\//.test(source)) {
+    const res = await fetch(source);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${source}`);
+    const { text } = await extractText(new Uint8Array(await res.arrayBuffer()), { mergePages: true });
+    return text;
+  }
+  if (source.toLowerCase().endsWith(".pdf")) {
+    const { text } = await extractText(new Uint8Array(readFileSync(source)), { mergePages: true });
+    return text;
+  }
+  return readFileSync(source, "utf8");
+}
 
 async function main() {
-  const entries = parsePdoj(readFileSync(path!, "utf8"));
+  // Parse first: a wrong URL or an agenda that reads as nothing should fail
+  // before we go anywhere near the database.
+  const entries = parsePdoj(await agendaText(path!));
   const withCode = entries.filter((e) => e.code !== null);
   console.log(`PDOJ: ${entries.length} files, ${withCode.length} with a number`);
   const skipped = entries.length - withCode.length;
   if (skipped) console.log(`  (${skipped} not numbered yet — nothing to match them on)`);
+
+  const supabase = makeAdminClient();
 
   const codes = withCode.map((e) => e.code!);
   const { data: items, error } = await supabase
