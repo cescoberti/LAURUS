@@ -32,6 +32,7 @@
 import { readFileSync } from "node:fs";
 import { extractText } from "unpdf";
 import { parsePdoj } from "@laurus/parser/pdoj";
+import { fetchBytesPatiently } from "./httpFetch.ts";
 import { makeAdminClient } from "./epShared.ts";
 
 const path = process.argv[2];
@@ -45,9 +46,11 @@ if (!path || path.startsWith("--")) {
 /** The agenda as text, from its URL, a local PDF, or a text file. */
 async function agendaText(source: string): Promise<string> {
   if (/^https?:\/\//.test(source)) {
-    const res = await fetch(source);
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${source}`);
-    const { text } = await extractText(new Uint8Array(await res.arrayBuffer()), { mergePages: true });
+    // node:https, never fetch(): the EP WAF fingerprints undici at the TLS
+    // level and turns it away — see the note on top of httpFetch.ts.
+    const res = await fetchBytesPatiently(source, { Accept: "application/pdf" });
+    if (res.status !== 200) throw new Error(`${res.status} for ${source}`);
+    const { text } = await extractText(new Uint8Array(res.body), { mergePages: true });
     return text;
   }
   if (source.toLowerCase().endsWith(".pdf")) {

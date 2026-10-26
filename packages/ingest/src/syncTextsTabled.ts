@@ -26,6 +26,7 @@
  */
 import { readFileSync } from "node:fs";
 import { parseTextsTabled } from "@laurus/parser/texts-tabled";
+import { fetchBytesPatiently } from "./httpFetch.ts";
 import { makeAdminClient } from "./epShared.ts";
 
 const LATEST = "https://www.europarl.europa.eu/plenary/en/texts-submitted.html";
@@ -35,16 +36,12 @@ const source = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? LATEST;
 /** The page, fetched or read from a file saved out of the browser. */
 async function pageHtml(from: string): Promise<string> {
   if (!/^https?:\/\//.test(from)) return readFileSync(from, "utf8");
-  const res = await fetch(from, {
-    headers: {
-      // The EP's front end turns away clients that do not look like a browser,
-      // and asks to be told who is calling.
-      "user-agent": process.env.EP_USER_AGENT ?? "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)",
-      accept: "text/html",
-    },
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${from}`);
-  return res.text();
+  // node:https, never fetch(): the EP WAF rejects undici at the TLS level, and
+  // its www host answers a datacenter client with an empty 202 before serving
+  // the page, so the retry-with-cookies helper is the one to use.
+  const res = await fetchBytesPatiently(from, { Accept: "text/html" });
+  if (res.status !== 200) throw new Error(`${res.status} for ${from}`);
+  return res.body.toString("utf8");
 }
 
 async function main() {
