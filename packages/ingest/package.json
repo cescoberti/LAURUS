@@ -18,7 +18,8 @@
     "check-translations": "node --experimental-strip-types src/checkTranslations.ts",
     "session-window": "node --experimental-strip-types src/sessionWindow.ts",
     "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",
-    "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts"
+    "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts",
+    "sync-pdoj": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncPdoj.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
