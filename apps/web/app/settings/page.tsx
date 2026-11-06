@@ -84,7 +84,7 @@ export default async function SettingsPage() {
             <input type="checkbox" name="wants_email" defaultChecked={profile?.wants_email ?? true} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">Email reminders</span>
-              <span className="block text-xs text-ink-500">New voting lists available, new amendments on the reports you follow.</span>
+              <span className="block text-xs text-ink-500">The official voting list, and the translation finished in your language, on the files you follow.</span>
             </span>
           </label>
 
