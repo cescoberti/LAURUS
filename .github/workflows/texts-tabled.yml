@@ -1,0 +1,76 @@
+# Fill in who the rapporteur is, while it still matters.
+#
+# A report's rapporteur reaches EP open data the day the report is tabled — the
+# week before the part-session that votes it — and LAURUS prepares voting lists
+# BEFORE the vote, so that week is the whole point. `tabling-window` opens on
+# the Monday of the week before the first sitting day and closes at the end of
+# the last one, for the four-day Strasbourg weeks and the Brussels
+# mini-sessions alike; outside it this job stops after one cheap query.
+#
+# Twice a day on weekdays: the Tabling Service deposits through the day (the
+# Global Europe report was issued at 22:04 Brussels), so the morning run picks
+# up what landed last night and the evening one what landed today.
+#
+# GitHub schedules are best-effort: under load a tick can slip, and GitHub
+# disables schedules on repos with no commits for 60 days (any commit
+# re-enables them). Run it by hand from the Actions tab whenever a name is
+# wanted now — `force` skips the window check.
+name: texts-tabled
+
+on:
+  schedule:
+    - cron: "30 6 * * 1-5"
+    - cron: "30 20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "Ask the window about another day (YYYY-MM-DD); blank = today"
+        required: false
+      force:
+        description: "Run even outside the tabling window"
+        type: boolean
+        default: false
+
+# One run at a time: both syncs write the same two columns.
+concurrency:
+  group: texts-tabled
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rapporteurs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EP_USER_AGENT: "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # Prints 1 or 0, and says on stderr which part-session it is looking at.
+      # A failed query exits non-zero and fails the step rather than reading as
+      # a quiet "nothing to do".
+      - name: Is anything being tabled this week?
+        id: window
+        env:
+          DAY: ${{ inputs.day }}
+        run: |
+          open=$(npm run -s tabling-window:ci --workspace @laurus/ingest -- $DAY)
+          echo "window open: $open"
+          echo "open=$open" >> "$GITHUB_OUTPUT"
+
+      # One API call per item still missing a name, 250 ms apart; nothing is
+      # overwritten, so a run that finds every name already in place is a no-op.
+      - name: Fill in rapporteurs and committees
+        if: steps.window.outputs.open == '1' || inputs.force
+        run: npm run sync-texts-tabled:ci --workspace @laurus/ingest -- --write

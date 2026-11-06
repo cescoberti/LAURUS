@@ -20,7 +20,10 @@
     "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",
     "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts",
     "sync-pdoj": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncPdoj.ts",
-    "sync-texts-tabled": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncTextsTabled.ts"
+    "sync-texts-tabled": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncTextsTabled.ts",
+    "sync-texts-tabled:ci": "node --experimental-strip-types src/syncTextsTabled.ts",
+    "tabling-window": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/tablingWindow.ts",
+    "tabling-window:ci": "node --experimental-strip-types src/tablingWindow.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
