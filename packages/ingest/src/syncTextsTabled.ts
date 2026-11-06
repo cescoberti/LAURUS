@@ -4,6 +4,7 @@
  *   npm run sync-texts-tabled                      # shows what it would write
  *   npm run sync-texts-tabled -- --write           # writes it
  *   npm run sync-texts-tabled -- saved-page.html   # read a saved page instead
+ *   npm run sync-texts-tabled -- --check          # what the site shows vs open data
  *
  * Who the rapporteur is on a report that has been tabled and not yet voted —
  * the week LAURUS exists for. Two sources for the same facts:
@@ -23,6 +24,13 @@
  * here as the way to check the API against what a human sees:
  *   https://www.europarl.europa.eu/plenary/en/texts-submitted.html
  *
+ * --check does the other direction: instead of filling what is empty, it holds
+ * what the site is already showing against open data. The column is filled by
+ * whichever sync reaches the row first — the draft agenda, the votes page, this
+ * one — and they write different forms of the same name, so the comparison is
+ * made on the label the site renders (surnames, upper case): "STAĶIS" and
+ * "Mārtiņš STAĶIS" read the same to anyone, a missing co-rapporteur does not.
+ *
  * `sync-rapporteurs` reads these names out of the per-sitting VOT XML, but that
  * is published after the vote, so it can say nothing about the files anyone is
  * actually preparing; it is a backfill for past part-sessions and nothing more.
@@ -32,11 +40,14 @@
 import { readFileSync } from "node:fs";
 import { parseTextsTabled } from "@laurus/parser/texts-tabled";
 import { reportCodeToWorkId, reportRefsFromWork } from "@laurus/parser/tabled-report-api";
+import { rapporteurLabel } from "@laurus/parser/rapporteur-name";
 import { getPlenaryDocument, listMembers } from "./epApi.ts";
 import { makeAdminClient, sleep } from "./epShared.ts";
 
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
+/** Compare what is already there instead of filling what is not. */
+const CHECK = args.includes("--check");
 /** How many documents one run may ask the API about; it is one call each. */
 const LIMIT = Number(args.find((a) => a.startsWith("--limit="))?.slice("--limit=".length) ?? 60);
 const file = args.find((a) => !a.startsWith("--"));
@@ -56,6 +67,12 @@ interface Names {
 }
 
 type Client = ReturnType<typeof makeAdminClient>;
+
+interface Patch {
+  id: string;
+  code: string;
+  patch: Record<string, string>;
+}
 
 async function readItems(supabase: Client, codes: string[]): Promise<Item[]> {
   const { data, error } = await supabase
@@ -134,8 +151,105 @@ async function fromApi(codes: string[]): Promise<Names[]> {
   return out;
 }
 
+/**
+ * Send the patches. `guarded` is the fill path: the column is written only if
+ * it is still NULL, because between the read and the write another sync may
+ * have landed a value and an existing one is not ours to touch. --check is the
+ * one caller that overwrites, and says so before it does.
+ */
+async function apply(supabase: Client, plan: Patch[], guarded: boolean): Promise<number> {
+  let updated = 0;
+  for (const p of plan) {
+    let q = supabase.from("items").update(p.patch).eq("id", p.id);
+    if (guarded && p.patch.rapporteur) q = q.is("rapporteur", null);
+    if (guarded && p.patch.committee) q = q.is("committee", null);
+    const { error } = await q;
+    if (error) console.error(`  ${p.code}: ${error.message}`);
+    else updated++;
+  }
+  return updated;
+}
+
+/**
+ * What the site is showing, held against open data.
+ *
+ * Scoped the way the dashboard is scoped — the part-sessions that have not
+ * ended, which is what `getSessions` puts on screen and the only part of the
+ * archive still moving. A vote that has happened keeps the name it was given;
+ * nobody is preparing it any more.
+ *
+ * Compared on the rendered label, so the three forms the syncs write for one
+ * member count as agreement and only a different name, or a name the site is
+ * missing, is reported.
+ */
+async function check(supabase: Client) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
+  const { data: sessions, error: sesErr } = await supabase
+    .from("sessions")
+    .select("id, month_label, location, start_date, end_date")
+    .gte("end_date", today)
+    .order("start_date");
+  if (sesErr || !sessions) throw new Error(`sessions read: ${sesErr?.message}`);
+  if (sessions.length === 0) {
+    console.log(`nothing ends on or after ${today}: the dashboard is empty, nothing to check.`);
+    return;
+  }
+  console.log(`on the dashboard today: ${sessions.map((x) => `${x.month_label} (${x.location}, ${x.start_date})`).join(", ")}`);
+
+  const { data, error } = await supabase
+    .from("items")
+    .select("id, code, rapporteur, committee")
+    .in(
+      "session_id",
+      sessions.map((x) => x.id as string),
+    )
+    .like("code", "A%");
+  if (error || !data) throw new Error(`items read: ${error?.message}`);
+  const items = (data as Item[]).filter((i) => i.rapporteur || i.committee);
+  console.log(`${items.length} report item(s) with something to compare`);
+  if (items.length === 0) return;
+  if (items.length > LIMIT) console.log(`asking about the first ${LIMIT}; pass --limit=N for more`);
+
+  const reports = await fromApi(items.slice(0, LIMIT).map((i) => i.code));
+  const byCode = new Map(items.map((i) => [i.code, i]));
+
+  const plan: Patch[] = [];
+  for (const r of reports) {
+    const item = byCode.get(r.code);
+    if (!item) continue;
+    const patch: Record<string, string> = {};
+    // No names back means the ids did not resolve, which fromApi has already
+    // warned about; silence is not agreement, so nothing is compared.
+    if (r.rapporteurs.length) {
+      const shown = rapporteurLabel(item.rapporteur);
+      const theirs = rapporteurLabel(r.rapporteurs.join(", "));
+      if (shown !== theirs) {
+        patch.rapporteur = r.rapporteurs.join(", ");
+        console.log(`  ${r.code.padEnd(16)} site shows ${shown ?? "nobody"}, open data says ${theirs}`);
+      }
+    }
+    if (item.committee && r.committees.length && item.committee !== r.committees[0]) {
+      patch.committee = r.committees[0]!;
+      console.log(`  ${r.code.padEnd(16)} site shows ${item.committee}, open data says ${r.committees.join("/")}`);
+    }
+    if (Object.keys(patch).length) plan.push({ id: item.id, code: r.code, patch });
+  }
+
+  if (plan.length === 0) {
+    console.log("\nthe site agrees with open data on every one of them.");
+    return;
+  }
+  if (!WRITE) {
+    console.log(`\n${plan.length} disagree — pass --write to take open data's version.`);
+    return;
+  }
+  console.log(`\noverwriting ${plan.length} item(s) with open data's version.`);
+  console.log(`done: ${await apply(supabase, plan, false)} items updated.`);
+}
+
 async function main() {
   const supabase = makeAdminClient();
+  if (CHECK) return check(supabase);
   let reports: Names[];
   let items: Item[];
 
@@ -166,7 +280,7 @@ async function main() {
   }
 
   const byCode = new Map(items.map((i) => [i.code, i]));
-  const plan: Array<{ id: string; code: string; patch: Record<string, string> }> = [];
+  const plan: Patch[] = [];
   for (const r of reports) {
     const item = byCode.get(r.code);
     if (!item) continue;
@@ -188,18 +302,7 @@ async function main() {
     return;
   }
 
-  let updated = 0;
-  for (const p of plan) {
-    // Guarded again in the statement: between the read and the write a sync may
-    // have landed a value, and an existing one is left alone.
-    let q = supabase.from("items").update(p.patch).eq("id", p.id);
-    if (p.patch.rapporteur) q = q.is("rapporteur", null);
-    if (p.patch.committee) q = q.is("committee", null);
-    const { error: upErr } = await q;
-    if (upErr) console.error(`  ${p.code}: ${upErr.message}`);
-    else updated++;
-  }
-  console.log(`\ndone: ${updated} items updated.`);
+  console.log(`\ndone: ${await apply(supabase, plan, true)} items updated.`);
 }
 
 main().catch((err) => {

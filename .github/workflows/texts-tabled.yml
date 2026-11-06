@@ -74,3 +74,11 @@ jobs:
       - name: Fill in rapporteurs and committees
         if: steps.window.outputs.open == '1' || inputs.force
         run: npm run sync-texts-tabled:ci --workspace @laurus/ingest -- --write
+
+      # The same window, the other direction: the names the dashboard is
+      # already showing, held against open data on the label the site renders.
+      # Reports only — taking open data's version over what another sync wrote
+      # is a decision someone makes, not one a cron makes at 06:30.
+      - name: Check the dashboard against open data
+        if: steps.window.outputs.open == '1' || inputs.force
+        run: npm run sync-texts-tabled:ci --workspace @laurus/ingest -- --check

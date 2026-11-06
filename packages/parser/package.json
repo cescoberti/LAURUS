@@ -13,7 +13,8 @@
     "./report-docx": "./src/reportDocx.ts",
     "./pdoj": "./src/pdoj.ts",
     "./texts-tabled": "./src/textsTabled.ts",
-    "./tabled-report-api": "./src/tabledReportApi.ts"
+    "./tabled-report-api": "./src/tabledReportApi.ts",
+    "./rapporteur-name": "./src/rapporteurName.ts"
   },
   "scripts": {
     "build": "tsc -b",
