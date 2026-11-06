@@ -12,7 +12,8 @@
     "./vot-xml": "./src/votXml.ts",
     "./report-docx": "./src/reportDocx.ts",
     "./pdoj": "./src/pdoj.ts",
-    "./texts-tabled": "./src/textsTabled.ts"
+    "./texts-tabled": "./src/textsTabled.ts",
+    "./tabled-report-api": "./src/tabledReportApi.ts"
   },
   "scripts": {
     "build": "tsc -b",
