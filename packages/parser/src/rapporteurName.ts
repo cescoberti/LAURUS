@@ -22,15 +22,60 @@ const PARTICLES = new Set([
   "das", "du", "le", "la", "ten", "ter", "af", "av", "zu", "of",
 ]);
 
-/** Surname portion of a "Given Family" name, keeping leading particles. */
+/**
+ * A token the source shouted: two letters or more, no lower case among them.
+ * The length test keeps initials ("J.") out, and comparing against both cases
+ * keeps out tokens with no cased letters at all.
+ */
+function shouted(token: string): boolean {
+  const letters = token.replace(/[^\p{L}]/gu, "");
+  return letters.length >= 2 && token === token.toUpperCase() && token !== token.toLowerCase();
+}
+
+/**
+ * Surname portion of a name, keeping every word of it.
+ *
+ * The EP shouts the family name and only the family name: open data writes
+ * "Juan Fernando LÓPEZ AGUILAR", the votes page writes "STAĶIS". So where
+ * there is capitalisation to read, read it — the surname is the shouted run,
+ * however many words long, plus any particle leading into it. All 747 members
+ * of the tenth term are written that way, and 58 of them carry a surname of
+ * two words or more.
+ *
+ * Guessing from position instead is what this replaces, and it was wrong for
+ * every Spanish and Portuguese double surname in the house: it kept the last
+ * word and dropped the first, so López Aguilar was filed under AGUILAR and
+ * García Hermida-van der Walle under DER WALLE. Half of a person's name, on
+ * the documents they are handed.
+ *
+ * Two cases leave nothing to read. A source that shouts the whole string is
+ * giving the family name alone, so all of it is kept. A source that shouts
+ * nothing — the agenda's "Aurelijus Veryga" — is genuinely ambiguous, and
+ * there the last word is still the best available guess; it is also why the
+ * ingest side prefers the open-data form when it can get it.
+ */
 function surname(name: string): string {
   const t = name.trim().split(/\s+/);
   if (t.length <= 1) return name.trim();
-  // Assume the first token is the given name; walk back from the end so any
-  // particle chain ("van der") stays with the family name.
-  let start = t.length - 1;
-  while (start > 1 && PARTICLES.has(t[start - 1]!.toLowerCase())) start--;
-  return t.slice(start).join(" ");
+
+  const caps = t.map(shouted);
+  if (caps.every(Boolean)) return t.join(" ");
+
+  let start: number;
+  let end: number;
+  if (caps.some(Boolean)) {
+    end = caps.lastIndexOf(true);
+    start = end;
+    while (start > 0 && caps[start - 1]!) start--;
+  } else {
+    // Nothing is shouted: assume the first token is the given name and take
+    // the last one, as before.
+    end = t.length - 1;
+    start = end;
+    if (start <= 1) return t.slice(1).join(" ");
+  }
+  while (start > 0 && PARTICLES.has(t[start - 1]!.toLowerCase())) start--;
+  return t.slice(start, end + 1).join(" ");
 }
 
 /**
