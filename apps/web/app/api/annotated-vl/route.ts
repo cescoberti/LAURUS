@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { loadVotingList } from "@/lib/annotatedVl/load";
+import { sessionUser } from "@/lib/supabase/server";
+import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
-import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
@@ -19,10 +19,7 @@ import { CONTACT_EMAIL } from "@/lib/committees";
  * ground-truth capture) is served instead. Requires an authenticated advisor.
  */
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);
@@ -50,8 +47,7 @@ export async function GET(request: Request) {
   // Split rows: parent emptied, part 1 = paragraph with the split-off words
   // struck, later parts = those words. Before the vote the requests are the
   // official list's own footer notes.
-  const votEn =
-    loaded.votEn ?? (loaded.official ? { splitVotes: splitRequestsFromNotes(vl.notes), separateVotes: [], rollCalls: [] } : null);
+  const votEn = votEnFor(loaded);
   await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments });
 
   // This is the UNVERIFIED route — the verified list goes out by email from
@@ -59,10 +55,8 @@ export async function GET(request: Request) {
   // header keeps the EP's version label, so the file name carries the caveat;
   // a list LAURUS built itself is a draft and is named as one.
   const buffer = await renderAnnotatedVlDocx(vl);
-  const who = (vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-");
-  const filename = loaded.official
-    ? `VL-${who}-${lang.toUpperCase()}-unverified.docx`
-    : `annotated-vl-DRAFT-${who}-${lang.toUpperCase()}.docx`;
+  const stem = fileStem(vl.rapporteur, lang, code);
+  const filename = loaded.official ? `${stem} (unverified).docx` : `${stem} (draft).docx`;
   void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang } });
 
   return new NextResponse(new Uint8Array(buffer), {

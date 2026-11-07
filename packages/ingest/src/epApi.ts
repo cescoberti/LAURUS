@@ -14,6 +14,8 @@
  * the manifestation paths returned here; treat direct DOCEO fetch as fallback.
  */
 
+import type { EpWork } from "@laurus/parser/tabled-report-api";
+
 const BASE = process.env.EP_API_BASE ?? "https://data.europarl.europa.eu/api/v2";
 const UA = process.env.EP_USER_AGENT ?? "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)";
 const JSON_LD = "application/ld+json";
@@ -118,4 +120,31 @@ export function fileRefs(doc: WorkDocument): Array<{
     }
   }
   return out;
+}
+
+/**
+ * Full Work for a single plenary document id, e.g. 'A-10-2026-0277' —
+ * participations included, which is where the rapporteur is. One call per
+ * document: `/documents/{id}` rate-limits hard when walked in bulk, so callers
+ * ask only about the documents they actually need and pace themselves.
+ */
+export async function getPlenaryDocument(id: string): Promise<(WorkDocument & EpWork) | undefined> {
+  const rows = await get<WorkDocument & EpWork>(`/plenary-documents/${encodeURIComponent(id)}`);
+  return rows[0];
+}
+
+export interface Member {
+  id: string;            // 'person/2341'
+  identifier?: string;   // '2341'
+  /** The name as the Parliament prints it: 'Michael GAHLER'. */
+  label?: string;
+}
+
+/**
+ * Every member of a parliamentary term in one call (747 rows for term 10,
+ * ~120 kB) — cheaper and kinder than a `/meps/{id}` lookup per rapporteur,
+ * and it carries members who have since been replaced.
+ */
+export function listMembers(term = 10): Promise<Member[]> {
+  return get<Member>("/meps", { "parliamentary-term": String(term), limit: "1000" });
 }

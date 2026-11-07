@@ -19,21 +19,16 @@
  * Idempotent: upserts on (item_id, number, language).
  * Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in the env.
  */
-import { createClient } from "@supabase/supabase-js";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
+import { makeAdminClient, sleep } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const LANGS_ARG = (process.argv[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const BASE = "https://data.europarl.europa.eu";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  db: { schema: "laurus" },
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const supabase = makeAdminClient();
 
 // ---------------------------------------------------------------------------
 // Enumerate AMENDMENT_LIST documents for the year

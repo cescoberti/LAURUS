@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "scripts": {
     "build": "tsc -b",
     "start": "node --experimental-strip-types src/cli.ts",
@@ -18,12 +18,18 @@
     "check-translations": "node --experimental-strip-types src/checkTranslations.ts",
     "session-window": "node --experimental-strip-types src/sessionWindow.ts",
     "sync-vot": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncVot.ts",
-    "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts"
+    "sync-rapporteurs": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncRapporteurs.ts",
+    "sync-pdoj": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncPdoj.ts",
+    "sync-texts-tabled": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/syncTextsTabled.ts",
+    "sync-texts-tabled:ci": "node --experimental-strip-types src/syncTextsTabled.ts",
+    "tabling-window": "node --experimental-strip-types --env-file=../../apps/web/.env.local src/tablingWindow.ts",
+    "tabling-window:ci": "node --experimental-strip-types src/tablingWindow.ts"
   },
   "dependencies": {
     "@laurus/parser": "*",
     "@supabase/supabase-js": "^2.58.0",
-    "fast-xml-parser": "^5.10.1"
+    "fast-xml-parser": "^5.10.1",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "playwright": "^1.55.0"

@@ -1,14 +1,14 @@
 import { after, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { loadVotingList } from "@/lib/annotatedVl/load";
-import { splitRequestsFromNotes } from "@laurus/parser/voting-list-docx";
+import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { verifyVotingList, votingListFingerprint, type VlVerificationReport, type VlCheck } from "@/lib/vlVerify";
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 
@@ -37,10 +37,7 @@ const VERIFICATION_MAX_AGE_DAYS = 30;
 const DAY = 86_400_000;
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);
@@ -100,9 +97,7 @@ export async function POST(request: Request) {
       // their official notation and are listed in the report.
       // Before the vote the split requests are only in the official list's
       // footer notes (English); after it, in the VOT.
-      const votEn =
-        loaded.votEn ??
-        (loaded.official ? { splitVotes: splitRequestsFromNotes(loaded.vl.notes), separateVotes: [], rollCalls: [] } : null);
+      const votEn = votEnFor(loaded);
       const expansionNotes = await expandSplitRows(loaded.vl, {
         itemCode: code,
         language: lang,
@@ -208,8 +203,10 @@ export async function POST(request: Request) {
       }
 
       const docx = await renderAnnotatedVlDocx(loaded.vl);
-      const stamp = report.verified ? "VERIFIED" : "UNVERIFIED";
-      const filename = `annotated-vl-${stamp}-${(loaded.vl.rapporteur ?? code).replace(/[^A-Za-z0-9]+/g, "-")}-${lang.toUpperCase()}.docx`;
+      // The verified list is the one that circulates, so it carries the plain
+      // name; anything that did not pass both passes says so in the name.
+      const stem = fileStem(loaded.vl.rapporteur, lang, code);
+      const filename = report.verified ? `${stem}.docx` : `${stem} (unverified).docx`;
 
       const sent = await sendVlEmail({ to, report, filename, docx });
       if (!sent.ok) {

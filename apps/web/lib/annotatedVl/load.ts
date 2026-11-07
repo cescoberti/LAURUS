@@ -15,7 +15,11 @@
  */
 import type { createClient } from "@/lib/supabase/server";
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { parseIndicativeVotingList, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import {
+  parseIndicativeVotingList,
+  splitRequestsFromNotes,
+  type AnnotatedVotingList,
+} from "@laurus/parser/voting-list-docx";
 import { parseMotionText, type MotionText } from "@laurus/parser/report-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
@@ -58,6 +62,23 @@ function bytesOf(hex: string): Buffer {
 }
 
 /** The motion for a resolution in `lang` — of a report (A-) or a motion (B-). */
+/**
+ * The English VOT the split expansion cuts on. After the vote that is the real
+ * payload; before it, the only record of the requests is the official list's
+ * own footer notes, so those stand in. A list LAURUS built itself has neither.
+ *
+ * The three routes that expand splits each wrote this ternary out, which is
+ * three chances for the pre-vote fallback to drift from the post-vote one.
+ */
+export function votEnFor(loaded: LoadedVl): VotPayload | null {
+  return (
+    loaded.votEn ??
+    (loaded.official
+      ? { splitVotes: splitRequestsFromNotes(loaded.vl.notes), separateVotes: [], rollCalls: [] }
+      : null)
+  );
+}
+
 export async function motionFor(epWorkId: string | null, lang: string): Promise<MotionText | null> {
   const id = epWorkId?.split("/").pop();
   if (!id) return null;

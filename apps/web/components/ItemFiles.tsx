@@ -29,7 +29,17 @@ const LANGS = DOCUMENT_LANGUAGE_CODES as readonly string[];
  * host turns a plain browser away — the link to the EP site is kept next to
  * each one anyway, for the record.
  */
-export function ItemFiles({ code, files }: { code: string; files: ItemFile[] }) {
+export function ItemFiles({
+  code,
+  files,
+  langs,
+  amendmentCount,
+}: {
+  code: string;
+  files: ItemFile[];
+  langs: string[];
+  amendmentCount: number;
+}) {
   // Only the languages the interface offers, newest version of each.
   const offered = files.filter((f) => LANGS.includes(f.language));
   const seen = new Set<string>();
@@ -48,12 +58,42 @@ export function ItemFiles({ code, files }: { code: string; files: ItemFile[] }) 
   })).filter((g) => g.rows.length > 0);
 
   const zip = (lang?: string) => `/api/item-files?code=${encodeURIComponent(code)}${lang ? `&lang=${lang}` : ""}`;
+  // Not the same zip: this one is the EP's amendment blocks, fetched live.
+  const amendmentsZip = (lang: string) => `/api/item-amendments?code=${encodeURIComponent(code)}&lang=${lang}`;
   const langsPresent = LANGS.filter((l) => latest.some((f) => f.language === l));
 
+  // An empty panel is the normal state for a report whose amendments LAURUS has
+  // already ingested — and the moment the EP's own DOCX is most wanted, to read
+  // the Remarks against. So the dead space carries the download instead of a
+  // dead end: /api/item-amendments resolves the blocks from the EP's amendment
+  // index, which is populated when `documents` is not.
   if (groups.length === 0) {
     return (
-      <section className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-ink-300">
-        The EP has published no document for this file in IT, EN or NL yet.
+      <section className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center">
+        <p className="text-sm text-ink-300">The EP has published no document for this file in IT, EN or NL yet.</p>
+        {amendmentCount > 0 && (
+          <>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-ink-500">
+              Its {amendmentCount} amendments are online all the same — the EP&rsquo;s own DOCX, untouched, in one zip.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {langs.map((l, i) => (
+                <a
+                  key={l}
+                  href={amendmentsZip(l)}
+                  className={
+                    i === 0
+                      ? "press inline-flex items-center gap-1.5 rounded-lg bg-eu-900 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-eu-800"
+                      : "press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-semibold text-ink-500 hover:border-eu-200 hover:bg-eu-50 hover:text-eu-900"
+                  }
+                  title={`Every amendment block the EP published for this report, in ${l.toUpperCase()}`}
+                >
+                  ↓ Download all · {l.toUpperCase()}
+                </a>
+              ))}
+            </div>
+          </>
+        )}
       </section>
     );
   }

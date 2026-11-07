@@ -168,7 +168,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
         </div>
 
         <div className="mb-7">
-          <ItemFiles code={code} files={files} />
+          <ItemFiles code={code} files={files} langs={userLangs} amendmentCount={amendments.length} />
         </div>
 
         <ItemTabs code={code} amendments={amendments} languages={languages} votRequests={votRequests} />

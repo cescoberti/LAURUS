@@ -18,6 +18,21 @@ supabase/migrations Postgres schema + RLS
 
 ## Data sources (verified 2026-07-12)
 
+> **A source published after the vote solves nothing.** LAURUS exists to prepare
+> the voting list *before* the sitting — that is the whole product. So when a
+> field is missing on a file of the week ahead, the question is which document
+> the EP publishes *before* the sitting, never where the value can be found
+> afterwards. Anything post-vote (the per-sitting VOT XML, adopted texts) is
+> backfill for history, and must never be the only source of a field the
+> interface shows. This was learnt the expensive way: rapporteurs were read
+> from the VOT XML, so every file in the coming week read "No rapporteur".
+
+- **Before the sitting — synoptic final draft agenda (PDOJ)**, published by the
+  Plenary Sittings Directorate weeks ahead and approved by the Conference of
+  Presidents: `www.europarl.europa.eu/sedcms/documents/PRIORITY_INFO/<id>/SYN_PDOJ_<month>_<place>_<lang>.pdf`.
+  Carries code, **rapporteur**, committee, procedure marker and deadlines for
+  every file on the agenda. PDF only. Parsed by `packages/parser/src/pdoj.ts`,
+  loaded by `npm run sync-pdoj --workspace @laurus/ingest`.
 - **Primary — EP Open Data API v2** (`https://data.europarl.europa.eu/api/v2`):
   open, no auth, JSON-LD. Documents use the ELI/FRBR model
   (Work → Expression per language → Manifestation per format), so per-language

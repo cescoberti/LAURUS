@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/supabase/server";
 import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
 import { fillRemarks, type AmendmentText } from "@/lib/fillRemarks";
 import { motionFor } from "@/lib/annotatedVl/load";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
+import { fileStem } from "@/lib/rapporteur";
 import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
 
@@ -16,10 +17,7 @@ export const runtime = "nodejs"; // mammoth + docx need Node, not edge
  * amendments (Italian first, English fallback) already ingested in Supabase.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const limit = await checkVlRateLimit(user.id);
@@ -90,7 +88,8 @@ export async function POST(request: Request) {
     itemCode: vl.reportCode,
     meta: { filled: report.filled, candidates: report.candidates },
   });
-  const filename = `annotated-vl-${(vl.rapporteur ?? vl.reportCode).replace(/[^A-Za-z0-9]+/g, "-")}.docx`;
+  // Built by LAURUS from an uploaded indicative list, Remarks filled in Italian.
+  const filename = `${fileStem(vl.rapporteur, "it", vl.reportCode)} (draft).docx`;
 
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,

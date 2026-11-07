@@ -11,6 +11,9 @@ import { createClient } from "@supabase/supabase-js";
 export const BASE = "https://data.europarl.europa.eu";
 export const UA = process.env.EP_USER_AGENT ?? "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)";
 
+/** Pause, for the pacing every EP fetch loop here does. */
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** Service-role client scoped to the `laurus` schema. */
 export function makeAdminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {

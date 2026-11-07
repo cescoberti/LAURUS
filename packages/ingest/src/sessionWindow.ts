@@ -15,14 +15,11 @@
  * and chains itself for as long as this says more than zero. So the plenary
  * week looks after itself: nobody runs anything the night before.
  */
-import { createClient } from "@supabase/supabase-js";
+import { makeAdminClient } from "./epShared.ts";
 
 const CAP_HOURS = 5.5;
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  db: { schema: "laurus" },
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const supabase = makeAdminClient();
 
 /** A wall-clock moment in Brussels, as an absolute instant. */
 function brussels(day: string, hour: number): Date {

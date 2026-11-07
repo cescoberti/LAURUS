@@ -57,7 +57,7 @@ export default async function VlGeneratorPage() {
             Generate annotated VL
           </button>
           <p className="text-xs text-ink-300">
-            The downloaded file is <code className="font-mono">annotated-vl-&lt;rapporteur&gt;.docx</code>{" "}
+            The downloaded file is <code className="font-mono">&lt;RAPPORTEUR&gt; DEL ITA (draft).docx</code>{" "}
             in the same black-and-white Tabling Service format.
           </p>
         </form>

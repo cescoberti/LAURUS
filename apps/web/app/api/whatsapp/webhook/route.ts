@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/track";
+import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
 
@@ -19,8 +20,6 @@ export const runtime = "nodejs";
  * Replies use TwiML (no outbound API call needed), so this endpoint works
  * even before Twilio credentials are configured as env vars.
  */
-
-const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://laurus-web-theta.vercel.app";
 
 function twiml(message: string): NextResponse {
   const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message
