@@ -68,6 +68,21 @@ test("the agenda's own spelling survives a round trip", () => {
   }
 });
 
+// A one-letter word can be part of the surname: the Catalan "i" joining two
+// family names, the Irish "Ó" opening one. Two sitting members are written the
+// first way and one the second, and all three lost half their name to a rule
+// that read a lone letter as an initial.
+test("the joining letters belong to the surname", () => {
+  assert.equal(rapporteurLabel("Antoni COMÍN I OLIVERES"), "COMÍN I OLIVERES");
+  assert.equal(rapporteurLabel("Diana RIBA I GINER"), "RIBA I GINER");
+  assert.equal(rapporteurLabel("Aodhán Ó RÍORDÁIN"), "Ó RÍORDÁIN");
+  assert.equal(rapporteurLabel("Cynthia NÍ MHURCHÚ"), "NÍ MHURCHÚ");
+});
+
+test("a lone letter with no capitals to read stays an initial", () => {
+  assert.equal(rapporteurLabel("Ann E Smith"), "SMITH");
+});
+
 test("no rapporteur gives no label", () => {
   assert.equal(rapporteurLabel(null), null);
   assert.equal(rapporteurLabel(undefined), null);

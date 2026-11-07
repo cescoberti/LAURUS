@@ -23,6 +23,15 @@ const PARTICLES = new Set([
 ]);
 
 /**
+ * One-letter words that join or open a family name: the Catalan and Spanish
+ * conjunctions in "Comín i Oliveres" and "Ortega y Gasset", the Portuguese one,
+ * and the Irish "Ó". They are read only where the source capitalises the
+ * surname, because in a name with no capitals to go by a lone letter is far
+ * more likely to be a middle initial than part of anyone's surname.
+ */
+const JOINERS = new Set(["i", "y", "e", "ó"]);
+
+/**
  * A token the source shouted: two letters or more, no lower case among them.
  * The length test keeps initials ("J.") out, and comparing against both cases
  * keeps out tokens with no cased letters at all.
@@ -30,6 +39,12 @@ const PARTICLES = new Set([
 function shouted(token: string): boolean {
   const letters = token.replace(/[^\p{L}]/gu, "");
   return letters.length >= 2 && token === token.toUpperCase() && token !== token.toLowerCase();
+}
+
+/** A word that attaches to the family name beside it. */
+function joins(token: string): boolean {
+  const w = token.toLowerCase();
+  return PARTICLES.has(w) || JOINERS.has(w);
 }
 
 /**
@@ -64,9 +79,12 @@ function surname(name: string): string {
   let start: number;
   let end: number;
   if (caps.some(Boolean)) {
+    // Walk back from the last shouted word over anything that belongs to a
+    // family name: more shouted words, particles, and the joining letters.
+    // "Antoni COMÍN I OLIVERES" is one surname of three words, not OLIVERES.
     end = caps.lastIndexOf(true);
     start = end;
-    while (start > 0 && caps[start - 1]!) start--;
+    while (start > 0 && (caps[start - 1]! || joins(t[start - 1]!))) start--;
   } else {
     // Nothing is shouted: assume the first token is the given name and take
     // the last one, as before.
