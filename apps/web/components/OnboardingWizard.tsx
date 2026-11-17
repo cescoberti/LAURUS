@@ -51,7 +51,7 @@ export function OnboardingWizard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+    <div className="card p-8 sm:p-10">
       {/* progress */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-ink-300">
@@ -71,7 +71,7 @@ export function OnboardingWizard({
       <div className="min-h-[18rem]">
         {step === 0 && (
           <div>
-            <h1 className="text-xl font-bold text-ink-900">Welcome to LAURUS 👋</h1>
+            <h1 className="display text-display-sm font-bold text-eu-900">Welcome to LAURUS</h1>
             <p className="mt-3 text-sm leading-relaxed text-ink-700">
               LAURUS gathers amendments and voting lists from European Parliament plenaries and hands them
               back to you already annotated and ready to use. Just a few quick questions and you&apos;re set.
@@ -81,8 +81,8 @@ export function OnboardingWizard({
 
         {step === 1 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Which committees do you follow?</h2>
-            <p className="mt-1 text-sm text-ink-500">Feel free to pick as many as you like — they help us surface what&apos;s relevant to you.</p>
+            <h2 className="display text-[1.375rem] font-bold text-ink-900">Which committees do you follow?</h2>
+            <p className="lede mt-5">Feel free to pick as many as you like — they help us surface what&apos;s relevant to you.</p>
             <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {COMMITTEES.map((c) => {
                 const on = committees.includes(c.code);
@@ -106,8 +106,8 @@ export function OnboardingWizard({
 
         {step === 2 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Which language would you like your voting lists in?</h2>
-            <p className="mt-1 text-sm text-ink-500">This becomes your default for voting lists — you can change it anytime.</p>
+            <h2 className="display text-[1.375rem] font-bold text-ink-900">Which language would you like your voting lists in?</h2>
+            <p className="lede mt-5">This becomes your default for voting lists — you can change it anytime.</p>
             <div className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {LANG_ORDER.map((l) => (
                 <button
@@ -127,7 +127,7 @@ export function OnboardingWizard({
 
         {step === 3 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">A quick note before you start 🌱</h2>
+            <h2 className="display text-[1.375rem] font-bold text-ink-900">A quick note before you start</h2>
             <div className="mt-3 space-y-3 text-sm leading-relaxed text-ink-700">
               <p>
                 LAURUS builds voting lists automatically from the Parliament&apos;s official documents. It&apos;s
@@ -152,7 +152,7 @@ export function OnboardingWizard({
 
         {step === 4 && (
           <div>
-            <h2 className="text-lg font-bold text-ink-900">Found a bug or have an idea? 💡</h2>
+            <h2 className="display text-[1.375rem] font-bold text-ink-900">Found a bug or have an idea?</h2>
             <p className="mt-3 text-sm leading-relaxed text-ink-700">
               Spotted something off, or have an idea to make LAURUS better? Feel free to drop a line to{" "}
               <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-eu-700 hover:underline">
@@ -180,7 +180,7 @@ export function OnboardingWizard({
             type="button"
             onClick={finish}
             disabled={saving}
-            className="rounded-lg bg-eu-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-60"
+            className="btn-primary"
           >
             {saving ? "Saving…" : "Start using LAURUS"}
           </button>
@@ -189,7 +189,7 @@ export function OnboardingWizard({
             type="button"
             onClick={() => canNext && setStep((s) => s + 1)}
             disabled={!canNext}
-            className="rounded-lg bg-eu-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-40"
+            className="btn-primary"
           >
             Next →
           </button>

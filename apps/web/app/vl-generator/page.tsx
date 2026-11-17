@@ -20,9 +20,9 @@ export default async function VlGeneratorPage() {
     <div className="min-h-screen">
       <TopNav active="Voting lists" />
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">VL Generator</h1>
-        <p className="mt-1 max-w-2xl text-sm text-ink-500">
+      <main className="mx-auto max-w-5xl px-8 py-16 lg:px-12 lg:py-20">
+        <h1 className="display text-display-md font-bold text-eu-900">VL Generator</h1>
+        <p className="lede mt-5 max-w-2xl">
           Upload the Tabling Service <em>indicative voting list</em>: LAURUS fills the{" "}
           <strong>Remarks</strong> column with the published amendment text (your default language, EN
           fallback) and hands the DOCX back ready to use. Remarks you already wrote by hand are never touched.
@@ -32,7 +32,7 @@ export default async function VlGeneratorPage() {
           action="/api/vl-generator"
           method="post"
           encType="multipart/form-data"
-          className="mt-6 flex max-w-2xl flex-col gap-4 rounded-xl border border-slate-200/80 bg-white p-6 shadow-card"
+          className="card mt-8 flex max-w-2xl flex-col gap-5 p-8"
         >
           <label className="text-sm font-semibold text-ink-900" htmlFor="vl">
             Voting list (.docx)
@@ -43,11 +43,11 @@ export default async function VlGeneratorPage() {
             type="file"
             required
             accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-700 file:mr-3 file:rounded-md file:border-0 file:bg-eu-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-eu-900"
+            className="field file:mr-3 file:rounded-full file:border-0 file:bg-eu-50 file:px-4 file:py-2 file:text-[0.8125rem] file:font-semibold file:text-eu-900"
           />
           <button
             type="submit"
-            className="inline-flex w-fit items-center gap-2 rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-eu-800"
+            className="btn-primary w-fit"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -63,7 +63,7 @@ export default async function VlGeneratorPage() {
         </form>
 
         <section className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">
+          <h2 className="eyebrow mb-5">
             Reports with amendments available ({covered?.length ?? 0})
           </h2>
           {covered && covered.length > 0 ? (

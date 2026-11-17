@@ -2,6 +2,7 @@ import { SessionBoard, type BoardFilter } from "@/components/SessionBoard";
 import { SessionSwitcher } from "@/components/SessionSwitcher";
 import { TodayBoard } from "@/components/TodayBoard";
 import { TopNav } from "@/components/TopNav";
+import { LaurusMark } from "@/components/Logo";
 import { getSessions, getSessionItems, getOfficialVlByItem, getViewerContext, type SessionSummary } from "@/lib/data";
 import type { DisplayItem } from "@/lib/types";
 
@@ -52,13 +53,17 @@ export default async function Dashboard({
     <div className="min-h-screen">
       <TopNav active={initialFilter === "followed" ? "My files" : "Votes"} />
 
-      <main className="mx-auto max-w-6xl px-6 py-7">
+      <main className="mx-auto max-w-shell px-8 pb-30 pt-16 lg:px-12 lg:pt-22">
         {/* One part-session at a time; the ones still to come are in the menu. */}
-        <SessionSwitcher sessions={sessions} active={active} filter={f} />
+        <div className="rise">
+          <SessionSwitcher sessions={sessions} active={active} filter={f} />
+        </div>
 
         {active && (
-          <section className="mt-5 grid gap-4 md:grid-cols-[1.4fr_1fr]">
-            <div className="flex flex-wrap content-start gap-x-6 gap-y-2">
+          <section className="rise rise-1 mt-14 grid gap-7 lg:mt-18 lg:grid-cols-[1.35fr_1fr]">
+            {/* The four numbers that answer "where does this part-session
+                stand" before anything is read. */}
+            <div className="card-raised grid grid-cols-2 gap-y-10 px-9 py-10 sm:grid-cols-4 sm:gap-y-0">
               <Stat value={items.length} label="votes" accent />
               <Stat value={withList} label="official lists" />
               <Stat value={followed} label="followed" />
@@ -71,27 +76,37 @@ export default async function Dashboard({
           </section>
         )}
 
-        <SessionBoard
-          items={items}
-          today={today}
-          initialFilter={initialFilter}
-          committees={viewer.committees}
-          vlLanguage={viewer.vlLanguage}
-        />
+        <div className="rise rise-2">
+          <SessionBoard
+            items={items}
+            today={today}
+            initialFilter={initialFilter}
+            committees={viewer.committees}
+            vlLanguage={viewer.vlLanguage}
+          />
+        </div>
 
-        <footer className="mt-12 border-t border-slate-200 pt-5 text-center text-xs text-ink-300">
-          LAURUS · Less paperwork. More wins. · Sources: EP Open Data API · Tabling Service lists
+        <footer className="mt-30 flex flex-col items-center gap-4 border-t border-slate-200/70 pt-12 text-center">
+          <LaurusMark size={22} className="text-laurel-700/50" />
+          <p className="text-[0.8125rem] font-medium text-ink-400">Less paperwork. More wins.</p>
+          <p className="text-xs text-ink-400">Sources: EP Open Data API · Tabling Service lists</p>
         </footer>
       </main>
     </div>
   );
 }
 
+/**
+ * A number large enough to be read across a desk, with its label beneath in
+ * small caps. The vertical hairline belongs to the one on its left.
+ */
 function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <span className={`text-2xl font-bold tracking-tight ${accent ? "text-eu-900" : "text-ink-900"}`}>{value}</span>
-      <span className="text-[13px] text-ink-500">{label}</span>
+    <div className="px-1 sm:border-l sm:border-slate-200/70 sm:px-7 sm:first:border-l-0 sm:first:pl-0">
+      <div className={`text-stat font-bold tabular-nums ${accent ? "text-eu-900" : "text-ink-900"}`}>{value}</div>
+      <div className="eyebrow mt-3 leading-[1.5]" title={label}>
+        {label}
+      </div>
     </div>
   );
 }

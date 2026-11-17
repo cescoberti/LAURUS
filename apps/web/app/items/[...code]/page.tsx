@@ -59,10 +59,10 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
     <div className="min-h-screen">
       <TopNav />
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
+      <main className="mx-auto max-w-5xl px-8 py-16 lg:px-12 lg:py-20">
         <Link
           href="/"
-          className="press -ml-1 mb-4 inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-[13px] font-medium text-ink-500 hover:text-eu-900"
+          className="press -ml-3 mb-10 inline-flex items-center gap-2 rounded-full px-3 py-2 text-[0.8125rem] font-semibold text-ink-400 hover:bg-ink-900/[0.04] hover:text-eu-900"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="m15 18-6-6 6-6" />
@@ -70,15 +70,15 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           All votes
         </Link>
 
-        <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="mb-12 flex flex-wrap items-start justify-between gap-x-10 gap-y-7">
           <div>
           {item?.rapporteur && (
-            <h1 className="display text-[1.75rem] font-extrabold uppercase text-eu-900">{rapporteurLabel(item.rapporteur)}</h1>
+            <h1 className="display text-display-md font-bold uppercase tracking-[-0.02em] text-eu-900">{rapporteurLabel(item.rapporteur)}</h1>
           )}
-          <p className={`${item?.rapporteur ? "mt-1 text-lg font-semibold" : "text-2xl font-bold"} leading-snug text-ink-900`}>
+          <p className={`${item?.rapporteur ? "mt-4 text-[1.1875rem] font-semibold" : "display text-display-sm font-bold"} max-w-[46rem] leading-snug text-ink-900`}>
             {item?.title.en || item?.title.it || "Item not found"}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-500">
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-[0.875rem] font-medium text-ink-400">
             {/* The code is the handle people already read, so it is the thing
                 to make clickable: the EP's own page for the file, where the
                 text and the amendments sit together. */}
@@ -112,7 +112,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           </div>
           {/* Where the list comes from: the EP's own, with its version, or
               a LAURUS draft until the EP publishes one. */}
-          <p className="mt-2 text-xs text-ink-500">
+          <p className="mt-5 max-w-[46rem] text-[0.8125rem] leading-relaxed text-ink-400">
             {officialVl ? (
               <>
                 <span className="inline-flex items-center gap-1.5 font-semibold text-ink-900">
@@ -132,7 +132,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           </p>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex shrink-0 flex-col items-end gap-3">
             {item && user && (
               <FollowButton itemId={item.id} code={code} following={followChannels.length > 0} channels={followChannels} />
             )}
@@ -146,15 +146,15 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
               {/* The instant file skips both verification passes, so it is
                   offered as a draft and labelled as one, in the filename too. */}
               <details className="text-right">
-                <summary className="cursor-pointer text-xs text-ink-300 hover:text-ink-500">
+                <summary className="cursor-pointer text-[0.75rem] font-medium text-ink-300 transition-colors hover:text-ink-500">
                   or download an unverified draft
                 </summary>
-                <div className="mt-1.5 flex flex-wrap justify-end gap-1">
+                <div className="mt-2.5 flex flex-wrap justify-end gap-1.5">
                   {userLangs.map((l) => (
                     <a
                       key={l}
                       href={`/api/annotated-vl?code=${encodeURIComponent(code)}&lang=${l}`}
-                      className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold uppercase text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
+                      className="btn-secondary px-3.5 py-1.5 text-[0.6875rem] uppercase tracking-[0.1em] text-ink-500 hover:text-eu-900"
                       title={`Unverified draft in ${l.toUpperCase()}`}
                     >
                       {l}
@@ -167,7 +167,7 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
           </div>
         </div>
 
-        <div className="mb-7">
+        <div className="mb-14">
           <ItemFiles code={code} files={files} langs={userLangs} amendmentCount={amendments.length} />
         </div>
 

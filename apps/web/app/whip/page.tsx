@@ -114,9 +114,9 @@ export default async function WhipPage() {
   return (
     <div className="min-h-screen">
       <TopNav active="Whip" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">Whip</h1>
-        <p className="mt-1 text-sm text-ink-500">
+      <main className="mx-auto max-w-5xl px-8 py-16 lg:px-12 lg:py-20">
+        <h1 className="display text-display-md font-bold text-eu-900">Whip</h1>
+        <p className="lede mt-5">
           Advisor assigned to each file, and the status of the plenary note. Advisors default from the
           committee (ECR map); reassign any file as needed. Note due {NOTE_LEAD_DAYS} days before the sitting.
         </p>
