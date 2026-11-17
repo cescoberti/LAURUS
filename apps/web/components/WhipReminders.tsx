@@ -41,7 +41,7 @@ export function WhipReminders({ rows, anyDue }: { rows: ReminderRow[]; anyDue: b
               setDone(true);
             }}
             disabled={busy}
-            className="ml-auto rounded-lg bg-eu-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-eu-800 disabled:opacity-70"
+            className="ml-auto btn-primary px-4 py-2 text-xs disabled:opacity-70"
           >
             {busy ? "Sending…" : done ? "Sent ✓" : "Send due reminders now"}
           </button>
@@ -53,10 +53,10 @@ export function WhipReminders({ rows, anyDue }: { rows: ReminderRow[]; anyDue: b
           Nothing due. Reminders appear here three weeks before a sitting.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+        <div className="card overflow-hidden">
           <table className="w-full min-w-[640px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/60">
+              <tr className="border-b border-ink-900/[0.055] bg-slate-50/60">
                 {["Sitting", "When", "Advisor", "Files", "Status"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     {h}

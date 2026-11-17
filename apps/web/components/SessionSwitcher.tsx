@@ -66,16 +66,17 @@ export function SessionSwitcher({
   const next = i >= 0 && i < sessions.length - 1 ? sessions[i + 1] : undefined;
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-7">
       <div className="min-w-0">
-        <div className="flex items-center gap-1">
+        <div className="eyebrow mb-5">European Parliament · Plenary</div>
+        <div className="-ml-1 flex items-center gap-2">
           <Arrow to={prev ? href(prev.id) : undefined} dir="prev" label={prev ? label(prev) : undefined} />
-          <h1 className="display truncate text-[clamp(1.9rem,3.4vw,2.6rem)] font-extrabold leading-tight text-eu-900">
+          <h1 className="display min-w-0 text-balance text-display-lg font-bold text-eu-900">
             {active ? monthYear(active) : "No part-session"}
           </h1>
           <Arrow to={next ? href(next.id) : undefined} dir="next" label={next ? label(next) : undefined} />
         </div>
-        {active && <p className="mt-1 pl-10 text-[15px] text-ink-500">{sessionSubtitle(active)}</p>}
+        {active && <p className="mt-5 pl-2 text-[1.0625rem] font-medium text-ink-500 sm:pl-12">{sessionSubtitle(active)}</p>}
       </div>
 
       <div ref={ref} className={`relative shrink-0 ${sessions.length > 1 ? "" : "hidden"}`}>
@@ -84,10 +85,21 @@ export function SessionSwitcher({
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="press flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-ink-700 shadow-card hover:bg-slate-50"
+          className="btn-secondary"
         >
           Coming up
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={open ? "rotate-180" : ""}>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className={`text-ink-400 transition-transform duration-300 ease-lux ${open ? "rotate-180" : ""}`}
+          >
             <path d="m6 9 6 6 6-6" />
           </svg>
         </button>
@@ -95,7 +107,7 @@ export function SessionSwitcher({
         {open && (
           <div
             role="menu"
-            className="scroll-y absolute right-0 top-full z-40 mt-1.5 max-h-[22rem] min-w-[14rem] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-sheet"
+            className="scroll-y animate-fade absolute right-0 top-full z-40 mt-3 max-h-[24rem] min-w-[17rem] overflow-y-auto rounded-2xl bg-white/90 p-2 shadow-sheet backdrop-blur-xl ring-1 ring-ink-900/[0.06]"
           >
             {sessions.map((s) => {
               const on = s.id === active?.id;
@@ -105,16 +117,18 @@ export function SessionSwitcher({
                   href={href(s.id)}
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className={`flex items-center gap-2 px-3.5 py-2 text-sm hover:bg-eu-50 ${
-                    on ? "bg-eu-50 font-semibold text-eu-900" : "font-medium text-ink-900"
+                  className={`press flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-[0.9375rem] hover:bg-eu-50 ${
+                    on ? "bg-eu-50 font-semibold text-eu-900" : "font-medium text-ink-700"
                   }`}
                 >
                   <span
                     aria-hidden
-                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${on ? "bg-eu-700" : "bg-laurel-600"}`}
+                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${
+                      on ? "bg-eu-900 ring-[3px] ring-eu-900/15" : "bg-laurel-600/70"
+                    }`}
                   />
                   <span className="truncate">{label(s)}</span>
-                  <span className="ml-auto shrink-0 text-[11px] tabular-nums text-ink-300">{s.vote_count || ""}</span>
+                  <span className="ml-auto shrink-0 text-xs font-semibold tabular-nums text-ink-300">{s.vote_count || ""}</span>
                 </Link>
               );
             })}
@@ -125,15 +139,22 @@ export function SessionSwitcher({
   );
 }
 
+/**
+ * Step to the part-session before or after. A glass disc, raised only on
+ * hover: at rest it must not compete with the title it sits beside.
+ */
 function Arrow({ to, dir, label: name }: { to?: string; dir: "prev" | "next"; label?: string }) {
   const path = dir === "prev" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6";
-  const cls = "grid h-9 w-9 shrink-0 place-items-center rounded-lg";
+  const cls = "grid h-10 w-10 shrink-0 place-items-center rounded-full";
+  const icon = (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={path} />
+    </svg>
+  );
   if (!to) {
     return (
-      <span className={`${cls} text-ink-300/50`} aria-hidden>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d={path} />
-        </svg>
+      <span className={`${cls} text-ink-300/40`} aria-hidden>
+        {icon}
       </span>
     );
   }
@@ -142,11 +163,9 @@ function Arrow({ to, dir, label: name }: { to?: string; dir: "prev" | "next"; la
       href={to}
       title={name}
       aria-label={dir === "prev" ? `Previous part-session: ${name}` : `Next part-session: ${name}`}
-      className={`press ${cls} text-ink-500 hover:bg-slate-100 hover:text-eu-900`}
+      className={`press ${cls} text-ink-400 hover:bg-white hover:text-eu-900 hover:shadow-card`}
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d={path} />
-      </svg>
+      {icon}
     </Link>
   );
 }

@@ -33,12 +33,33 @@ export function LaurusMark({ size = 28, className = "" }: { size?: number; class
   );
 }
 
-export function Wordmark({ className = "" }: { className?: string }) {
+/**
+ * The wordmark. Wide tracking and a hairline gold rule under the mark: the
+ * two details that separate a logotype from a word set in a UI font.
+ */
+export function Wordmark({
+  className = "",
+  size = 26,
+  /** In the bar on a phone the mark stands alone: the name costs 90px that
+   *  the navigation needs more than the logo does. */
+  compact = false,
+}: {
+  className?: string;
+  size?: number;
+  compact?: boolean;
+}) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <LaurusMark className="text-laurel-700" />
-      <span className="text-[19px] font-bold tracking-[0.14em] text-eu-900">
-        LAURUS
+    <div className={`group flex items-center gap-2.5 ${className}`}>
+      <LaurusMark
+        size={size}
+        className="text-laurel-700 transition-transform duration-500 ease-lux group-hover:-rotate-6"
+      />
+      <span
+        className={`text-[1.0625rem] font-bold uppercase leading-none tracking-[0.2em] text-eu-900 ${
+          compact ? "hidden sm:inline" : ""
+        }`}
+      >
+        Laurus
       </span>
     </div>
   );

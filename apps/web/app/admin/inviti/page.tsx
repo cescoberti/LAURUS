@@ -28,24 +28,24 @@ export default async function InvitiPage() {
   return (
     <div className="min-h-screen">
       <TopNav active="admin" />
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">Invites</h1>
-        <p className="mt-1 text-sm text-ink-500">
+      <main className="mx-auto max-w-3xl px-8 py-16 lg:px-12 lg:py-20">
+        <h1 className="display text-display-md font-bold text-eu-900">Invites</h1>
+        <p className="lede mt-5">
           Generate an invite link to share with a new member. The link stays valid for 30 days and can be
           used once.
         </p>
 
-        <form action={generateInviteAction} className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 sm:flex-row sm:items-end">
+        <form action={generateInviteAction} className="card mt-8 flex flex-col gap-4 p-6 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="text-sm font-medium text-ink-900">Email (optional)</label>
             <input
               type="email"
               name="email"
               placeholder="nome@europarl.europa.eu"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
+              className="field mt-2"
             />
           </div>
-          <button type="submit" className="rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800">
+          <button type="submit" className="btn-primary">
             Generate invite link
           </button>
         </form>

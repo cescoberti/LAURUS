@@ -56,8 +56,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
   return (
     <Shell>
-      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-        <h1 className="text-lg font-bold text-ink-900">Invite not valid</h1>
+      <div className="card p-10 text-center">
+        <h1 className="display text-[1.375rem] font-bold text-ink-900">Invite not valid</h1>
         <p className="mt-2 text-sm text-ink-500">
           This invite link isn&apos;t valid, has expired, or has already been used. Ask your administrator
           for a new one, or{" "}

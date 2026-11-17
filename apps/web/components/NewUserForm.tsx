@@ -10,7 +10,7 @@ export function NewUserForm() {
   );
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-card">
+    <div className="card p-7">
       <p className="mb-4 text-sm font-semibold text-ink-900">Onboarda un nuovo advisor</p>
       <form action={formAction} className="grid gap-3 sm:grid-cols-[1.4fr_1fr_0.8fr_auto]">
         <input
@@ -18,17 +18,17 @@ export function NewUserForm() {
           type="email"
           required
           placeholder="nome.cognome@epgroup.eu"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
+          className="field"
         />
         <input
           name="fullName"
           placeholder="Full name"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
+          className="field"
         />
         <select
           name="role"
           defaultValue="member"
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15"
+          className="field"
         >
           <option value="member">Member</option>
           <option value="whip">Whip</option>
@@ -37,7 +37,7 @@ export function NewUserForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-eu-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-eu-700 disabled:opacity-60"
+          className="btn-primary"
         >
           {pending ? "Creating…" : "Invite"}
         </button>

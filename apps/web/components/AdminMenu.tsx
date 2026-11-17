@@ -35,12 +35,14 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`press flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
-          active || open ? "bg-eu-50 font-semibold text-eu-900" : "text-ink-500 hover:bg-slate-100 hover:text-ink-900"
+        className={`press flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[0.875rem] ${
+          active || open
+            ? "bg-white font-semibold text-eu-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(20,26,43,0.06),0_6px_16px_-8px_rgba(20,26,43,0.18)]"
+            : "font-medium text-ink-500 hover:bg-ink-900/[0.04] hover:text-ink-900"
         }`}
       >
         Admin
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={open ? "rotate-180" : ""}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`text-ink-400 transition-transform duration-300 ease-lux ${open ? "rotate-180" : ""}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
@@ -48,7 +50,7 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-40 mt-1.5 min-w-[11rem] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-sheet"
+          className="animate-fade absolute left-0 top-full z-40 mt-3 min-w-[13rem] rounded-2xl bg-white/90 p-2 shadow-sheet backdrop-blur-xl ring-1 ring-ink-900/[0.06]"
         >
           {items.map((i) => (
             <Link
@@ -56,7 +58,7 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
               href={i.href}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block px-3.5 py-2 text-sm font-medium text-ink-700 hover:bg-eu-50 hover:text-eu-900"
+              className="press block rounded-xl px-3.5 py-2.5 text-[0.9375rem] font-medium text-ink-700 hover:bg-eu-50 hover:text-eu-900"
             >
               {i.label}
             </Link>

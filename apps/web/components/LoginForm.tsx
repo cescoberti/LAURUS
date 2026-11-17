@@ -4,21 +4,21 @@ import { useActionState, useState } from "react";
 import { loginAction, sendMagicLinkAction, type LoginState, type MagicLinkState } from "@/app/login/actions";
 import { GoogleButton, OrDivider } from "./GoogleButton";
 
-const field =
-  "w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-eu-600 focus:ring-2 focus:ring-eu-600/15";
+const field = "field";
+const labelClass = "mb-2 block text-[0.75rem] font-semibold tracking-[0.04em] text-ink-500";
 
 export function LoginForm({ next }: { next: string }) {
   const [mode, setMode] = useState<"password" | "link">("password");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <GoogleButton next={next} />
       <OrDivider />
       {mode === "password" ? <PasswordForm next={next} /> : <MagicLinkForm next={next} />}
       <button
         type="button"
         onClick={() => setMode((m) => (m === "password" ? "link" : "password"))}
-        className="w-full text-center text-[13px] font-medium text-ink-500 hover:text-eu-900"
+        className="press w-full rounded-full py-1.5 text-center text-[0.8125rem] font-semibold text-ink-400 hover:text-eu-900"
       >
         {mode === "password" ? "Email me a sign-in link instead" : "Use my password instead"}
       </button>
@@ -30,21 +30,21 @@ function PasswordForm({ next }: { next: string }) {
   const [state, formAction, pending] = useActionState<LoginState | undefined, FormData>(loginAction, undefined);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="next" value={next} />
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-500">Email</label>
+        <label className={labelClass}>Email</label>
         <input name="email" type="email" required autoFocus className={field} />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-500">Password</label>
+        <label className={labelClass}>Password</label>
         <input name="password" type="password" required className={field} />
       </div>
 
       {state?.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+        <p className="rounded-xl bg-red-50/80 px-4 py-3 text-[0.875rem] text-red-700 ring-1 ring-inset ring-red-200">
           {state.error}
         </p>
       )}
@@ -52,7 +52,7 @@ function PasswordForm({ next }: { next: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="press w-full rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-700 disabled:opacity-60"
+        className="btn-primary w-full"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
@@ -66,9 +66,9 @@ function MagicLinkForm({ next }: { next: string }) {
 
   if (state?.sent) {
     return (
-      <div className="rounded-lg bg-eu-50 px-4 py-3 text-sm text-eu-900 ring-1 ring-inset ring-eu-200">
-        <p className="font-semibold">Check your inbox</p>
-        <p className="mt-1 text-[13px] text-ink-700">
+      <div className="rounded-2xl bg-eu-50/80 px-5 py-4 text-eu-900 ring-1 ring-inset ring-eu-200/70">
+        <p className="text-[0.9375rem] font-bold">Check your inbox</p>
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-ink-700">
           If that address has a LAURUS account, a sign-in link is on its way. It expires in an hour.
         </p>
       </div>
@@ -76,15 +76,15 @@ function MagicLinkForm({ next }: { next: string }) {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       <input type="hidden" name="next" value={next} />
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-500">Email</label>
+        <label className={labelClass}>Email</label>
         <input name="email" type="email" required autoFocus className={field} />
       </div>
 
       {state?.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+        <p className="rounded-xl bg-red-50/80 px-4 py-3 text-[0.875rem] text-red-700 ring-1 ring-inset ring-red-200">
           {state.error}
         </p>
       )}
@@ -92,7 +92,7 @@ function MagicLinkForm({ next }: { next: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="press w-full rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-700 disabled:opacity-60"
+        className="btn-primary w-full"
       >
         {pending ? "Sending…" : "Email me a link"}
       </button>

@@ -12,9 +12,9 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
   if (state?.ok && typeof window !== "undefined") window.location.reload();
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-8">
-      <h1 className="text-xl font-bold text-ink-900">Welcome to LAURUS 👋</h1>
-      <p className="mt-1 text-sm text-ink-500">Create your account to get started.</p>
+    <div className="card p-10">
+      <h1 className="display text-display-sm font-bold text-eu-900">Welcome to LAURUS</h1>
+      <p className="lede mt-5">Create your account to get started.</p>
 
       <div className="mt-6 space-y-4">
         <GoogleButton token={token} label="Sign up with Google" />
@@ -42,14 +42,14 @@ export function OnboardingSignup({ token, presetEmail }: { token: string; preset
             required
             minLength={8}
             placeholder="at least 8 characters"
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
+            className="field mt-2"
           />
         </div>
         {state?.error && <p className="text-sm text-red-700">{state.error}</p>}
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800 disabled:opacity-60"
+          className="btn-primary w-full"
         >
           {pending ? "Creating…" : "Create account & continue"}
         </button>

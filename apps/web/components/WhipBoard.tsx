@@ -67,10 +67,10 @@ export function WhipBoard({
               </span>
             </div>
 
-            <div className="scroll-x overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+            <div className="scroll-x card overflow-hidden">
               <table className="w-full min-w-[720px] border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/60">
+                  <tr className="border-b border-ink-900/[0.055] bg-slate-50/60">
                     {["Rapporteur / subject", "Cmte", "Advisor", "Plenary note"].map((h) => (
                       <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                         {h}
