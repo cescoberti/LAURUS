@@ -66,6 +66,8 @@ export async function triage(input: {
   text: string | null;
   attachments: Array<{ filename: string; content_type: string }>;
   routeKind: InboxKind;
+  /** Told what the call used, so its cost can be recorded. */
+  onUsage?: (u: { input_tokens: number; output_tokens: number }) => void;
 }): Promise<Analysis | null> {
   if (!triageAvailable()) return null;
   const client = new Anthropic();
@@ -89,6 +91,7 @@ export async function triage(input: {
         },
       ],
     });
+    input.onUsage?.(response.usage);
     for (const block of response.content) if (block.type === "text") text += block.text;
   } catch {
     return null;

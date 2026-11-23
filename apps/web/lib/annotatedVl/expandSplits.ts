@@ -414,6 +414,8 @@ export async function expandSplitRows(
     votEn: VotPayload | null;
     votLang: VotPayload | null;
     amendments: DbAmendment[];
+    /** Told what each model call used, by which agent made it. */
+    onUsage?: (agent: "quote-aligner" | "split-agent", u: { input_tokens: number; output_tokens: number }) => void;
   },
 ): Promise<SplitExpansionNote[]> {
   const notes: SplitExpansionNote[] = [];
@@ -463,7 +465,7 @@ export async function expandSplitRows(
     const enSubject = "error" in resolvedEn ? null : resolvedEn.text;
 
     const align: Aligner | null = quoteAlignmentAvailable()
-      ? (en, quotes, langPara) => alignQuotes(en, quotes, langPara, opts.language)
+      ? (en, quotes, langPara) => alignQuotes(en, quotes, langPara, opts.language, (u) => opts.onUsage?.("quote-aligner", u))
       : null;
     const cut: Awaited<ReturnType<typeof cutParts>> = enSubject
       ? await cutParts(enSubject, langSubject, reqEn.parts, reqLang?.parts ?? [], isEnglishList, align)
@@ -490,7 +492,14 @@ export async function expandSplitRows(
   // and they do not depend on one another.
   const results = await Promise.all(
     agentJobs.map((j) =>
-      splitAgent({ subject: j.subject, language: opts.language, notationEn: j.notation, paraEn: j.paraEn, paraLang: j.paraLang }),
+      splitAgent({
+        subject: j.subject,
+        language: opts.language,
+        notationEn: j.notation,
+        paraEn: j.paraEn,
+        paraLang: j.paraLang,
+        onUsage: (u) => opts.onUsage?.("split-agent", u),
+      }),
     ),
   );
   for (const [i, j] of agentJobs.entries()) {

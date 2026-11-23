@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhook, fetchReceivedEmail, fetchReceivedAttachment, parseAddress, type ReceivedEvent } from "@/lib/inbox/resend";
 import { triage, proposeAction, type InboxKind } from "@/lib/inbox/triage";
+import { TRIAGE_EVENT, costUsd } from "@/lib/agents";
+import { logEvent } from "@/lib/track";
 
 // Fetching the mail plus its attachments and one Claude call can exceed the
 // default budget on a slow day.
@@ -50,7 +52,13 @@ export async function POST(request: Request) {
   }
 
   const { data: known } = await admin.from("users").select("id").eq("email", from.email).maybeSingle();
+  const used = { calls: 0, input: 0, output: 0 };
   const analysis = await triage({
+    onUsage: (u) => {
+      used.calls += 1;
+      used.input += u.input_tokens;
+      used.output += u.output_tokens;
+    },
     from: from.email,
     fromName: from.name,
     to: toAddr,
@@ -60,6 +68,11 @@ export async function POST(request: Request) {
     routeKind,
   });
   const action = proposeAction(analysis, { email: from.email, knownUser: !!known });
+  if (used.calls) {
+    void logEvent(TRIAGE_EVENT, {
+      meta: { ...used, triaged: !!analysis, usd: costUsd("claude-opus-5", used.input, used.output) },
+    });
+  }
 
   const { error } = await admin.from("inbox_messages").insert({
     resend_email_id: emailId,

@@ -51,6 +51,8 @@ export interface SplitAgentInput {
   paraEn: string | null;
   /** The same text in the list's language, when it could be read. */
   paraLang: string | null;
+  /** Told what each call used, so the cost of the agent can be recorded. */
+  onUsage?: (u: { input_tokens: number; output_tokens: number }) => void;
 }
 
 /** A stretch of the target paragraph: where it starts, and whether the same words occur elsewhere too. */
@@ -184,6 +186,7 @@ export async function splitAgent(input: SplitAgentInput): Promise<SplitAgentResu
         system: SYSTEM,
         messages,
       });
+      input.onUsage?.(response.usage);
       if (response.stop_reason !== "end_turn") return null;
       let text = "";
       for (const block of response.content) if (block.type === "text") text += block.text;

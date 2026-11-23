@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { COMMITTEES, CONTACT_EMAIL } from "@/lib/committees";
 import { DOCUMENT_LANGUAGES } from "@/lib/languages";
+import { DAILY_VL_LIMIT } from "@/lib/limits";
 import { completeOnboardingAction } from "@/app/onboarding/actions";
 
 const LANG_ORDER = DOCUMENT_LANGUAGES;
@@ -140,7 +141,7 @@ export function OnboardingWizard({
               </p>
               <p>
                 To keep things fast and sustainable for everyone, each user can generate up to{" "}
-                <strong>10 voting lists per day</strong>.
+                <strong>{DAILY_VL_LIMIT} voting lists per day</strong>.
               </p>
             </div>
             <label className="mt-4 flex items-center gap-2 text-sm font-medium text-ink-900">

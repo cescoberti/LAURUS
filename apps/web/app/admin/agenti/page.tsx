@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { createClient } from "@/lib/supabase/server";
-import { AGENTS, SPLIT_EVENT, type AgentInfo } from "@/lib/agents";
+import { AGENTS, SPLIT_EVENT, TRIAGE_EVENT, costUsd, type AgentInfo } from "@/lib/agents";
 import type { Analysis, ProposedAction } from "@/lib/inbox/triage";
 
 export const dynamic = "force-dynamic";
@@ -34,14 +34,30 @@ export default async function AgentsPage() {
   const supabase = await createClient();
   const since = new Date(Date.now() - 30 * DAY).toISOString();
 
-  const [{ data: messages }, { data: splitEvents }] = await Promise.all([
+  const [{ data: messages }, { data: splitEvents }, { data: triageEvents }] = await Promise.all([
     supabase
       .from("inbox_messages")
       .select("id, subject, from_email, received_at, status, analysis, proposed_action")
       .order("received_at", { ascending: false })
       .limit(200),
-    supabase.from("events").select("item_code, created_at, meta").eq("type", SPLIT_EVENT).gte("created_at", since).order("created_at", { ascending: false }).limit(200),
+    supabase.from("events").select("item_code, created_at, meta").eq("type", SPLIT_EVENT).gte("created_at", since).order("created_at", { ascending: false }).limit(500),
+    supabase.from("events").select("created_at, meta").eq("type", TRIAGE_EVENT).gte("created_at", since).limit(500),
   ]);
+
+  const usd = (n: number) => (n < 0.01 && n > 0 ? "< $0.01" : `$${n.toFixed(2)}`);
+  type SpendMeta = { calls?: number; input?: number; output?: number };
+  const sumSpend = (rows: Array<{ meta: Record<string, unknown> }>, pick: (m: Record<string, unknown>) => SpendMeta | undefined) => {
+    let calls = 0;
+    let input = 0;
+    let output = 0;
+    for (const r of rows) {
+      const s = pick(r.meta ?? {});
+      calls += Number(s?.calls) || 0;
+      input += Number(s?.input) || 0;
+      output += Number(s?.output) || 0;
+    }
+    return { calls, input, output, usd: costUsd("claude-opus-5", input, output) };
+  };
 
   const keyConfigured = !!process.env.ANTHROPIC_API_KEY;
 
@@ -80,6 +96,9 @@ export default async function AgentsPage() {
   };
 
   // --- Split agents: from the events the VL route writes ---------------------
+  const triageSpend = sumSpend((triageEvents ?? []) as Array<{ meta: Record<string, unknown> }>, (m) => m as SpendMeta);
+  triageActivity.stats.push(["Calls (30 d)", triageSpend.calls], ["Cost (30 d)", usd(triageSpend.usd)]);
+
   type SplitMeta = { aligned?: number; agent?: number; repeated?: number; translated?: number; errors?: number; language?: string };
   const ev = (splitEvents ?? []) as Array<{ item_code: string | null; created_at: string; meta: SplitMeta }>;
   const sum = (k: keyof SplitMeta) => ev.reduce((n, e) => n + (Number(e.meta?.[k]) || 0), 0);
@@ -100,6 +119,10 @@ export default async function AgentsPage() {
     outcome: describe(e.meta ?? {}),
     href: e.item_code ? `/items/${encodeURIComponent(e.item_code)}` : undefined,
   }));
+  const splitRows = ev as unknown as Array<{ meta: Record<string, unknown> }>;
+  const spendOf = (m: Record<string, unknown>, who: string) => (m.spend as Record<string, SpendMeta> | undefined)?.[who];
+  const agentSpend = sumSpend(splitRows, (m) => spendOf(m, "split-agent"));
+  const alignerSpend = sumSpend(splitRows, (m) => spendOf(m, "quote-aligner"));
   const splitNote = ev.length === 0 ? "Nothing recorded yet: this log starts with the first voting list generated after it went online." : undefined;
 
   const activity: Record<string, Activity> = {
@@ -111,12 +134,18 @@ export default async function AgentsPage() {
         ["Repeated quote, check it", sum("repeated")],
         ["Translated, not verbatim", sum("translated")],
         ["Left with an error", sum("errors")],
+        ["Model calls (30 d)", agentSpend.calls],
+        ["Cost (30 d)", usd(agentSpend.usd)],
       ],
       recent: recentSplits,
       note: splitNote,
     },
     "quote-aligner": {
-      stats: [["Rows aligned (30 d)", sum("aligned")]],
+      stats: [
+        ["Rows aligned (30 d)", sum("aligned")],
+        ["Model calls (30 d)", alignerSpend.calls],
+        ["Cost (30 d)", usd(alignerSpend.usd)],
+      ],
       recent: [],
       note: splitNote,
     },
@@ -201,7 +230,7 @@ function AgentCard({ agent: a, activity, keyConfigured }: { agent: AgentInfo; ac
 
       {activity && (
         <div className="mt-7 border-t border-ink-900/[0.07] pt-6">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {activity.stats.map(([label, value]) => (
               <div key={label} className="rounded-xl bg-slate-50 px-4 py-3">
                 <p className="text-xl font-bold text-eu-900">{value}</p>
