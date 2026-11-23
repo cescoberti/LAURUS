@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TopNav } from "@/components/TopNav";
 import { NewUserForm } from "@/components/NewUserForm";
+import { DeleteUserButton } from "@/components/DeleteUserButton";
 
 export default async function AdminUsersPage() {
   const supabase = await createClient();
@@ -36,8 +37,8 @@ export default async function AdminUsersPage() {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-ink-900/[0.055] bg-slate-50/60">
-                {["Email", "Nome", "Ruolo", "Creato"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                {["Email", "Nome", "Ruolo", "Creato", ""].map((h, i) => (
+                  <th key={h || i} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     {h}
                   </th>
                 ))}
@@ -61,6 +62,9 @@ export default async function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-ink-500">
                     {new Date(u.created_at).toLocaleDateString("it-IT")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {u.id !== user.id && u.role !== "admin" && <DeleteUserButton id={u.id} email={u.email} />}
                   </td>
                 </tr>
               ))}
