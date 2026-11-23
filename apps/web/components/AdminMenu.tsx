@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * The five admin sections behind one button, so they stop crowding the bar
+ * The admin sections behind one button, so they stop crowding the bar
  * for the one person who can see them. Closes on outside click, on Escape,
  * and on navigating away.
  */
-export function AdminMenu({ items, active }: { items: Array<{ label: string; href: string }>; active?: boolean }) {
+export function AdminMenu({ items, active }: { items: Array<{ label: string; href: string; hint?: string }>; active?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,10 +35,10 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`press flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[0.875rem] ${
+        className={`press flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[0.875rem] ring-1 ring-inset ${
           active || open
-            ? "bg-white font-semibold text-eu-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(20,26,43,0.06),0_6px_16px_-8px_rgba(20,26,43,0.18)]"
-            : "font-medium text-ink-500 hover:bg-ink-900/[0.04] hover:text-ink-900"
+            ? "bg-white font-semibold text-eu-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_6px_16px_-8px_rgba(20,26,43,0.18)] ring-ink-900/[0.08]"
+            : "font-medium text-ink-600 ring-ink-900/[0.09] hover:bg-ink-900/[0.04] hover:text-ink-900"
         }`}
       >
         Admin
@@ -50,7 +50,7 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
       {open && (
         <div
           role="menu"
-          className="animate-fade absolute left-0 top-full z-40 mt-3 min-w-[13rem] rounded-2xl bg-white/90 p-2 shadow-sheet backdrop-blur-xl ring-1 ring-ink-900/[0.06]"
+          className="animate-fade absolute right-0 top-full z-40 mt-3 w-[min(19rem,calc(100vw-2.5rem))] rounded-2xl bg-white p-2 shadow-sheet ring-1 ring-ink-900/[0.08]"
         >
           {items.map((i) => (
             <Link
@@ -58,9 +58,10 @@ export function AdminMenu({ items, active }: { items: Array<{ label: string; hre
               href={i.href}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="press block rounded-xl px-3.5 py-2.5 text-[0.9375rem] font-medium text-ink-700 hover:bg-eu-50 hover:text-eu-900"
+              className="press block rounded-xl px-3.5 py-2.5 hover:bg-eu-50"
             >
-              {i.label}
+              <span className="block text-[0.9375rem] font-semibold text-ink-900">{i.label}</span>
+              {i.hint && <span className="mt-0.5 block text-[0.75rem] leading-snug text-ink-400">{i.hint}</span>}
             </Link>
           ))}
         </div>

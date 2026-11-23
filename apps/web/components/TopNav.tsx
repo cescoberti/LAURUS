@@ -13,15 +13,15 @@ const NAV: Array<{ label: NavActive; href: string }> = [
   { label: "Voting lists", href: "/vl-generator" },
 ];
 
-// Admin-only, and all behind one menu: five more links in the bar made the
-// four that every advisor uses harder to find.
-const ADMIN: Array<{ label: string; href: string }> = [
-  { label: "Users", href: "/admin/users" },
-  { label: "Inbox", href: "/admin/inbox" },
-  { label: "Agents", href: "/admin/agenti" },
-  { label: "Invites", href: "/admin/inviti" },
-  { label: "Usage", href: "/admin/utilizzo" },
-  { label: "Tracker", href: "/admin/tracker" },
+// Admin-only, and all behind one menu: six more links in the bar made the
+// ones that every advisor uses harder to find. Each says what is behind it.
+const ADMIN: Array<{ label: string; href: string; hint: string }> = [
+  { label: "Users", href: "/admin/users", hint: "Members, roles and access" },
+  { label: "Inbox", href: "/admin/inbox", hint: "Email waiting for your approval" },
+  { label: "Agents", href: "/admin/agenti", hint: "What the models do, and how checked" },
+  { label: "Invites", href: "/admin/inviti", hint: "Invitation links" },
+  { label: "Usage", href: "/admin/utilizzo", hint: "Voting lists per member" },
+  { label: "Tracker", href: "/admin/tracker", hint: "Who is connected, which files" },
 ];
 
 function initials(name: string | null | undefined, email: string | undefined): string {
@@ -62,14 +62,13 @@ export async function TopNav({ active }: { active?: NavActive }) {
               {n.label}
             </Link>
           ))}
-          {(profile?.role === "admin" || profile?.role === "whip") && (
-            <Link href="/whip" className={linkClass(active === "Whip")}>
-              Whip
-            </Link>
-          )}
-          {profile?.role === "admin" && <AdminMenu items={ADMIN} active={active === "admin"} />}
+          {/* Whip is switched off for now: the page is still there at /whip, but
+              nothing in the bar leads to it. */}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-1.5 text-sm">
+          {/* Outside the scrolling nav on purpose: a scroll container clips
+              whatever hangs below it, and that is what cut the menu short. */}
+          {profile?.role === "admin" && <AdminMenu items={ADMIN} active={active === "admin"} />}
           {user && (
             <Link
               href="/settings"
