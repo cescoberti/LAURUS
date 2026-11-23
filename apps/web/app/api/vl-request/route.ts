@@ -8,6 +8,7 @@ import { verifyVotingList, votingListFingerprint, type VlVerificationReport, typ
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
+import { SPLIT_EVENT } from "@/lib/agents";
 import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
@@ -105,6 +106,22 @@ export async function POST(request: Request) {
         votLang: loaded.vot,
         amendments: loaded.amendments,
       });
+      // What the agents did on this list, for the admin's Agents panel.
+      if (expansionNotes.length) {
+        const n = (c: string) => expansionNotes.filter((x) => x.code === c).length;
+        void logEvent(SPLIT_EVENT, {
+          userId: user.id,
+          itemCode: code,
+          meta: {
+            language: lang,
+            aligned: n("RESA_AUTOMATICA"),
+            agent: n("SPLIT_AGENTE"),
+            repeated: n("SPLIT_AGENTE_OCCORRENZA"),
+            translated: n("SPLIT_TRADOTTO"),
+            errors: expansionNotes.filter((x) => x.level === "error").length,
+          },
+        });
+      }
       const expansionCheck: VlCheck = {
         id: "split-expansion",
         pass: 2,
