@@ -55,7 +55,7 @@ export function SessionBoard({
       if (filter === "followed" && !i.following) return false;
       if (filter === "mine" && !i.mine) return false;
       if (!q) return true;
-      return [i.code, i.title, i.rapporteur ?? "", i.committee].some((f) => f.toLowerCase().includes(q));
+      return [i.code, i.title, i.rapporteur ?? "", ...(i.committees.length ? i.committees : [i.committee])].some((f) => f.toLowerCase().includes(q));
     });
     const byDay = new Map<string, DisplayItem[]>();
     for (const item of filtered) {
@@ -124,6 +124,7 @@ export function SessionBoard({
           isToday={g.iso === today}
           vlLanguage={vlLanguage}
           onToggleFollow={toggleFollow}
+          myCommittees={committees}
         />
       ))}
     </>

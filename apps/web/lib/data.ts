@@ -20,6 +20,8 @@ export interface ItemRow {
   title: { en?: string; it?: string };
   rapporteur: string | null;
   committee: string | null;
+  /** Every responsible committee in the Parliament's order; null until a sync has filled it. */
+  committees: string[] | null;
   vote_date: string | null;
   vl_status: "none" | "draft" | "final";
   am_count: number;
@@ -51,7 +53,7 @@ export async function getSessionItems(sessionId: string): Promise<ItemRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("items")
-    .select("id, code, title, rapporteur, committee, vote_date, vl_status, am_count, documents (type, language, source_url)")
+    .select("id, code, title, rapporteur, committee, committees, vote_date, vl_status, am_count, documents (type, language, source_url)")
     .eq("session_id", sessionId)
     .order("vote_date")
     .order("code");
@@ -65,6 +67,8 @@ interface AmendmentDbRow {
   language: string;
   target: string | null;
   tabled_by: string | null;
+  tabled_members?: string[] | null;
+  tabled_group?: string | null;
   original_text: string | null;
   amended_text: string | null;
   kind: ParsedAmendment["kind"];
@@ -79,11 +83,20 @@ export async function getItemAmendments(
   itemId: string,
 ): Promise<{ amendments: ConsolidatedAmendment[]; languages: string[] }> {
   const supabase = await createClient();
-  const { data } = await supabase
+  // The author columns come with migration 0017; until it is applied the tab
+  // must still show the amendments, so a refused select falls back to the old one.
+  let { data, error } = (await supabase
     .from("amendments")
-    .select("number, language, target, tabled_by, original_text, amended_text, kind")
+    .select("number, language, target, tabled_by, tabled_members, tabled_group, original_text, amended_text, kind")
     .eq("item_id", itemId)
-    .order("number");
+    .order("number")) as { data: AmendmentDbRow[] | null; error: unknown };
+  if (error) {
+    ({ data } = (await supabase
+      .from("amendments")
+      .select("number, language, target, tabled_by, original_text, amended_text, kind")
+      .eq("item_id", itemId)
+      .order("number")) as { data: AmendmentDbRow[] | null; error: unknown });
+  }
 
   const rows = (data as AmendmentDbRow[] | null) ?? [];
   const byLanguage: Record<string, ParsedAmendment[]> = {};
@@ -94,6 +107,8 @@ export async function getItemAmendments(
       kind: r.kind,
       target: r.target ?? undefined,
       tabledBy: r.tabled_by ?? undefined,
+      tabledMembers: r.tabled_members ?? undefined,
+      tabledGroup: r.tabled_group ?? undefined,
       originalText: r.original_text ?? undefined,
       amendedText: r.amended_text ?? undefined,
     });
@@ -129,7 +144,7 @@ export async function getItemByCode(code: string): Promise<ItemRow | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("items")
-    .select("id, code, title, rapporteur, committee, vote_date, vl_status, am_count, documents (type, language, source_url)")
+    .select("id, code, title, rapporteur, committee, committees, vote_date, vl_status, am_count, documents (type, language, source_url)")
     .eq("code", code)
     .limit(1)
     .maybeSingle();

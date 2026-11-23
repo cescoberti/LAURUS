@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseAmendmentsDocx } from "./amendmentsDocx.ts";
 import { consolidateAmendments } from "./consolidate.ts";
+import { signatoryLabel } from "./signatories.ts";
 
 const fixture = (name: string) =>
   readFileSync(fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url)));
@@ -104,6 +105,25 @@ test("parses amendments tabled on a motion for a resolution", async () => {
   assert.equal(nine.tabledBy, "ECR");
   assert.equal(nine.originalText ?? "", ""); // a new recital has no present text
   assert.match(nine.amendedText ?? "", /Council of European Muslims/);
+});
+
+// The template prints the MEPs and the group on separate lines; `tabledBy`
+// keeps only one of them, so the two are carried on their own.
+test("signatories and the group are kept apart", async () => {
+  const ams = await parseAmendmentsDocx(fixture("am-B-10-2026-0424-AM-009-011-en.docx"), "en");
+  const nine = ams[0]!;
+  assert.equal(nine.tabledGroup, "ECR");
+  assert.equal(nine.tabledMembers?.[0], "Nicolas Bay");
+  assert.equal(nine.tabledMembers?.[1], "Marion Maréchal");
+  assert.ok((nine.tabledMembers?.length ?? 0) > 2);
+  assert.equal(signatoryLabel(nine.tabledMembers, nine.tabledGroup), "Nicolas Bay et al. · ECR");
+});
+
+test("the author label: lead signatory, et al., group", () => {
+  assert.equal(signatoryLabel(["Ana Pop"], "S&D"), "Ana Pop · S&D");
+  assert.equal(signatoryLabel(["Ana Pop", "Ion Rus"], null), "Ana Pop et al.");
+  assert.equal(signatoryLabel([], "ECR"), "ECR");
+  assert.equal(signatoryLabel(undefined, undefined), null);
 });
 
 test("an author written as an entity in the template is decoded", async () => {

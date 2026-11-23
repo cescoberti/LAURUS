@@ -128,3 +128,42 @@ test("a payload with no document code is refused rather than guessed at", () => 
   assert.equal(reportRefsFromWork({ identifier: "A-10-2026-0277" }), null);
   assert.equal(reportRefsFromWork({ label: "PE784.222" }), null);
 });
+
+
+// A10-0041/2026, Omnibus IV (2025/0130(COD)), as the API returned it on
+// 23/11/2026: three committees, one co-rapporteur each, and both the creator
+// list and the AUTHOR participations in an order that is not the EP's. The
+// procedure file on OEIL prints ECON–VIVALDINI, ENVI–HANSEN, LIBE–MANDL, which
+// is precedenceOrder ascending.
+const OMNIBUS: EpWork = {
+  label: "A10-0041/2026",
+  identifier: "A-10-2026-0041",
+  creator: ["person/190713", "org/LIBE", "person/257143", "org/ENVI", "person/257033", "org/ECON"],
+  workHadParticipation: [
+    { had_participant_organization: ["org/ENVI"], participation_role: "def/ep-roles/AUTHOR" },
+    { had_participant_person: ["person/257033"], participation_in_name_of: "org/ENVI", participation_role: "def/ep-roles/RAPPORTEUR_CO", politicalGroup: "org/PPE", precedenceOrder: 1101 },
+    { had_participant_organization: ["org/ECON"], participation_role: "def/ep-roles/AUTHOR" },
+    { had_participant_person: ["person/190713"], participation_in_name_of: "org/LIBE", participation_role: "def/ep-roles/RAPPORTEUR_CO", politicalGroup: "org/PPE", precedenceOrder: 2101 },
+    { had_participant_organization: ["org/LIBE"], participation_role: "def/ep-roles/AUTHOR" },
+    { had_participant_person: ["person/257143"], participation_in_name_of: "org/ECON", participation_role: "def/ep-roles/RAPPORTEUR_CO", politicalGroup: "org/ECR", precedenceOrder: 804 },
+  ],
+};
+
+test("joint committees: every rapporteur, with committee and group, in the EP's order", () => {
+  const r = reportRefsFromWork(OMNIBUS)!;
+  assert.deepEqual(r.rapporteurIds, ["person/257143", "person/257033", "person/190713"]);
+  assert.deepEqual(r.committees, ["ECON", "ENVI", "LIBE"]);
+  assert.deepEqual(
+    r.leads.map((l) => [l.personId, l.committee, l.group]),
+    [
+      ["person/257143", "ECON", "ECR"],
+      ["person/257033", "ENVI", "PPE"],
+      ["person/190713", "LIBE", "PPE"],
+    ],
+  );
+});
+
+test("committees follow the rapporteurs' precedence, not the payload", () => {
+  // A10-0277: AFET (101) before DEVE (402) although DEVE's rapporteur comes first in the payload.
+  assert.deepEqual(reportRefsFromWork(JOINT)!.committees, ["AFET", "DEVE"]);
+});

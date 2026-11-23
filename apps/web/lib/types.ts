@@ -6,7 +6,9 @@ export interface DisplayItem {
   code: string;
   title: string;
   rapporteur?: string;
-  committee: string; // committee code or "TBD"
+  committee: string; // lead committee code or "TBD"
+  /** All responsible committees in the Parliament's order (lead first); [] when unknown. */
+  committees: string[];
   voteDate?: string; // ISO date of the plenary vote
   vl: VlStatus;
   /** Amendments ingested for the file — the VL can be generated once > 0. */

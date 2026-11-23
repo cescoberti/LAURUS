@@ -17,11 +17,21 @@
  * the September top-up seed (`seedAgenda.ts`) covers those for the current
  * session. Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
  */
-import { listMeetings, getDocument } from "./epApi.ts";
-import { makeAdminClient, groupSessions, displayCode, COMMITTEES, personName, mapLimit, foreseenActivities, reportRef } from "./epShared.ts";
+import { listMeetings } from "./epApi.ts";
+import { makeAdminClient, groupSessions, displayCode, mapLimit, foreseenActivities, reportRef, reportDetails, saveLeads, type ForeseenActivity, type ReportDetails } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const TODAY = new Date().toISOString().slice(0, 10);
+
+/**
+ * A scheduled vote, as opposed to the debate on the same file or the sitting's
+ * own time blocks. The API prints the type as `def/ep-activities/PLENARY_VOTE`;
+ * the last segment is matched exactly, so a type nobody has seen yet is read as
+ * "not a vote" rather than silently dating a file from a debate.
+ */
+function isVote(a: ForeseenActivity): boolean {
+  return a.had_activity_type?.split("/").pop() === "PLENARY_VOTE";
+}
 
 const supabase = makeAdminClient();
 
@@ -59,7 +69,13 @@ async function main() {
       sessionRows.find((s) => s.start_date <= date && date <= s.end_date)?.id;
 
     // 3. Collect draft-agenda file items across those sittings (dedup per file).
-    const seen = new Map<string, { sessionId: string; identifier: string; code: string; title: { en: string; it: string } }>();
+    //    A file shows up twice in a week — as PLENARY_DEBATE on one day and as
+    //    PLENARY_VOTE on another — and only the second fixes the vote date, so
+    //    the activity type is what the day is taken from, never the loop day.
+    const seen = new Map<
+      string,
+      { sessionId: string; identifier: string; code: string; title: { en: string; it: string }; voteDate: string | null }
+    >();
     for (const day of sittingDays) {
       const sessionId = sessionFor(day);
       if (!sessionId) continue;
@@ -69,58 +85,89 @@ async function main() {
         if (!identifier) continue; // procedural item or file without a report yet
         const code = displayCode(identifier);
         const key = `${sessionId}|${code}`;
-        if (seen.has(key)) continue;
+        const voteDay = isVote(a) ? (a.activity_date ?? day) : null;
+        const had = seen.get(key);
+        if (had) {
+          // Voted across two sittings (a split vote carried over): the first
+          // day is the one to prepare for.
+          if (voteDay && (!had.voteDate || voteDay < had.voteDate)) had.voteDate = voteDay;
+          continue;
+        }
         seen.set(key, {
           sessionId,
           identifier,
           code,
           title: { en: a.activity_label?.en ?? code, it: a.activity_label?.it ?? "" },
+          voteDate: voteDay,
         });
       }
     }
     const files = [...seen.values()];
-    console.log(`draft-agenda files with a report: ${files.length}`);
+    const dated = files.filter((f) => f.voteDate).length;
+    console.log(`draft-agenda files with a report: ${files.length} (${dated} with a scheduled vote day)`);
 
     // 4. Resolve committee + rapporteur from the report's FRBR tree.
     let detailsOk = 0;
     const enriched = await mapLimit(files, 4, async (f) => {
-      let committee: string | undefined;
-      let rapporteur: string | undefined;
+      let details: ReportDetails | undefined;
       try {
-        const doc = await getDocument(f.identifier);
-        if (doc) {
-          detailsOk++;
-          const creator = (doc as unknown as { creator?: string[] }).creator ?? [];
-          committee = creator
-            .filter((c) => c.startsWith("org/"))
-            .map((c) => c.slice(4))
-            .find((code) => COMMITTEES.has(code));
-          const person = creator.find((c) => c.startsWith("person/"));
-          if (person) rapporteur = await personName(person);
-        }
+        details = await reportDetails(f.identifier);
+        if (details) detailsOk++;
       } catch {
         // a missing committee/rapporteur is not fatal — the row is still useful
       }
-      return { ...f, committee, rapporteur };
+      return {
+        ...f,
+        committee: details?.committee,
+        committees: details?.committees ?? [],
+        rapporteur: details?.rapporteur,
+        leads: details?.leads ?? [],
+      };
     });
     console.log(`report details resolved: ${detailsOk}/${files.length}`);
 
-    // 5. Upsert items. No vote_date — these have not been voted yet.
-    //    A file whose details we failed to resolve this run (the EP publishes
-    //    the agenda days before the Open Data record carries its creator, and
-    //    /documents 504s under load) must not blank a name an earlier run got
-    //    right: fall back to what the row already holds.
+    // 5. Upsert items, vote_date included: the order of business approved by
+    //    the Conference of Presidents fixes the day weeks before the vote, so
+    //    "not voted yet" is not the same as "no date". Leaving it NULL until
+    //    the sitting week is what made every upcoming file read "Date TBD" —
+    //    blind in exactly the window LAURUS exists for.
+    //
+    //    This is an upsert on (session_id, code), so every column named here
+    //    overwrites what the row holds. A file whose details we failed to
+    //    resolve this run (the EP publishes the agenda days before the Open
+    //    Data record carries its creator, and /documents 504s under load) must
+    //    not blank a name an earlier run got right: fall back to what the row
+    //    already holds.
     const { data: priorRows } = await supabase
       .from("items")
-      .select("session_id, code, committee, rapporteur")
+      .select("session_id, code, committee, committees, rapporteur, vote_date")
       .in("session_id", [...new Set(files.map((f) => f.sessionId))]);
     const prior = new Map(
-      (priorRows ?? []).map((r) => [`${r.session_id}|${r.code}`, r as { committee: string | null; rapporteur: string | null }]),
+      (priorRows ?? []).map((r) => [
+        `${r.session_id}|${r.code}`,
+        r as { committee: string | null; committees: string[] | null; rapporteur: string | null; vote_date: string | null },
+      ]),
     );
 
+    /**
+     * The draft agenda owns the date of a vote still to come, and may move it
+     * between days as the week firms up. It does not own a vote that already
+     * happened: that date comes from the VOT/adopted text and stays.
+     */
+    function voteDateFor(agenda: string | null, stored: string | null): string | null {
+      if (!agenda) return stored;
+      if (stored && stored < TODAY) return stored;
+      return agenda;
+    }
+
+    const changes: string[] = [];
     const itemRows = enriched.map((e) => {
       const had = prior.get(`${e.sessionId}|${e.code}`);
       const committee = e.committee ?? had?.committee ?? null;
+      const voteDate = voteDateFor(e.voteDate, had?.vote_date ?? null);
+      if (voteDate !== (had?.vote_date ?? null)) {
+        changes.push(`  ${e.code.padEnd(16)} vote_date: ${had?.vote_date ?? "—"} → ${voteDate ?? "—"}`);
+      }
       return {
         session_id: e.sessionId,
         code: e.code,
@@ -128,12 +175,22 @@ async function main() {
         title: e.title,
         rapporteur: e.rapporteur ?? had?.rapporteur ?? null,
         committee,
-        committees: committee ? [committee] : null,
+        committees: e.committees.length ? e.committees : (had?.committees ?? (committee ? [committee] : null)),
+        vote_date: voteDate,
       };
     });
+    if (changes.length) console.log(`vote dates from the agenda (${changes.length}):\n${changes.join("\n")}`);
     if (itemRows.length) {
-      const { error: itemErr } = await supabase.from("items").upsert(itemRows, { onConflict: "session_id,code" });
+      const { data: upserted, error: itemErr } = await supabase
+        .from("items")
+        .upsert(itemRows, { onConflict: "session_id,code" })
+        .select("id, session_id, code");
       if (itemErr) throw new Error(`items upsert: ${itemErr.message}`);
+      const idByKey = new Map((upserted ?? []).map((r) => [`${r.session_id}|${r.code}`, r.id as string]));
+      for (const e of enriched) {
+        const itemId = idByKey.get(`${e.sessionId}|${e.code}`);
+        if (itemId) await saveLeads(supabase, itemId, e.leads);
+      }
     }
     console.log(`items: ${itemRows.length} upserted`);
 

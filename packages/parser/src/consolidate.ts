@@ -14,6 +14,8 @@ export interface ConsolidatedAmendment {
   originalText: Record<string, string>;
   amendedText: Record<string, string>;
   tabledBy?: string;
+  tabledMembers?: string[];
+  tabledGroup?: string;
 }
 
 /**
@@ -39,6 +41,8 @@ export function consolidateAmendments(
           originalText: {},
           amendedText: {},
           tabledBy: a.tabledBy,
+          tabledMembers: a.tabledMembers,
+          tabledGroup: a.tabledGroup,
         };
         map.set(a.number, c);
       }
@@ -49,6 +53,8 @@ export function consolidateAmendments(
       if (a.originalText) c.originalText[language] = a.originalText;
       if (a.amendedText) c.amendedText[language] = a.amendedText;
       if (!c.tabledBy && a.tabledBy) c.tabledBy = a.tabledBy;
+      if (!c.tabledMembers && a.tabledMembers) c.tabledMembers = a.tabledMembers;
+      if (!c.tabledGroup && a.tabledGroup) c.tabledGroup = a.tabledGroup;
     }
   }
 

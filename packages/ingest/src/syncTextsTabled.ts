@@ -35,14 +35,17 @@
  * is published after the vote, so it can say nothing about the files anyone is
  * actually preparing; it is a backfill for past part-sessions and nothing more.
  *
- * Writes only where the column is NULL; nothing at all without --write.
+ * Writes only where the column is NULL; nothing at all without --write. The
+ * exception is --check --write, which takes open data's version of rapporteur,
+ * committee and committees (the whole list, in the Parliament's order) over a
+ * filled row, and rewrites item_rapporteurs for every report it asked about.
  */
 import { readFileSync } from "node:fs";
 import { parseTextsTabled } from "@laurus/parser/texts-tabled";
 import { reportCodeToWorkId, reportRefsFromWork } from "@laurus/parser/tabled-report-api";
 import { rapporteurLabel } from "@laurus/parser/rapporteur-name";
 import { getPlenaryDocument, listMembers } from "./epApi.ts";
-import { makeAdminClient, sleep } from "./epShared.ts";
+import { makeAdminClient, saveLeads, sleep, type ReportLeadRow } from "./epShared.ts";
 
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
@@ -57,6 +60,7 @@ interface Item {
   code: string;
   rapporteur: string | null;
   committee: string | null;
+  committees: string[] | null;
 }
 
 /** A report's names, whichever source they came from. */
@@ -64,6 +68,8 @@ interface Names {
   code: string;
   rapporteurs: string[];
   committees: string[];
+  /** Each rapporteur with committee and group, for `item_rapporteurs`; API source only. */
+  leads?: ReportLeadRow[];
 }
 
 type Client = ReturnType<typeof makeAdminClient>;
@@ -71,13 +77,13 @@ type Client = ReturnType<typeof makeAdminClient>;
 interface Patch {
   id: string;
   code: string;
-  patch: Record<string, string>;
+  patch: Record<string, string | string[]>;
 }
 
 async function readItems(supabase: Client, codes: string[]): Promise<Item[]> {
   const { data, error } = await supabase
     .from("items")
-    .select("id, code, rapporteur, committee")
+    .select("id, code, rapporteur, committee, committees")
     .in("code", codes);
   if (error || !data) throw new Error(`items read: ${error?.message}`);
   return data as Item[];
@@ -87,7 +93,7 @@ async function readItems(supabase: Client, codes: string[]): Promise<Item[]> {
 async function itemsMissingNames(supabase: Client): Promise<Item[]> {
   const { data, error } = await supabase
     .from("items")
-    .select("id, code, rapporteur, committee")
+    .select("id, code, rapporteur, committee, committees")
     .like("code", "A%")
     .or("rapporteur.is.null,committee.is.null");
   if (error || !data) throw new Error(`items read: ${error?.message}`);
@@ -142,7 +148,18 @@ async function fromApi(codes: string[]): Promise<Names[]> {
     const names = refs.rapporteurIds.map((pid) => members.get(pid) || "");
     const unknown = refs.rapporteurIds.filter((_, i) => !names[i]);
     if (unknown.length) console.warn(`  ${code}: unknown person id ${unknown.join(", ")} — leaving the name alone`);
-    out.push({ code, rapporteurs: unknown.length ? [] : names, committees: refs.committees });
+    const leads: ReportLeadRow[] = refs.leads.flatMap((l) => {
+      const name = members.get(l.personId);
+      return name ? [{ ...l, name }] : [];
+    });
+    out.push({
+      code,
+      rapporteurs: unknown.length ? [] : names,
+      committees: refs.committees,
+      // A list with a name missing is not written: item_rapporteurs would show
+      // a joint report one rapporteur short.
+      leads: unknown.length ? [] : leads,
+    });
     // One call each, and this endpoint rate-limits when walked in bulk.
     await sleep(250);
   }
@@ -198,7 +215,7 @@ async function check(supabase: Client) {
 
   const { data, error } = await supabase
     .from("items")
-    .select("id, code, rapporteur, committee")
+    .select("id, code, rapporteur, committee, committees")
     .in(
       "session_id",
       sessions.map((x) => x.id as string),
@@ -217,7 +234,7 @@ async function check(supabase: Client) {
   for (const r of reports) {
     const item = byCode.get(r.code);
     if (!item) continue;
-    const patch: Record<string, string> = {};
+    const patch: Record<string, string | string[]> = {};
     // No names back means the ids did not resolve, which fromApi has already
     // warned about; silence is not agreement, so nothing is compared.
     if (r.rapporteurs.length) {
@@ -228,23 +245,39 @@ async function check(supabase: Client) {
         console.log(`  ${r.code.padEnd(16)} site shows ${shown ?? "nobody"}, open data says ${theirs}`);
       }
     }
-    if (item.committee && r.committees.length && item.committee !== r.committees[0]) {
+    // The whole list, in the Parliament's order: LIBE alone, or LIBE/ECON, is
+    // not what OEIL prints for Omnibus IV (ECON/ENVI/LIBE).
+    const shownCommittees = item.committees?.length ? item.committees : item.committee ? [item.committee] : [];
+    if (r.committees.length && shownCommittees.length && shownCommittees.join("/") !== r.committees.join("/")) {
       patch.committee = r.committees[0]!;
-      console.log(`  ${r.code.padEnd(16)} site shows ${item.committee}, open data says ${r.committees.join("/")}`);
+      patch.committees = r.committees;
+      console.log(`  ${r.code.padEnd(16)} site shows ${shownCommittees.join("/")}, open data says ${r.committees.join("/")}`);
     }
     if (Object.keys(patch).length) plan.push({ id: item.id, code: r.code, patch });
   }
 
-  if (plan.length === 0) {
-    console.log("\nthe site agrees with open data on every one of them.");
-    return;
-  }
+  if (plan.length === 0) console.log("\nthe site agrees with open data on every one of them.");
   if (!WRITE) {
-    console.log(`\n${plan.length} disagree — pass --write to take open data's version.`);
+    if (plan.length) console.log(`\n${plan.length} disagree — pass --write to take open data's version.`);
     return;
   }
-  console.log(`\noverwriting ${plan.length} item(s) with open data's version.`);
-  console.log(`done: ${await apply(supabase, plan, false)} items updated.`);
+  if (plan.length) {
+    console.log(`\noverwriting ${plan.length} item(s) with open data's version.`);
+    console.log(`done: ${await apply(supabase, plan, false)} items updated.`);
+  }
+  await writeLeads(supabase, reports, byCode);
+}
+
+/** item_rapporteurs for every report the API answered for, agreeing or not. */
+async function writeLeads(supabase: Client, reports: Names[], byCode: Map<string, Item>) {
+  let n = 0;
+  for (const r of reports) {
+    const item = byCode.get(r.code);
+    if (!item || !r.leads?.length) continue;
+    await saveLeads(supabase, item.id, r.leads);
+    n++;
+  }
+  console.log(`item_rapporteurs written for ${n} file(s).`);
 }
 
 async function main() {
@@ -284,8 +317,9 @@ async function main() {
   for (const r of reports) {
     const item = byCode.get(r.code);
     if (!item) continue;
-    const patch: Record<string, string> = {};
+    const patch: Record<string, string | string[]> = {};
     if (!item.rapporteur && r.rapporteurs.length) patch.rapporteur = r.rapporteurs.join(", ");
+    if (!item.committees?.length && r.committees.length) patch.committees = r.committees;
     // The full set of committees belongs in items.committees, which syncAgenda
     // owns; this column holds the leading one.
     if (!item.committee && r.committees.length) patch.committee = r.committees[0]!;
@@ -303,6 +337,7 @@ async function main() {
   }
 
   console.log(`\ndone: ${await apply(supabase, plan, true)} items updated.`);
+  await writeLeads(supabase, reports, byCode);
 }
 
 main().catch((err) => {

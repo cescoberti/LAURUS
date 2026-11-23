@@ -6,6 +6,7 @@ export * from "./types.ts";
 export * from "./matchAmendmentRef.ts";
 export * from "./votingList.ts";
 export * from "./consolidate.ts";
+export * from "./signatories.ts";
 export * from "./splitSeparate.ts";
 export * from "./remarksDiff.ts";
 export * from "./epUrls.ts";

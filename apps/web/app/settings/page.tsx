@@ -18,6 +18,10 @@ export default async function SettingsPage() {
     .single();
   const selected = new Set<string>(profile?.languages ?? DEFAULT_LANGUAGES);
   const myCommittees = new Set<string>(profile?.committees ?? []);
+  // Read on its own: a database without migration 0017 has no such column, and
+  // that must not take the rest of the profile down with it.
+  const { data: autoRow } = await supabase.from("users").select("auto_follow_committees").eq("id", user!.id).single();
+  const autoFollow = new Set<string>((autoRow?.auto_follow_committees as string[] | null) ?? []);
   const defaultLang = profile?.vl_language ?? "it";
 
   return (
@@ -37,6 +41,24 @@ export default async function SettingsPage() {
               {COMMITTEES.map((c) => (
                 <label key={c.code} className="press flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.875rem] text-ink-700 hover:bg-ink-900/[0.035]">
                   <input type="checkbox" name="committees" value={c.code} defaultChecked={myCommittees.has(c.code)} className="accent-eu-700" />
+                  <span className="font-mono text-[0.6875rem] font-semibold tracking-wide text-ink-400">{c.code}</span>
+                  <span className="truncate">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900">Automatic star</p>
+            <p className="mb-5 mt-1.5 text-[0.8125rem] text-ink-500">
+              Every file of these committees is starred for you, in the part-sessions ahead and as new files appear —
+              so the voting-list and translation alerts reach you without starring them one by one. Take a star off a
+              file and it stays off.
+            </p>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              {COMMITTEES.map((c) => (
+                <label key={c.code} className="press flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.875rem] text-ink-700 hover:bg-ink-900/[0.035]">
+                  <input type="checkbox" name="auto_follow_committees" value={c.code} defaultChecked={autoFollow.has(c.code)} className="accent-eu-700" />
                   <span className="font-mono text-[0.6875rem] font-semibold tracking-wide text-ink-400">{c.code}</span>
                   <span className="truncate">{c.name}</span>
                 </label>

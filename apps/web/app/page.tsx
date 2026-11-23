@@ -34,6 +34,7 @@ export default async function Dashboard({
       title: r.title.en || r.title.it || r.code,
       rapporteur: r.rapporteur ?? undefined,
       committee: r.committee ?? "TBD",
+      committees: r.committees?.length ? r.committees : r.committee ? [r.committee] : [],
       voteDate: r.vote_date ?? undefined,
       vl: r.vl_status,
       amCount: r.am_count,
@@ -41,7 +42,7 @@ export default async function Dashboard({
       fileUrlLang: r.documents.find((d) => d.type === "report" && d.language === viewer.vlLanguage)?.source_url,
       officialVl: vl ? { versionLabel: vl.version_label, fetchedAt: vl.fetched_at } : undefined,
       following: viewer.followedItemIds.has(r.id),
-      mine: r.committee !== null && viewer.committees.includes(r.committee),
+      mine: [r.committee, ...(r.committees ?? [])].some((c) => c !== null && viewer.committees.includes(c)),
     };
   });
 

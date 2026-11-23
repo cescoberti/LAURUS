@@ -1,7 +1,11 @@
 export interface ParsedAmendment {
   number: number;
   tabledBy?: string;
-  target?: string;         // 'Recital C', 'Article 4', '§ 15'
+  /** The MEPs who signed it, in the order the template prints them (first = lead signatory). */
+  tabledMembers?: string[];
+  /** The group it is tabled on behalf of (`ECR`), from `<AuNomDe>{ECR}`. */
+  tabledGroup?: string;
+  target?: string;        // 'Recital C', 'Article 4', '§ 15'
   originalText?: string;
   amendedText?: string;
   /**

@@ -98,7 +98,9 @@ export default async function ItemDetail({ params }: { params: Promise<{ code: s
             ) : (
               <span className="font-mono text-eu-700">{code}</span>
             )}
-            {item?.committee && <CommitteeChip code={item.committee} />}
+            {(item?.committees?.length ? item.committees : item?.committee ? [item.committee] : []).map((c) => (
+              <CommitteeChip key={c} code={c} />
+            ))}
             {item?.vote_date && (
               <span>
                 {item.vote_date >= new Date().toISOString().slice(0, 10) ? "Vote on" : "Voted"}{" "}

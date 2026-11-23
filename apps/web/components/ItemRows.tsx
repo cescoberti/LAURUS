@@ -16,12 +16,16 @@ export function ItemRows({
   isToday,
   vlLanguage,
   onToggleFollow,
+  myCommittees,
 }: {
   group: DayGroup;
   isToday: boolean;
   vlLanguage: string;
   onToggleFollow: (item: DisplayItem) => void;
+  /** The viewer's own committees, so each chip can be lit on its own. */
+  myCommittees: string[];
 }) {
+  const mine = new Set(myCommittees);
   // One file to carry into the chamber: every list the member follows that day.
   const followedWithList = group.items.filter((i) => i.following && (i.officialVl || i.amCount > 0));
 
@@ -67,8 +71,12 @@ export function ItemRows({
               </div>
               <div className="mt-1.5 font-mono text-[0.6875rem] tracking-wide text-eu-600/80">{item.code}</div>
             </div>
-            <div className="w-[4.5rem] text-center">
-              <CommitteeChip code={item.committee} mine={item.mine} />
+            {/* One chip per responsible committee, in the Parliament's order; the
+                chip is the member's colour only for a committee that is theirs. */}
+            <div className="flex w-[4.5rem] flex-col items-center gap-1">
+              {(item.committees.length ? item.committees : [item.committee]).map((c) => (
+                <CommitteeChip key={c} code={c} mine={mine.has(c)} />
+              ))}
             </div>
             <div className="w-[10.5rem]">
               <ListState item={item} />

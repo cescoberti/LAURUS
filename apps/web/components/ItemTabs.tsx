@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { remarksFor } from "@laurus/parser";
+import { remarksFor, signatoryLabel } from "@laurus/parser";
 import type { ConsolidatedAmendment, VotPayload } from "@/lib/data";
 
 /** Render light HTML (<b>/<i>/<s> from the remarks diff) as React nodes. */
@@ -208,6 +208,7 @@ function AmendmentsView({
           const original = a.originalText[lang] ?? "";
           const amended = a.amendedText[lang] ?? "";
           const remarks = remarksFor(original || null, amended || null);
+          const signatory = signatoryLabel(a.tabledMembers, a.tabledGroup);
           return (
             <div key={a.number} className="card overflow-hidden">
               <div className="flex items-center gap-3 border-b border-ink-900/[0.055] bg-slate-50/60 px-4 py-2.5">
@@ -215,6 +216,14 @@ function AmendmentsView({
                   {a.number}
                 </span>
                 <span className="text-sm font-medium text-ink-900">{target}</span>
+                {signatory && (
+                  <span
+                    className="min-w-0 truncate text-[0.8125rem] text-ink-500"
+                    title={a.tabledMembers?.length ? `${a.tabledMembers.join(", ")}${a.tabledGroup ? ` — ${a.tabledGroup}` : ""}` : undefined}
+                  >
+                    {signatory}
+                  </span>
+                )}
                 {a.kind !== "standard" && (
                   <span className="rounded-md bg-gold-500/15 px-2 py-0.5 text-[11px] font-semibold text-gold-600 ring-1 ring-inset ring-gold-500/30">
                     {a.kind}

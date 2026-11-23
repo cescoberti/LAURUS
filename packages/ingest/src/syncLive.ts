@@ -22,12 +22,12 @@
  *                report already ingested is picked up on the next run
  *   4. VOT       the sitting days' results-of-votes XML (404 until the votes
  *                happen) → vot_requests; an item found in day D's VOT gets
- *                vote_date = D if it had none
+ *                vote_date = D, correcting the day the draft agenda planned
  *   5. voting lists  the official Tabling Service lists on "Order and lists
  *                of votes" → voting_lists (append-only, one row per distinct
  *                file); a new version label is fetched at once, an unchanged
  *                one re-checked (conditional GET) at most hourly; the page's
- *                sitting day fills vote_date ahead of the vote
+ *                sitting day corrects vote_date as the sitting is held
  *   6. vote_count refreshed so the board and whip page show the session
  *
  * Everything is idempotent: re-running is the normal mode of operation.
@@ -44,11 +44,13 @@ import {
   BASE,
   makeAdminClient,
   displayCode,
-  COMMITTEES,
-  personName,
   mapLimit,
   foreseenActivities,
   reportRef,
+  reportDetails,
+  saveLeads,
+  upsertAmendments,
+  type ReportDetails,
   sleep,
 } from "./epShared.ts";
 
@@ -185,18 +187,19 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
   });
 
   const enriched = await mapLimit(fresh, 3, async (f) => {
-    let committee: string | undefined;
-    let rapporteur: string | undefined;
+    let details: ReportDetails | undefined;
     try {
-      const doc = await getDocument(f.identifier);
-      const creator = (doc as unknown as { creator?: string[] } | undefined)?.creator ?? [];
-      committee = creator.filter((c) => c.startsWith("org/")).map((c) => c.slice(4)).find((c) => COMMITTEES.has(c));
-      const person = creator.find((c) => c.startsWith("person/"));
-      if (person) rapporteur = await personName(person);
+      details = await reportDetails(f.identifier);
     } catch {
       // resolved on a later pass
     }
-    return { ...f, committee, rapporteur };
+    return {
+      ...f,
+      committee: details?.committee,
+      committees: details?.committees ?? [],
+      rapporteur: details?.rapporteur,
+      leads: details?.leads ?? [],
+    };
   });
 
   await backfillFamilies(s);
@@ -214,12 +217,22 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
         title: e.title,
         rapporteur: e.rapporteur ?? null,
         committee: e.committee ?? null,
-        committees: e.committee ? [e.committee] : null,
+        committees: e.committees.length ? e.committees : e.committee ? [e.committee] : null,
         family_key: subjectKey(e.title.en),
       })),
       { onConflict: "session_id,code" },
     );
     if (error) throw new Error(`items upsert: ${error.message}`);
+    const { data: created } = await supabase
+      .from("items")
+      .select("id, code")
+      .eq("session_id", s.id)
+      .in("code", added.map((e) => e.code));
+    const createdId = new Map((created ?? []).map((r) => [r.code as string, r.id as string]));
+    for (const e of added) {
+      const itemId = createdId.get(e.code);
+      if (itemId) await saveLeads(supabase, itemId, e.leads);
+    }
   }
 
   for (const e of enriched) {
@@ -229,8 +242,9 @@ async function syncAgenda(s: Session, days: string[]): Promise<number> {
     if (e.rapporteur && !row.rapporteur) patch.rapporteur = e.rapporteur;
     if (e.committee && !row.committee) {
       patch.committee = e.committee;
-      patch.committees = [e.committee];
+      patch.committees = e.committees.length ? e.committees : [e.committee];
     }
+    await saveLeads(supabase, row.id, e.leads);
     if (!Object.keys(patch).length) continue;
     const { error } = await supabase.from("items").update(patch).eq("id", row.id);
     if (error) throw new Error(`items detail fill ${e.code}: ${error.message}`);
@@ -549,6 +563,8 @@ async function syncAmendments(s: Session): Promise<{ blocks: number; items: numb
               language: lang,
               target: a.target ?? null,
               tabled_by: a.tabledBy ?? null,
+              tabled_members: a.tabledMembers ?? null,
+              tabled_group: a.tabledGroup ?? null,
               original_text: a.originalText ?? null,
               amended_text: a.amendedText ?? null,
               kind: a.kind,
@@ -557,7 +573,7 @@ async function syncAmendments(s: Session): Promise<{ blocks: number; items: numb
         ).values(),
       ];
       if (rows.length) {
-        const { error } = await supabase.from("amendments").upsert(rows, { onConflict: "item_id,number,language" });
+        const error = await upsertAmendments(supabase, rows);
         if (error) {
           console.warn(`  ${w.id} ${lang}: upsert failed — ${error.message}`);
           continue;
@@ -616,7 +632,11 @@ async function syncVot(s: Session, days: string[]): Promise<{ files: number; row
         const item = v.codes.map((c) => byCode.get(c)).find(Boolean);
         if (!item) continue;
         upserts.push({ item_id: item.id, language: lang, source_url: url, payload: v.payload });
-        if (!item.vote_date) {
+        // The VOT for a day names the files voted that day, so it does not
+        // only fill an empty date: it corrects one. syncAgenda now writes the
+        // day the order of business PLANS, and the EP moves votes between
+        // sitting days during the week — this is where that is caught.
+        if (item.vote_date !== day) {
           await supabase.from("items").update({ vote_date: day }).eq("id", item.id);
           (item as { vote_date: string | null }).vote_date = day;
         }
@@ -696,7 +716,9 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
     if (!item) continue; // a file this session does not track (e.g. a C document)
     listed++;
 
-    if (e.day && !item.vote_date) {
+    // Same precedence as above: the votes page reports the sitting as it
+    // happened, so it overrides the day the draft agenda planned.
+    if (e.day && item.vote_date !== e.day) {
       await supabase.from("items").update({ vote_date: e.day }).eq("id", item.id);
       (item as { vote_date: string | null }).vote_date = e.day;
     }
