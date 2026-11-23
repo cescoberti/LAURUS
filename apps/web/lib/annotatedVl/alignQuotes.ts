@@ -47,6 +47,7 @@ export async function alignQuotes(
   quotesEn: string[],
   langParagraph: string,
   language: string,
+  onUsage?: (u: { input_tokens: number; output_tokens: number }) => void,
 ): Promise<Array<string | null> | null> {
   if (!quoteAlignmentAvailable() || quotesEn.length === 0) return null;
   const client = new Anthropic();
@@ -67,6 +68,7 @@ export async function alignQuotes(
         },
       ],
     });
+    onUsage?.(response.usage);
     if (response.stop_reason !== "end_turn") return null;
     for (const block of response.content) if (block.type === "text") text += block.text;
   } catch {

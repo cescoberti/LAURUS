@@ -96,3 +96,46 @@ export const AGENTS: AgentInfo[] = [
 
 /** The event the VL route writes after it has expanded the splits of a list. */
 export const SPLIT_EVENT = "agent_split";
+/** The event the inbound-mail route writes after it has triaged a message. */
+export const TRIAGE_EVENT = "agent_triage";
+
+/**
+ * US dollars per million tokens, from Anthropic's price list of 2026-11-03.
+ * These are what the cost in the Agents panel is computed with: change them
+ * here when the list or the model in use changes.
+ */
+export const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-opus-5": { in: 5, out: 25 },
+};
+
+/** What a model call used, as the API reports it. */
+export interface TokenUse {
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export type SpendKey = "quote-aligner" | "split-agent";
+
+export interface Spend {
+  calls: number;
+  input: number;
+  output: number;
+}
+
+export const emptySpend = (): Record<SpendKey, Spend> => ({
+  "quote-aligner": { calls: 0, input: 0, output: 0 },
+  "split-agent": { calls: 0, input: 0, output: 0 },
+});
+
+export function addSpend(into: Record<SpendKey, Spend>, agent: SpendKey, u: TokenUse): void {
+  const s = into[agent];
+  s.calls += 1;
+  s.input += u.input_tokens;
+  s.output += u.output_tokens;
+}
+
+/** Dollars for `input` / `output` tokens on `model`; 0 for a model not in the table. */
+export function costUsd(model: string, input: number, output: number): number {
+  const p = PRICES[model];
+  return p ? (input * p.in + output * p.out) / 1_000_000 : 0;
+}
