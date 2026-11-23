@@ -55,7 +55,7 @@ export function SessionBoard({
       if (filter === "followed" && !i.following) return false;
       if (filter === "mine" && !i.mine) return false;
       if (!q) return true;
-      return [i.code, i.title, i.rapporteur ?? "", i.committee].some((f) => f.toLowerCase().includes(q));
+      return [i.code, i.title, i.rapporteur ?? "", ...(i.committees.length ? i.committees : [i.committee])].some((f) => f.toLowerCase().includes(q));
     });
     const byDay = new Map<string, DisplayItem[]>();
     for (const item of filtered) {
@@ -68,16 +68,20 @@ export function SessionBoard({
       .map(([iso, dayItems]) => ({ iso, day: dayLabel(iso), items: dayItems }));
   }, [items, query, filter]);
 
+  /** Filter pills: the active one is filled with the institutional blue,
+   *  the others are glass. Nothing else in the toolbar carries colour. */
   const chip = (on: boolean) =>
-    `press whitespace-nowrap rounded-xl border px-3 py-2 text-[13px] font-medium ${
-      on ? "border-eu-900 bg-eu-900 text-white" : "border-slate-200 bg-white text-ink-500 hover:bg-slate-50"
+    `press whitespace-nowrap rounded-full px-4.5 py-2.5 text-[0.875rem] font-semibold ${
+      on
+        ? "bg-eu-900 text-white shadow-glow-eu"
+        : "bg-white/70 text-ink-500 backdrop-blur hover:bg-white hover:text-ink-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(20,26,43,0.07)]"
     }`;
 
   return (
     <>
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <label className="flex min-w-[14rem] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-card transition-[box-shadow,border-color] focus-within:border-eu-600 focus-within:ring-[3px] focus-within:ring-eu-900/10">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="text-ink-300" aria-hidden>
+      <div className="mt-18 flex flex-wrap items-center gap-2.5">
+        <label className="group flex min-w-[18rem] flex-1 items-center gap-3 rounded-full bg-white/70 px-5 py-3 backdrop-blur shadow-[inset_0_1px_2px_rgba(20,26,43,0.04),0_0_0_1px_rgba(20,26,43,0.07)] transition-shadow duration-300 ease-lux focus-within:shadow-[inset_0_1px_2px_rgba(20,26,43,0.03),0_0_0_1px_rgba(0,51,153,0.45),0_0_0_4px_rgba(0,51,153,0.10)]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 text-ink-300 transition-colors group-focus-within:text-eu-900" aria-hidden>
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
           </svg>
@@ -85,7 +89,7 @@ export function SessionBoard({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search rapporteur, subject, code, committee…"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-ink-300"
+            className="w-full bg-transparent text-[0.9375rem] text-ink-900 outline-none placeholder:text-ink-300"
           />
         </label>
         <button className={chip(filter === "all")} onClick={() => setFilter("all")}>
@@ -102,7 +106,7 @@ export function SessionBoard({
       </div>
 
       {groups.length === 0 && (
-        <p className="py-12 text-center text-sm text-ink-300">
+        <p className="mx-auto max-w-prose py-26 text-center text-[1.0625rem] leading-relaxed text-ink-400">
           {query
             ? `No votes match “${query}”.`
             : filter === "followed"
@@ -120,6 +124,7 @@ export function SessionBoard({
           isToday={g.iso === today}
           vlLanguage={vlLanguage}
           onToggleFollow={toggleFollow}
+          myCommittees={committees}
         />
       ))}
     </>

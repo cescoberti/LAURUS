@@ -4,6 +4,7 @@ import { sendEmail, emailConfigured } from "@/lib/notify/email";
 import { sendWhatsApp, whatsappConfigured } from "@/lib/notify/whatsapp";
 import { rapporteurLabel } from "@/lib/rapporteur";
 import { logEvent } from "@/lib/track";
+import { applyAutoFollows } from "@/lib/autoFollow";
 import { SITE } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -143,6 +144,11 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  // Members who asked for a star on every file of some committees (ECON, BUDG,
+  // CONT …) get it first, so a file that has just appeared is followed before
+  // the subscriptions below are read.
+  const auto = await applyAutoFollows();
+
   const { data: itemSubs } = await admin
     .from("subscriptions")
     .select("id, user_id, target_id, channel")
@@ -182,7 +188,7 @@ export async function POST(request: Request) {
       }
     }
   }
-  if (!subs.length) return NextResponse.json({ followed: 0, sent: 0 });
+  if (!subs.length) return NextResponse.json({ followed: 0, sent: 0, autoStarred: auto.starred });
 
   const itemIds = [...new Set(subs.map((s) => s.target_id as string))];
   const [{ data: items }, { data: amLangs }, { data: vots }, { data: vls }, { data: users }] = await Promise.all([
@@ -311,6 +317,6 @@ export async function POST(request: Request) {
     sent++;
   }
 
-  void logEvent("vl_alerts", { meta: { followed: subs.length, sent, skipped } });
-  return NextResponse.json({ followed: subs.length, sent, skipped });
+  void logEvent("vl_alerts", { meta: { followed: subs.length, sent, skipped, autoStarred: auto.starred } });
+  return NextResponse.json({ followed: subs.length, sent, skipped, autoStarred: auto.starred });
 }

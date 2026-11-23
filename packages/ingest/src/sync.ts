@@ -14,7 +14,7 @@
  * (pass apps/web/.env.local via --env-file).
  */
 import { listMeetings, getDocument, fileRefs, type WorkDocument } from "./epApi.ts";
-import { BASE, UA, makeAdminClient, groupSessions, displayCode, COMMITTEES, personName, mapLimit } from "./epShared.ts";
+import { BASE, UA, makeAdminClient, groupSessions, displayCode, mapLimit, reportDetails, saveLeads, type ReportDetails } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const ITEM_LANGS = ["en", "it"] as const;
@@ -113,9 +113,8 @@ async function main() {
     // 3. Report details → committee, rapporteur, file refs (bounded fan-out)
     let detailsOk = 0;
     const enriched = await mapLimit(prepared, 6, async (p) => {
-      let committee: string | undefined;
-      let rapporteur: string | undefined;
       let doc: WorkDocument | undefined;
+      let details: ReportDetails | undefined;
       if (/^(A|B|RC)-/.test(p.identifier)) {
         try {
           doc = await getDocument(p.identifier);
@@ -125,15 +124,16 @@ async function main() {
       }
       if (doc) {
         detailsOk++;
-        const creator = (doc as unknown as { creator?: string[] }).creator ?? [];
-        committee = creator
-          .filter((c) => c.startsWith("org/"))
-          .map((c) => c.slice(4))
-          .find((code) => COMMITTEES.has(code));
-        const person = creator.find((c) => c.startsWith("person/"));
-        if (person) rapporteur = await personName(person);
+        details = await reportDetails(p.identifier, doc);
       }
-      return { ...p, committee, rapporteur, doc };
+      return {
+        ...p,
+        committee: details?.committee,
+        committees: details?.committees ?? [],
+        rapporteur: details?.rapporteur,
+        leads: details?.leads ?? [],
+        doc,
+      };
     });
     console.log(`report details resolved: ${detailsOk}/${prepared.length}`);
 
@@ -145,6 +145,7 @@ async function main() {
       title: e.title,
       rapporteur: e.rapporteur ?? null,
       committee: e.committee ?? null,
+      committees: e.committees.length ? e.committees : null,
       vote_date: e.voteDate,
     }));
     const { data: upsertedItems, error: itemErr } = await supabase
@@ -154,6 +155,10 @@ async function main() {
     if (itemErr || !upsertedItems) throw new Error(`items upsert: ${itemErr?.message}`);
     console.log(`items: ${upsertedItems.length} upserted`);
     const itemIdByCode = new Map(upsertedItems.map((i) => [i.code, i.id]));
+    for (const e of enriched) {
+      const itemId = itemIdByCode.get(e.code);
+      if (itemId) await saveLeads(supabase, itemId, e.leads);
+    }
 
     // 5. Documents: report PDFs for en/it
     const docRows = enriched.flatMap((e) => {

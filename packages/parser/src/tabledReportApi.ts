@@ -40,7 +40,26 @@ export interface EpWork {
     had_participant_organization?: string[];
     participation_in_name_of?: string;
     precedenceOrder?: number;
+    politicalGroup?: string;
   }>;
+}
+
+/**
+ * One rapporteur of the file, as the Parliament records the participation: who,
+ * for which committee, from which group, and where they stand in the order.
+ * A joint-committee report has one per committee (A10-0041/2026, Omnibus IV:
+ * VIVALDINI for ECON, HANSEN for ENVI, MANDL for LIBE).
+ */
+export interface ReportLead {
+  /** `person/257143` — the persistent id, never a printed name. */
+  personId: string;
+  /** `ECON`; null when the participation names no committee. */
+  committee: string | null;
+  /** `ECR`, `PPE`, `S-D` as the API writes them; null when absent. */
+  group: string | null;
+  /** The API's precedenceOrder: committee in protocol order, then the person. */
+  precedence: number | null;
+  role: "RAPPORTEUR" | "RAPPORTEUR_CO";
 }
 
 export interface TabledReportRefs {
@@ -48,7 +67,15 @@ export interface TabledReportRefs {
   code: string;
   /** `['person/2341', 'person/197498']`, in the Parliament's own precedence order. */
   rapporteurIds: string[];
-  /** Responsible committees: the AUTHOR organisations, in payload order. */
+  /** Each rapporteur with committee, group and precedence, in the same order. */
+  leads: ReportLead[];
+  /**
+   * Responsible committees in the Parliament's order: those with a rapporteur
+   * first, in the rapporteurs' precedence (ECON, ENVI, LIBE — the order the
+   * procedure file on OEIL prints them in), then any other AUTHOR committee in
+   * payload order. Payload order alone is not the EP's: A10-0034/2026 lists
+   * LIBE before ECON, OEIL prints ECON first.
+   */
   committees: string[];
   title: string;
   /** `2025/0227(COD)` when the title carries one. */
@@ -88,6 +115,24 @@ export function reportRefsFromWork(work: EpWork): TabledReportRefs | null {
   if (!code || !CODE.test(code)) return null;
 
   const parts = work.workHadParticipation ?? [];
+  const ordered = parts
+    .filter((p) => p.participation_role && LEAD_ROLES.has(p.participation_role))
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (a.p.precedenceOrder ?? Infinity) - (b.p.precedenceOrder ?? Infinity) || a.i - b.i);
+  const leadRows: ReportLead[] = [];
+  for (const { p } of ordered) {
+    for (const personId of p.had_participant_person ?? []) {
+      if (leadRows.some((l) => l.personId === personId)) continue;
+      const committee = p.participation_in_name_of?.replace(/^org\//, "") ?? null;
+      leadRows.push({
+        personId,
+        committee: committee && COMMITTEE.test(committee) ? committee : null,
+        group: p.politicalGroup?.replace(/^org\//, "") ?? null,
+        precedence: p.precedenceOrder ?? null,
+        role: p.participation_role === "def/ep-roles/RAPPORTEUR" ? "RAPPORTEUR" : "RAPPORTEUR_CO",
+      });
+    }
+  }
   const leads = parts
     .filter((p) => p.participation_role && LEAD_ROLES.has(p.participation_role))
     .map((p, i) => ({ p, i }))
@@ -112,10 +157,13 @@ export function reportRefsFromWork(work: EpWork): TabledReportRefs | null {
   const title = anyTitle(work.title_dcterms);
   const alt = work.is_realized_by?.map((e) => anyTitle(e.title_alternative)).find(Boolean) ?? "";
 
+  const authors = [...new Set(committees)];
+  const withLead = [...new Set(leadRows.map((l) => l.committee).filter((c): c is string => !!c && authors.includes(c)))];
   return {
     code,
     rapporteurIds: [...new Set(leads)],
-    committees: [...new Set(committees)],
+    leads: leadRows,
+    committees: [...withLead, ...authors.filter((c) => !withLead.includes(c))],
     title: title || anyTitle(work.is_realized_by?.[0]?.title),
     procedureRef: PROCEDURE.exec(alt)?.[1] ?? null,
     tabledOn: work.document_date ?? null,

@@ -22,7 +22,7 @@
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
-import { makeAdminClient, sleep } from "./epShared.ts";
+import { makeAdminClient, sleep, upsertAmendments } from "./epShared.ts";
 
 const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
 const LANGS_ARG = (process.argv[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -176,6 +176,8 @@ async function main() {
               language: lang,
               target: a.target ?? null,
               tabled_by: a.tabledBy ?? null,
+              tabled_members: a.tabledMembers ?? null,
+              tabled_group: a.tabledGroup ?? null,
               original_text: a.originalText ?? null,
               amended_text: a.amendedText ?? null,
               kind: a.kind,
@@ -192,9 +194,7 @@ async function main() {
       const uniqueRows = [
         ...new Map(amRows.map((r) => [`${r.item_id}|${r.number}|${r.language}`, r])).values(),
       ];
-      const { error: upErr } = await supabase
-        .from("amendments")
-        .upsert(uniqueRows, { onConflict: "item_id,number,language" });
+      const upErr = await upsertAmendments(supabase, uniqueRows);
       if (upErr) {
         console.warn(`  ${code}: upsert failed — ${upErr.message}`);
         continue;

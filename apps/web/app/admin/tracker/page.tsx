@@ -37,11 +37,11 @@ export default async function TrackerPage() {
   return (
     <div className="min-h-screen">
       <TopNav active="admin" />
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-6xl px-8 py-16 lg:px-12 lg:py-20">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-ink-900">Tracker</h1>
-            <p className="mt-1 text-sm text-ink-500">Connected users and requested files — visible to admins only.</p>
+            <h1 className="display text-display-md font-bold text-eu-900">Tracker</h1>
+            <p className="lede mt-5">Connected users and requested files — visible to admins only.</p>
           </div>
           <Link href="/admin/users" className="text-sm font-medium text-eu-700 hover:underline">
             Manage users →
@@ -55,7 +55,7 @@ export default async function TrackerPage() {
             ["Total requests", events?.length ?? 0],
             ["Files requested", perItem.size],
           ].map(([label, n]) => (
-            <div key={label} className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card">
+            <div key={label} className="card p-6">
               <p className="text-2xl font-bold text-eu-900">{n}</p>
               <p className="text-xs text-ink-500">{label}</p>
             </div>
@@ -64,8 +64,8 @@ export default async function TrackerPage() {
 
         <div className="grid gap-8 lg:grid-cols-2">
           <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Most requested files</h2>
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+            <h2 className="eyebrow mb-5">Most requested files</h2>
+            <div className="card overflow-hidden">
               {topItems.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-ink-300">No requests recorded yet.</p>
               ) : (
@@ -88,8 +88,8 @@ export default async function TrackerPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Users</h2>
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+            <h2 className="eyebrow mb-5">Users</h2>
+            <div className="card overflow-hidden">
               <table className="w-full text-left text-sm">
                 <tbody>
                   {(users ?? []).map((u) => (
@@ -114,8 +114,8 @@ export default async function TrackerPage() {
         </div>
 
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Recent activity</h2>
-          <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+          <h2 className="eyebrow mb-5">Recent activity</h2>
+          <div className="card overflow-hidden">
             {(events ?? []).length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-ink-300">No events.</p>
             ) : (

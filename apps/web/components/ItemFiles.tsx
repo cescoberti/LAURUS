@@ -83,8 +83,8 @@ export function ItemFiles({
                   href={amendmentsZip(l)}
                   className={
                     i === 0
-                      ? "press inline-flex items-center gap-1.5 rounded-lg bg-eu-900 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-eu-800"
-                      : "press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-semibold text-ink-500 hover:border-eu-200 hover:bg-eu-50 hover:text-eu-900"
+                      ? "btn-primary px-4 py-2 text-[0.8125rem]"
+                      : "btn-secondary px-3.5 py-1.5 text-[0.8125rem] text-ink-500 hover:text-eu-900"
                   }
                   title={`Every amendment block the EP published for this report, in ${l.toUpperCase()}`}
                 >
@@ -99,8 +99,8 @@ export function ItemFiles({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+    <section className="card overflow-hidden">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-ink-900/[0.055] bg-slate-50/60 px-4 py-3">
         <h2 className="text-sm font-bold text-ink-900">Files from the EP</h2>
         <span className="text-xs text-ink-300">
           {latest.length} document{latest.length === 1 ? "" : "s"}
@@ -111,7 +111,7 @@ export function ItemFiles({
               <a
                 key={l}
                 href={zip(l)}
-                className="press rounded-lg border border-slate-200 px-2.5 py-1 text-[12px] font-semibold uppercase text-ink-500 hover:border-eu-200 hover:bg-eu-50 hover:text-eu-900"
+                className="btn-secondary px-3.5 py-1.5 text-[0.6875rem] uppercase tracking-[0.1em] text-ink-500 hover:text-eu-900"
                 title={`Every ${l.toUpperCase()} document for this file, in one zip`}
               >
                 ↓ {l}
@@ -119,7 +119,7 @@ export function ItemFiles({
             ))}
           <a
             href={zip()}
-            className="press rounded-lg bg-eu-900 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-eu-800"
+            className="btn-primary px-4 py-2 text-[0.8125rem]"
             title="Every document for this file, in one zip"
           >
             ↓ Download all <span className="font-medium text-white/60">.zip</span>
@@ -127,7 +127,7 @@ export function ItemFiles({
         </div>
       </header>
 
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-ink-900/[0.055]">
         {groups.map((g) => (
           <div key={g.type} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
             <div className="w-[7.5rem] shrink-0 text-[13px] font-semibold text-ink-900">{TYPE_LABEL[g.type]}</div>

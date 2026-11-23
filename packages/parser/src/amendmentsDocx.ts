@@ -217,6 +217,10 @@ function parseTokenBlocks(html: string, language: string): ParsedAmendment[] {
       target: target || undefined,
       // "S&amp;D" comes straight out of the template token: decode it.
       tabledBy: docAmend ? textOf(docAmend) : undefined,
+      // The two halves of the author line, kept apart: `tabledBy` collapses
+      // them into whichever came first, and a member list loses its group.
+      tabledMembers: members ? textOf(members).split(/\s*,\s*/).filter(Boolean) : undefined,
+      tabledGroup: group || undefined,
       ...columns,
     });
   }

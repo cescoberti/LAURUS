@@ -24,18 +24,18 @@ export default async function AdminUsersPage() {
   return (
     <div className="min-h-screen">
       <TopNav active="admin" />
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <h1 className="mb-1 text-2xl font-bold text-ink-900">Utenti</h1>
+      <main className="mx-auto max-w-3xl px-8 py-16 lg:px-12 lg:py-20">
+        <h1 className="display mb-2 text-display-md font-bold text-eu-900">Utenti</h1>
         <p className="mb-6 text-sm text-ink-500">
           Onboarda un nuovo advisor. Riceve una email di invito per impostare la propria password.
         </p>
 
         <NewUserForm />
 
-        <div className="mt-8 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+        <div className="card mt-10 overflow-hidden">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/60">
+              <tr className="border-b border-ink-900/[0.055] bg-slate-50/60">
                 {["Email", "Nome", "Ruolo", "Creato"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                     {h}

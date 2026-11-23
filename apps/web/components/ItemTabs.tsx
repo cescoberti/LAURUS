@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { remarksFor } from "@laurus/parser";
+import { remarksFor, signatoryLabel } from "@laurus/parser";
 import type { ConsolidatedAmendment, VotPayload } from "@/lib/data";
 
 /** Render light HTML (<b>/<i>/<s> from the remarks diff) as React nodes. */
@@ -64,7 +64,7 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-ink-500 transition-colors hover:bg-eu-50 hover:text-eu-900"
+      className="btn-secondary px-3.5 py-1.5 text-[0.6875rem] text-ink-500 hover:text-eu-900"
       title="Copy (formatting included) to paste into the VL"
     >
       {copied ? "Copied ✓" : label}
@@ -92,20 +92,22 @@ export function ItemTabs({
 
   return (
     <div>
-      <div className="mb-5 flex gap-1 border-b border-slate-200">
+      {/* A segmented control in a glass track: the tab bar is a single
+          object, not two labels sitting on a rule. */}
+      <div className="mb-10 inline-flex gap-1 rounded-full bg-white/60 p-1.5 backdrop-blur shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(20,26,43,0.06)]">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${
+            className={`press flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.9375rem] ${
               tab === t
-                ? "border-eu-700 text-eu-900"
-                : "border-transparent text-ink-500 hover:text-ink-900"
+                ? "bg-white font-semibold text-eu-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(20,26,43,0.06),0_6px_16px_-8px_rgba(20,26,43,0.2)]"
+                : "font-medium text-ink-400 hover:text-ink-900"
             }`}
           >
             {t}
             {t === "Amendments" && amendments.length > 0 && (
-              <span className="rounded-full bg-eu-100 px-1.5 text-[11px] font-semibold text-eu-700">
+              <span className="rounded-full bg-eu-900/[0.07] px-2 py-0.5 text-[0.6875rem] font-bold tabular-nums text-eu-700">
                 {amendments.length}
               </span>
             )}
@@ -149,7 +151,7 @@ function AmendmentsView({
             <a
               key={l}
               href={`/api/item-amendments?code=${encodeURIComponent(code)}&lang=${l}`}
-              className="press rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
+              className="btn-secondary px-3.5 py-1.5 text-xs text-ink-500 hover:text-eu-900"
             >
               Try the EP files · {l.toUpperCase()}
             </a>
@@ -172,7 +174,7 @@ function AmendmentsView({
               read the Remarks against when checking the list before a vote. */}
           <a
             href={`/api/item-amendments?code=${encodeURIComponent(code)}&lang=${lang}`}
-            className="press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500 transition-colors hover:border-eu-200 hover:text-eu-900"
+            className="btn-secondary px-3.5 py-1.5 text-xs text-ink-500 hover:text-eu-900"
             title={`Every amendment block the EP published for this report, in ${lang.toUpperCase()}`}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -206,13 +208,22 @@ function AmendmentsView({
           const original = a.originalText[lang] ?? "";
           const amended = a.amendedText[lang] ?? "";
           const remarks = remarksFor(original || null, amended || null);
+          const signatory = signatoryLabel(a.tabledMembers, a.tabledGroup);
           return (
-            <div key={a.number} className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
-              <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+            <div key={a.number} className="card overflow-hidden">
+              <div className="flex items-center gap-3 border-b border-ink-900/[0.055] bg-slate-50/60 px-4 py-2.5">
                 <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-eu-900 px-1.5 text-xs font-bold text-white">
                   {a.number}
                 </span>
                 <span className="text-sm font-medium text-ink-900">{target}</span>
+                {signatory && (
+                  <span
+                    className="min-w-0 truncate text-[0.8125rem] text-ink-500"
+                    title={a.tabledMembers?.length ? `${a.tabledMembers.join(", ")}${a.tabledGroup ? ` — ${a.tabledGroup}` : ""}` : undefined}
+                  >
+                    {signatory}
+                  </span>
+                )}
                 {a.kind !== "standard" && (
                   <span className="rounded-md bg-gold-500/15 px-2 py-0.5 text-[11px] font-semibold text-gold-600 ring-1 ring-inset ring-gold-500/30">
                     {a.kind}
@@ -346,23 +357,23 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
           )}
           <button
             onClick={copy}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-slate-50"
+            className="btn-secondary px-4 py-2 text-xs text-ink-700"
           >
             {copied ? "Copied ✓" : "Copy CSV"}
           </button>
           <button
             onClick={download}
-            className="rounded-lg bg-eu-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-eu-800"
+            className="btn-primary px-4 py-2 text-xs"
           >
             Download CSV
           </button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+      <div className="card overflow-hidden">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60">
+            <tr className="border-b border-ink-900/[0.055] bg-slate-50/60">
               {["Type", "Subject", "Group", "Part", "Text"].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                   {h}

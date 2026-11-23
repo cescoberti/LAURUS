@@ -1,6 +1,7 @@
 import { LoginForm } from "@/components/LoginForm";
 import { Wordmark } from "@/components/Logo";
 
+/** The first impression: one sheet of paper, centred, surrounded by air. */
 export default async function LoginPage({
   searchParams,
 }: {
@@ -8,35 +9,46 @@ export default async function LoginPage({
 }) {
   const { next, error } = await searchParams;
 
+  const notice =
+    error === "not-invited"
+      ? {
+          tone: "warn" as const,
+          text: "That account is not a LAURUS member yet. LAURUS is invite-only — ask an admin for an invite, then sign in with the same address.",
+        }
+      : error === "oauth-failed"
+        ? { tone: "error" as const, text: "Sign-in did not complete. Please try again." }
+        : error === "invite-link-invalid"
+          ? { tone: "error" as const, text: "This invite link is not valid or has expired. Ask an admin to re-invite you." }
+          : null;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex justify-center">
-          <Wordmark />
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 py-22">
+      <div className="w-full max-w-[25rem]">
+        <div className="rise flex flex-col items-center text-center">
+          <Wordmark size={34} className="scale-[1.15]" />
+          <h1 className="display mt-10 text-display-md font-bold text-eu-900">Less paperwork.</h1>
+          <p className="mt-3 text-[1.0625rem] font-medium text-ink-500">More wins.</p>
         </div>
 
-        {error === "not-invited" && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            That account is not a LAURUS member yet. LAURUS is invite-only — ask an admin for an invite,
-            then sign in with the same address.
+        {notice && (
+          <div
+            className={`rise rise-1 mt-12 rounded-2xl px-5 py-4 text-[0.875rem] leading-relaxed ${
+              notice.tone === "warn"
+                ? "bg-gold-200/40 text-gold-600 ring-1 ring-inset ring-gold-500/25"
+                : "bg-red-50/80 text-red-700 ring-1 ring-inset ring-red-200"
+            }`}
+          >
+            {notice.text}
           </div>
         )}
 
-        {error === "oauth-failed" && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            Sign-in did not complete. Please try again.
-          </div>
-        )}
-
-        {error === "invite-link-invalid" && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            This invite link is not valid or has expired. Ask an admin to re-invite you.
-          </div>
-        )}
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+        <div className={`rise rise-2 card-raised px-8 py-9 ${notice ? "mt-7" : "mt-14"}`}>
           <LoginForm next={next ?? "/"} />
         </div>
+
+        <p className="rise rise-3 mt-10 text-center text-xs text-ink-400">
+          EP Plenary Companion · invite-only
+        </p>
       </div>
     </div>
   );

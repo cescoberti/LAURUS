@@ -7,6 +7,8 @@
  * way. Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in the env.
  */
 import { createClient } from "@supabase/supabase-js";
+import { reportRefsFromWork } from "@laurus/parser/tabled-report-api";
+import { getDocument, getPlenaryDocument, type WorkDocument } from "./epApi.ts";
 
 export const BASE = "https://data.europarl.europa.eu";
 export const UA = process.env.EP_USER_AGENT ?? "LAURUS/0.1 (+mailto:francesco.berti.liv@gmail.com)";
@@ -115,6 +117,142 @@ export async function personName(personRef: string): Promise<string | undefined>
   }
   personCache.set(id, name);
   return name;
+}
+
+/** One rapporteur of a report, ready for `item_rapporteurs`. */
+export interface ReportLeadRow {
+  personId: string;
+  name: string;
+  committee: string | null;
+  group: string | null;
+  precedence: number | null;
+  role: "RAPPORTEUR" | "RAPPORTEUR_CO";
+}
+
+/** Who is responsible for a report, in the Parliament's own order. */
+export interface ReportDetails {
+  /** Every rapporteur's name in order, joined by ", " — the `items.rapporteur` string. */
+  rapporteur: string | undefined;
+  /** The first committee: the column that has always held the lead. */
+  committee: string | undefined;
+  /** All responsible committees, in the Parliament's order. */
+  committees: string[];
+  leads: ReportLeadRow[];
+}
+
+/**
+ * Committees and rapporteurs of a report, ALL of them, in the order the
+ * Parliament gives them.
+ *
+ * The old way — first `person/` and first `org/` of the `creator` array — was
+ * wrong for any report with more than one committee, because that array has no
+ * order: Omnibus IV (A10-0034/2026) came out as VIGENIN/LIBE when the file is
+ * ECON → VIVALDINI, LIBE → VIGENIN. The order lives in the participations:
+ * `precedenceOrder` ascending is also the order OEIL prints.
+ *
+ * `plenary-documents/{id}` carries those participations; `/documents/{id}`
+ * (what `fallback` is, when the caller already fetched it) may not, and a
+ * B-/RC- document has none, so those still go through `creator`, as before.
+ *
+ * `rapporteur` is left undefined when any one name fails to resolve: a list
+ * missing a co-rapporteur is worse than no list, and the caller keeps what the
+ * row already holds.
+ */
+export async function reportDetails(identifier: string, fallback?: WorkDocument): Promise<ReportDetails | undefined> {
+  try {
+    const work = await getPlenaryDocument(identifier);
+    const refs = work ? reportRefsFromWork(work) : null;
+    if (refs && (refs.leads.length || refs.committees.length)) {
+      const names = await Promise.all(refs.leads.map((l) => personName(l.personId)));
+      const leads: ReportLeadRow[] = refs.leads.flatMap((l, i) =>
+        names[i] ? [{ ...l, name: names[i]!, committee: l.committee && COMMITTEES.has(l.committee) ? l.committee : null }] : [],
+      );
+      const committees = refs.committees.filter((c) => COMMITTEES.has(c));
+      return {
+        rapporteur: leads.length && leads.length === refs.leads.length ? leads.map((l) => l.name).join(", ") : undefined,
+        committee: committees[0],
+        committees,
+        leads,
+      };
+    }
+  } catch {
+    // the plenary endpoint is the less reliable of the two; fall through
+  }
+
+  let doc = fallback;
+  if (!doc) {
+    try {
+      doc = await getDocument(identifier);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!doc) return undefined;
+  const creator = (doc as unknown as { creator?: string[] }).creator ?? [];
+  const committees = creator.filter((c) => c.startsWith("org/")).map((c) => c.slice(4)).filter((c) => COMMITTEES.has(c));
+  const person = creator.find((c) => c.startsWith("person/"));
+  const name = person ? await personName(person) : undefined;
+  return { rapporteur: name, committee: committees[0], committees, leads: [] };
+}
+
+type AdminClient = ReturnType<typeof makeAdminClient>;
+
+let leadsTableMissing = false;
+
+/**
+ * Upsert amendment rows. The author columns (`tabled_members`, `tabled_group`)
+ * come with migration 0017; if it has not been applied yet the rows go in
+ * without them, rather than every amendment ingest failing on a column.
+ */
+export async function upsertAmendments(supabase: AdminClient, rows: Array<Record<string, unknown>>): Promise<{ message: string } | null> {
+  const onConflict = "item_id,number,language";
+  const first = await supabase.from("amendments").upsert(rows, { onConflict });
+  if (!first.error) return null;
+  if (!/tabled_(members|group)/.test(first.error.message)) return first.error;
+  const plain = rows.map((r) => {
+    const { tabled_members: _m, tabled_group: _g, ...rest } = r;
+    return rest;
+  });
+  const retry = await supabase.from("amendments").upsert(plain, { onConflict });
+  return retry.error;
+}
+
+/**
+ * Make `item_rapporteurs` say what the Parliament says for one file: write the
+ * leads, drop the rows of anyone no longer on it. Nothing to write (details
+ * unresolved this run) leaves the table alone rather than emptying it.
+ */
+export async function saveLeads(supabase: AdminClient, itemId: string, leads: ReportLeadRow[]): Promise<void> {
+  if (!leads.length) return;
+  if (leadsTableMissing) return;
+  const { error } = await supabase.from("item_rapporteurs").upsert(
+    leads.map((l) => ({
+      item_id: itemId,
+      person_id: l.personId,
+      name: l.name,
+      committee: l.committee,
+      political_group: l.group,
+      precedence: l.precedence,
+      role: l.role,
+    })),
+    { onConflict: "item_id,person_id" },
+  );
+  if (error) {
+    // The table comes with migration 0017. A sync that runs before it is
+    // applied must still do its real work, so this is said once and skipped.
+    if (/item_rapporteurs/.test(error.message)) {
+      leadsTableMissing = true;
+      console.warn("item_rapporteurs is not there yet (migration 0017) — rapporteur rows skipped for this run");
+      return;
+    }
+    throw new Error(`item_rapporteurs upsert: ${error.message}`);
+  }
+  const { error: delErr } = await supabase
+    .from("item_rapporteurs")
+    .delete()
+    .eq("item_id", itemId)
+    .not("person_id", "in", `(${leads.map((l) => l.personId).join(",")})`);
+  if (delErr) throw new Error(`item_rapporteurs cleanup: ${delErr.message}`);
 }
 
 // ---------------------------------------------------------------------------

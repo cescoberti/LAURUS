@@ -8,7 +8,7 @@ export default function SetPasswordPage() {
         <div className="mb-8 flex justify-center">
           <Wordmark />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+        <div className="card p-8">
           <p className="mb-4 text-sm text-ink-500">Imposta la tua password per accedere a LAURUS.</p>
           <SetPasswordForm />
         </div>

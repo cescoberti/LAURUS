@@ -18,26 +18,30 @@ export default async function SettingsPage() {
     .single();
   const selected = new Set<string>(profile?.languages ?? DEFAULT_LANGUAGES);
   const myCommittees = new Set<string>(profile?.committees ?? []);
+  // Read on its own: a database without migration 0017 has no such column, and
+  // that must not take the rest of the profile down with it.
+  const { data: autoRow } = await supabase.from("users").select("auto_follow_committees").eq("id", user!.id).single();
+  const autoFollow = new Set<string>((autoRow?.auto_follow_committees as string[] | null) ?? []);
   const defaultLang = profile?.vl_language ?? "it";
 
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-ink-900">Settings</h1>
-        <p className="mt-1 text-sm text-ink-500">
+      <main className="mx-auto max-w-3xl px-8 py-16 lg:px-12 lg:py-22">
+        <h1 className="display text-display-md font-bold text-eu-900">Settings</h1>
+        <p className="lede mt-5">
           Your working preferences and how you want to be notified when LAURUS has news on your reports.
         </p>
 
-        <form action={saveSettingsAction} className="mt-6 space-y-5 rounded-xl border border-slate-200/80 bg-white p-6 shadow-card">
+        <form action={saveSettingsAction} className="card mt-12 space-y-10 p-9 sm:p-11">
           <div>
-            <p className="text-sm font-semibold text-ink-900">Committees you follow</p>
-            <p className="mb-2 text-xs text-ink-500">Used to surface the reports that matter to you.</p>
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            <p className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900">Committees you follow</p>
+            <p className="mb-5 mt-1.5 text-[0.8125rem] text-ink-500">Used to surface the reports that matter to you.</p>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
               {COMMITTEES.map((c) => (
-                <label key={c.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
+                <label key={c.code} className="press flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.875rem] text-ink-700 hover:bg-ink-900/[0.035]">
                   <input type="checkbox" name="committees" value={c.code} defaultChecked={myCommittees.has(c.code)} className="accent-eu-700" />
-                  <span className="font-mono text-xs font-semibold text-ink-300">{c.code}</span>
+                  <span className="font-mono text-[0.6875rem] font-semibold tracking-wide text-ink-400">{c.code}</span>
                   <span className="truncate">{c.name}</span>
                 </label>
               ))}
@@ -45,14 +49,32 @@ export default async function SettingsPage() {
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-ink-900" htmlFor="vl_language">
+            <p className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900">Automatic star</p>
+            <p className="mb-5 mt-1.5 text-[0.8125rem] text-ink-500">
+              Every file of these committees is starred for you, in the part-sessions ahead and as new files appear —
+              so the voting-list and translation alerts reach you without starring them one by one. Take a star off a
+              file and it stays off.
+            </p>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+              {COMMITTEES.map((c) => (
+                <label key={c.code} className="press flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.875rem] text-ink-700 hover:bg-ink-900/[0.035]">
+                  <input type="checkbox" name="auto_follow_committees" value={c.code} defaultChecked={autoFollow.has(c.code)} className="accent-eu-700" />
+                  <span className="font-mono text-[0.6875rem] font-semibold tracking-wide text-ink-400">{c.code}</span>
+                  <span className="truncate">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900" htmlFor="vl_language">
               Default voting-list language
             </label>
             <select
               id="vl_language"
               name="vl_language"
               defaultValue={defaultLang}
-              className="mt-1 block w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 focus:border-eu-600 focus:outline-none"
+              className="field mt-4 block max-w-xs"
             >
               {DOCUMENT_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -62,9 +84,9 @@ export default async function SettingsPage() {
             </select>
           </div>
 
-          <hr className="border-slate-100" />
+          <hr className="hairline" />
           <div>
-            <label className="text-sm font-semibold text-ink-900" htmlFor="whatsapp_phone">
+            <label className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900" htmlFor="whatsapp_phone">
               WhatsApp number
             </label>
             <input
@@ -73,47 +95,47 @@ export default async function SettingsPage() {
               type="tel"
               defaultValue={profile?.whatsapp_phone ?? ""}
               placeholder="+39 333 1234567"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 focus:border-eu-600 focus:outline-none"
+              className="field mt-4"
             />
-            <p className="mt-1 text-xs text-ink-300">
+            <p className="mt-3 text-[0.8125rem] text-ink-400">
               With international prefix. Used for reminders and for the WhatsApp bot.
             </p>
           </div>
 
-          <label className="flex items-start gap-3 text-sm text-ink-900">
+          <label className="press -mx-3 flex items-start gap-3.5 rounded-2xl px-3 py-2.5 text-[0.9375rem] text-ink-900 hover:bg-ink-900/[0.025]">
             <input type="checkbox" name="wants_email" defaultChecked={profile?.wants_email ?? true} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">Email reminders</span>
-              <span className="block text-xs text-ink-500">The official voting list, and the translation finished in your language, on the files you follow.</span>
+              <span className="mt-1 block text-[0.8125rem] leading-relaxed text-ink-500">The official voting list, and the translation finished in your language, on the files you follow.</span>
             </span>
           </label>
 
-          <label className="flex items-start gap-3 text-sm text-ink-900">
+          <label className="press -mx-3 flex items-start gap-3.5 rounded-2xl px-3 py-2.5 text-[0.9375rem] text-ink-900 hover:bg-ink-900/[0.025]">
             <input type="checkbox" name="wants_whatsapp" defaultChecked={profile?.wants_whatsapp ?? false} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">WhatsApp reminders</span>
-              <span className="block text-xs text-ink-500">The same alerts, on the number above.</span>
+              <span className="mt-1 block text-[0.8125rem] leading-relaxed text-ink-500">The same alerts, on the number above.</span>
             </span>
           </label>
 
-          <label className="flex items-start gap-3 text-sm text-ink-900">
+          <label className="press -mx-3 flex items-start gap-3.5 rounded-2xl px-3 py-2.5 text-[0.9375rem] text-ink-900 hover:bg-ink-900/[0.025]">
             <input type="checkbox" name="wants_clean_final" defaultChecked={profile?.wants_clean_final ?? false} className="mt-0.5 accent-eu-700" />
             <span>
               <span className="font-semibold">Final post-vote text by email</span>
-              <span className="block text-xs text-ink-500">
+              <span className="mt-1 block text-[0.8125rem] leading-relaxed text-ink-500">
                 As soon as the EP publishes the adopted text, you get the clean file as an attachment.
               </span>
             </span>
           </label>
 
           <div>
-            <p className="text-sm font-semibold text-ink-900">Working languages</p>
-            <p className="mb-2 text-xs text-ink-500">
+            <p className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900">Working languages</p>
+            <p className="mb-5 mt-1.5 text-[0.8125rem] text-ink-500">
               Annotated VLs are prepared only in the selected languages (default: IT + EN).
             </p>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-3">
               {DOCUMENT_LANGUAGES.map((l) => (
-                <label key={l.code} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-700 hover:bg-slate-50">
+                <label key={l.code} className="press flex items-center gap-2.5 rounded-xl px-3 py-2 text-[0.875rem] text-ink-700 hover:bg-ink-900/[0.035]">
                   <input
                     type="checkbox"
                     name="languages"
@@ -121,13 +143,13 @@ export default async function SettingsPage() {
                     defaultChecked={selected.has(l.code)}
                     className="accent-eu-700"
                   />
-                  <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}
+                  <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-400">{l.code}</span> {l.label}
                 </label>
               ))}
             </div>
           </div>
 
-          <button type="submit" className="rounded-lg bg-eu-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-eu-800">
+          <button type="submit" className="btn-primary mt-2">
             Save
           </button>
         </form>

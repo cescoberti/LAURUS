@@ -34,14 +34,14 @@ export function FollowButton({
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-2">
       <button
         onClick={toggle}
         disabled={busy}
-        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-70 ${
+        className={`btn px-4 py-2 text-[0.8125rem] disabled:opacity-70 ${
           on
-            ? "border-laurel-200 bg-laurel-50 text-laurel-800 hover:bg-laurel-100"
-            : "border-slate-200 bg-white text-ink-700 hover:border-eu-200 hover:text-eu-900"
+            ? "bg-laurel-50 text-laurel-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_0_0_1px_rgba(45,106,79,0.18)] hover:bg-laurel-100"
+            : "btn-secondary text-ink-700 hover:text-eu-900"
         }`}
         title={on ? "You are told when this file's VL material changes" : "Get told when this file's VL material changes"}
       >
@@ -52,7 +52,7 @@ export function FollowButton({
         {on ? "Following" : "Follow this file"}
       </button>
       {on && (
-        <span className="text-[11px] text-ink-300">
+        <span className="text-[0.6875rem] font-medium text-ink-400">
           alerts by {channels.length ? channels.join(" + ") : "email"}
         </span>
       )}

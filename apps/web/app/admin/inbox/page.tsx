@@ -70,16 +70,16 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   return (
     <div className="min-h-screen">
       <TopNav active="admin" />
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-4xl px-8 py-16 lg:px-12 lg:py-20">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="display text-[1.75rem] font-extrabold text-eu-900">Inbox</h1>
-            <p className="mt-1 text-sm text-ink-500">
+            <h1 className="display text-display-md font-bold text-eu-900">Inbox</h1>
+            <p className="lede mt-5">
               Documents to <span className="font-mono text-eu-700">{MAILBOX}</span>, people to <span className="font-mono text-eu-700">{HELLO}</span>. Each email is read and
               comes with the one thing to do about it — you approve.
             </p>
           </div>
-          <a href={all ? "/admin/inbox" : "/admin/inbox?all=1"} className="press rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-medium text-ink-500 hover:bg-slate-50">
+          <a href={all ? "/admin/inbox" : "/admin/inbox?all=1"} className="btn-secondary px-4 py-2 text-[0.8125rem] text-ink-500">
             {all ? "Open only" : "Show handled too"}
           </a>
         </div>
@@ -135,7 +135,7 @@ function MessageCard({ m, links }: { m: Message; links: Map<string, string> }) {
             return (
               <li key={att.storage_path}>
                 {url ? (
-                  <a href={url} className="press inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-eu-900 hover:bg-eu-50" title={att.content_type}>
+                  <a href={url} className="btn-secondary px-3.5 py-1.5 text-xs text-eu-900" title={att.content_type}>
                     📎 {att.filename} <span className="text-ink-300">{kb(att.size)}</span>
                   </a>
                 ) : (
@@ -166,15 +166,15 @@ function MessageCard({ m, links }: { m: Message; links: Map<string, string> }) {
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 <label className="text-xs text-ink-500">
                   Email
-                  <input name="email" defaultValue={a.email} className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-ink-900" />
+                  <input name="email" defaultValue={a.email} className="field mt-2 px-3 py-2 text-[0.875rem]" />
                 </label>
                 <label className="text-xs text-ink-500">
                   Name
-                  <input name="full_name" defaultValue={a.full_name ?? ""} placeholder="as in the email" className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-ink-900" />
+                  <input name="full_name" defaultValue={a.full_name ?? ""} placeholder="as in the email" className="field mt-2 px-3 py-2 text-[0.875rem]" />
                 </label>
                 <label className="text-xs text-ink-500">
                   VL language
-                  <select name="vl_language" defaultValue={a.vl_language} className="mt-0.5 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-ink-900">
+                  <select name="vl_language" defaultValue={a.vl_language} className="field mt-2 px-3 py-2 text-[0.875rem]">
                     {EU_LANGUAGES.map((l) => (
                       <option key={l.code} value={l.code}>
                         {l.label}
@@ -211,7 +211,7 @@ function MessageCard({ m, links }: { m: Message; links: Map<string, string> }) {
             </div>
           )}
           <div className="mt-3 flex items-center gap-2">
-            <button type="submit" className="press rounded-lg bg-eu-900 px-4 py-2 text-sm font-semibold text-white hover:bg-eu-800">
+            <button type="submit" className="btn-primary">
               {a.type === "create_invite" ? "Approve & send invite" : a.type === "update_committees" ? "Approve" : "Mark handled"}
             </button>
             <button type="submit" formAction={ignoreInboxAction} className="press rounded-lg px-3 py-2 text-sm font-medium text-ink-500 hover:bg-slate-100">
@@ -223,7 +223,7 @@ function MessageCard({ m, links }: { m: Message; links: Map<string, string> }) {
       {open && (!a || a.type === "none") && (
         <form action={ignoreInboxAction} className="mt-4 flex items-center gap-2">
           <input type="hidden" name="id" value={m.id} />
-          <button type="submit" formAction={approveInboxAction} className="press rounded-lg bg-eu-900 px-4 py-2 text-sm font-semibold text-white hover:bg-eu-800">
+          <button type="submit" formAction={approveInboxAction} className="btn-primary">
             Mark handled
           </button>
           <button type="submit" className="press rounded-lg px-3 py-2 text-sm font-medium text-ink-500 hover:bg-slate-100">

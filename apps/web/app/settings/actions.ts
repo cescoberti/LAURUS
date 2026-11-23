@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { DOCUMENT_LANGUAGE_SET, DEFAULT_LANGUAGES, documentLanguage } from "@/lib/languages";
 import { COMMITTEE_CODES } from "@/lib/committees";
+import { applyAutoFollows } from "@/lib/autoFollow";
 
 export async function saveSettingsAction(formData: FormData): Promise<void> {
   const supabase = await createClient();
@@ -23,6 +24,7 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     .filter((l) => DOCUMENT_LANGUAGE_SET.has(l));
 
   const committees = formData.getAll("committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
+  const autoFollow = formData.getAll("auto_follow_committees").map(String).filter((c) => COMMITTEE_CODES.has(c));
   const rawVlLang = String(formData.get("vl_language") ?? "it");
   const vlLanguage = documentLanguage(rawVlLang);
   // The default VL language is always part of the working-language set.
@@ -41,5 +43,13 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     })
     .eq("id", user.id);
 
+  // On its own, so that a database without migration 0017 (no such column) still
+  // saves everything above instead of refusing the whole form.
+  const { error: autoErr } = await supabase.from("users").update({ auto_follow_committees: autoFollow }).eq("id", user.id);
+
+  // Star the files already there now, not at the next alert run.
+  if (!autoErr && autoFollow.length) await applyAutoFollows(user.id);
+
   revalidatePath("/settings");
+  revalidatePath("/");
 }

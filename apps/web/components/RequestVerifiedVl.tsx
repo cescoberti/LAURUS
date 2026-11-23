@@ -45,18 +45,18 @@ export function RequestVerifiedVl({
     }
   };
 
-  const label = state === "working" ? "Sending…" : state === "done" ? "Sent ✓" : `Email me the verified VL · ${lang.toUpperCase()}`;
+  const label = state === "working" ? "Sending…" : state === "done" ? "Sent" : `Email me the verified VL · ${lang.toUpperCase()}`;
 
   return (
-    <div className={`flex flex-col gap-1.5 ${block ? "" : "items-end"}`}>
+    <div className={`flex flex-col gap-2 ${block ? "" : "items-end"}`}>
       <button
         onClick={request}
         disabled={state === "working" || state === "done"}
-        className={`press inline-flex items-center gap-2 rounded-xl px-4 font-semibold shadow-sm disabled:cursor-default disabled:opacity-80 ${
+        className={`btn gap-2.5 disabled:cursor-default disabled:opacity-80 ${
           secondary
-            ? `border text-sm ${state === "done" ? "border-laurel-200 bg-white text-laurel-700" : "border-eu-200 bg-white text-eu-900 hover:bg-eu-50"}`
-            : `text-sm text-white ${state === "done" ? "bg-laurel-700" : "bg-eu-900 hover:bg-eu-800"}`
-        } ${block ? "w-full justify-between py-3" : secondary ? "py-1.5" : "py-2.5"}`}
+            ? `btn-secondary text-[0.8125rem] ${state === "done" ? "text-laurel-700" : "text-eu-900"}`
+            : `text-white ${state === "done" ? "bg-laurel-700 shadow-[0_10px_30px_-14px_rgba(31,81,56,0.6)]" : "bg-eu-900 shadow-glow-eu hover:bg-eu-800"}`
+        } ${block ? "w-full justify-between py-3.5" : secondary ? "px-4 py-2" : "px-5 py-3"}`}
       >
         <span className="inline-flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -68,8 +68,8 @@ export function RequestVerifiedVl({
         {block && state === "idle" && <small className="text-xs font-medium opacity-70">two checks, ~1 min</small>}
       </button>
 
-      {state === "done" && <p className={`text-xs text-laurel-700 ${block ? "" : "max-w-[16rem] text-right"}`}>{message}</p>}
-      {state === "error" && <p className={`text-xs text-red-600 ${block ? "" : "max-w-[16rem] text-right"}`}>{message}</p>}
+      {state === "done" && <p className={`text-[0.75rem] leading-relaxed text-laurel-700 ${block ? "" : "max-w-[16rem] text-right"}`}>{message}</p>}
+      {state === "error" && <p className={`text-[0.75rem] leading-relaxed text-red-600 ${block ? "" : "max-w-[16rem] text-right"}`}>{message}</p>}
     </div>
   );
 }
