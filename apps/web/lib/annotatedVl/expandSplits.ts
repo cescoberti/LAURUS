@@ -64,6 +64,20 @@ function tidy(s: string): string {
   return s.replace(/\s{2,}/g, " ").replace(/\s+([,;.:])/g, "$1").trim();
 }
 
+/**
+ * The official list's footer marks a part that is ALSO a roll-call or separate
+ * vote with a bracketed tag after the quote — `“to PIF offences” [ROLL-CALL VOTE]`.
+ * The tag is the Tabling Service's, not the report's: left in, the words
+ * searched for in the paragraph were `to PIF offences" [ROLL-CALL VOTE]` and
+ * every such split came back TERMINI_NON_TROVATI. Only an upper-case tag at the
+ * end is taken off, so a bracket in the report's own words ("[or]") is safe.
+ * The notation printed on the list is not touched; this is only for cutting.
+ */
+const TRAILING_TAGS = /(?:\s*\[[A-ZÀ-Ý][A-ZÀ-Ý\s,/-]{1,40}\])+\s*$/;
+function partText(raw: string): string {
+  return norm(raw).replace(TRAILING_TAGS, "").trim();
+}
+
 function stripOuterQuotes(s: string): string {
   return s.replace(/^["']\s*/, "").replace(/\s*["']$/, "").trim();
 }
@@ -208,7 +222,7 @@ async function cutParts(
   isEnglishList: boolean,
   align: Aligner | null,
 ): Promise<{ parts: PartTexts[] } | { error: { code: string; detail: string } }> {
-  const first = norm(enParts[0]?.text ?? "");
+  const first = partText(enParts[0]?.text ?? "");
   if (SEQUENTIAL.test(first)) {
     return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: "sequential-cut notation; which side keeps the quoted words is not stated" } };
   }
@@ -216,9 +230,9 @@ async function cutParts(
   // Quotes to exclude: from part 1 when part 2 is a back-reference, otherwise
   // each later part quotes its own words.
   let quotesEn: string[];
-  const laterAreQuotes = enParts.slice(1).every((p) => !THOSE_WORDS.test(norm(p.text)));
+  const laterAreQuotes = enParts.slice(1).every((p) => !THOSE_WORDS.test(partText(p.text)));
   if (enParts.length >= 2 && laterAreQuotes) {
-    quotesEn = enParts.slice(1).map((p) => stripOuterQuotes(norm(p.text)));
+    quotesEn = enParts.slice(1).map((p) => stripOuterQuotes(partText(p.text)));
   } else {
     const terms = excludedTerms(first);
     if (!terms) return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `notation "${first.slice(0, 60)}…" not recognised` } };
@@ -276,10 +290,10 @@ async function cutParts(
   let warning: PartTexts["warning"];
   if (langParts.length === enParts.length && langParts.length > 0) {
     langQuotes =
-      langParts.length >= 2 && langParts.slice(1).every((p) => !THOSE_WORDS.test(norm(p.text)))
-        ? langParts.slice(1).map((p) => stripOuterQuotes(norm(p.text)))
+      langParts.length >= 2 && langParts.slice(1).every((p) => !THOSE_WORDS.test(partText(p.text)))
+        ? langParts.slice(1).map((p) => stripOuterQuotes(partText(p.text)))
         : (() => {
-            const t = excludedTerms(norm(langParts[0]?.text ?? ""));
+            const t = excludedTerms(partText(langParts[0]?.text ?? ""));
             return t ? [t] : null;
           })();
     if (!langQuotes) return fallback("VERSIONE_TRADOTTA_ASSENTE", "translated notation incomplete");
