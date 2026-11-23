@@ -33,6 +33,7 @@ import { documentTextUrl } from "@laurus/parser";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
+import { splitAgent, splitAgentAvailable, type LocatedRun, type SplitAgentResult } from "./splitAgent";
 
 const BASE = "https://data.europarl.europa.eu";
 
@@ -204,7 +205,7 @@ function resolveSubject(
 interface PartTexts {
   /** Rendering in the list's language (light HTML: `<s>` marks the split-off words). */
   main: string;
-  warning?: { code: string; detail: string };
+  warning?: { code: string; detail: string; level?: "error" | "warning" };
 }
 
 /** Locates the translated runs for English quotes (see alignQuotes.ts). */
@@ -334,6 +335,68 @@ function struck(paragraph: string, quotes: string[]): string {
   return out;
 }
 
+/** The paragraph with each located run struck through, by position (the same words may occur twice). */
+function struckAt(paragraph: string, runs: LocatedRun[]): string {
+  let out = "";
+  let from = 0;
+  for (const r of [...runs].sort((a, b) => a.at - b.at)) {
+    out += paragraph.slice(from, r.at) + `<s>${r.text}</s>`;
+    from = r.at + r.text.length;
+  }
+  return out + paragraph.slice(from);
+}
+
+/** Write the parts of one split into its row, the parent emptied. */
+function applyParts(row: AnnotatedVotingList["rows"][number], parts: PartTexts[], subject: string, notes: SplitExpansionNote[]): void {
+  // The parent row stays empty: what is voted is in the parts.
+  row.remarks = "";
+  for (const [i, part] of parts.entries()) {
+    const target = row.splitParts[i]!;
+    target.notation ??= target.remarks;
+    target.remarks = part.main;
+    if (part.warning && i === 0) {
+      notes.push({ subject, level: part.warning.level ?? "warning", code: part.warning.code, detail: part.warning.detail });
+    }
+  }
+}
+
+/** What the split agent returned, as the parts of the row. */
+function agentParts(r: SplitAgentResult, paraLang: string | null): PartTexts[] {
+  if (r.kind === "located" && paraLang) {
+    const all = r.runs.flat();
+    const repeated = all.some((x) => x.repeated);
+    return [
+      {
+        main: struckAt(paraLang, all),
+        warning: repeated
+          ? {
+              code: "SPLIT_AGENTE_OCCORRENZA",
+              detail:
+                "the quoted words occur more than once in the paragraph; the split agent chose which one (the last, unless the English says otherwise) — check it is the one the request means",
+            }
+          : {
+              code: "SPLIT_AGENTE",
+              detail: "the Italian words were located by the split agent in the report's own paragraph and checked verbatim — review",
+            },
+      },
+      ...r.runs.map((rs) => ({ main: sentenceCase(rs.map((x) => x.text).join(" … ")) })),
+    ];
+  }
+  const texts = r.kind === "translated" ? r.texts : [];
+  return texts.map((text, i) => ({
+    main: text,
+    warning:
+      i === 0
+        ? {
+            code: "SPLIT_TRADOTTO",
+            level: "error" as const,
+            detail:
+              "no verbatim Italian could be found in the report: the parts are an Italian TRANSLATION of the request's notation, not text of the report — verify against the EP's Italian VOT after the vote",
+          }
+        : undefined,
+  }));
+}
+
 /** The split-off words stand alone in their row, so they open with a capital ("Di tutti i tipi"). */
 function sentenceCase(words: string): string {
   return words.charAt(0).toLocaleUpperCase() + words.slice(1);
@@ -372,6 +435,15 @@ export async function expandSplitRows(
     if (a.language === opts.language) amLang.set(a.number, text);
   }
 
+  const agentJobs: Array<{
+    row: (typeof splitRows)[number];
+    subject: string;
+    notation: string[];
+    paraEn: string | null;
+    paraLang: string | null;
+    cut: Awaited<ReturnType<typeof cutParts>>;
+  }> = [];
+
   for (const row of splitRows) {
     const subject = row.subject;
     const reqEn = (opts.votEn?.splitVotes ?? []).find((sv) => norm(sv.subject) === norm(subject));
@@ -386,31 +458,50 @@ export async function expandSplitRows(
     }
 
     const resolvedEn = resolveSubject(subject, paraEn, amEn);
-    if ("error" in resolvedEn) {
-      notes.push({ subject, level: "error", code: "OGGETTO_NON_RISOLTO", detail: resolvedEn.error });
-      continue;
-    }
     const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang);
     const langSubject = resolvedLang && !("error" in resolvedLang) ? resolvedLang.text : null;
+    const enSubject = "error" in resolvedEn ? null : resolvedEn.text;
 
     const align: Aligner | null = quoteAlignmentAvailable()
       ? (en, quotes, langPara) => alignQuotes(en, quotes, langPara, opts.language)
       : null;
-    const cut = await cutParts(resolvedEn.text, langSubject, reqEn.parts, reqLang?.parts ?? [], isEnglishList, align);
+    const cut: Awaited<ReturnType<typeof cutParts>> = enSubject
+      ? await cutParts(enSubject, langSubject, reqEn.parts, reqLang?.parts ?? [], isEnglishList, align)
+      : { error: { code: "OGGETTO_NON_RISOLTO", detail: (resolvedEn as { error: string }).error } };
+
+    // A list in another language must not be left with the English notation in
+    // it. Whatever the plain cut could not finish — an error, or a fall back to
+    // the English words — goes to the split agent, which works on the Italian
+    // side only. If it gives nothing, the plain result stands, as before.
+    const wentEnglish =
+      !("error" in cut) && ["RESA_NON_LETTERALE", "VERSIONE_TRADOTTA_ASSENTE"].includes(cut.parts[0]?.warning?.code ?? "");
+    if (!isEnglishList && splitAgentAvailable() && ("error" in cut || wentEnglish)) {
+      agentJobs.push({ row, subject, notation: reqEn.parts.map((p) => p.text), paraEn: enSubject, paraLang: langSubject, cut });
+      continue;
+    }
     if ("error" in cut) {
       notes.push({ subject, level: "error", code: cut.error.code, detail: cut.error.detail });
       continue;
     }
+    applyParts(row, cut.parts, subject, notes);
+  }
 
-    // The parent row stays empty: what is voted is in the parts.
-    row.remarks = "";
-    for (const [i, part] of cut.parts.entries()) {
-      const target = row.splitParts[i]!;
-      target.notation ??= target.remarks;
-      target.remarks = part.main;
-      if (part.warning && i === 0) {
-        notes.push({ subject, level: "warning", code: part.warning.code, detail: part.warning.detail });
-      }
+  // The agent's rows together: each is one call (up to three tries inside it),
+  // and they do not depend on one another.
+  const results = await Promise.all(
+    agentJobs.map((j) =>
+      splitAgent({ subject: j.subject, language: opts.language, notationEn: j.notation, paraEn: j.paraEn, paraLang: j.paraLang }),
+    ),
+  );
+  for (const [i, j] of agentJobs.entries()) {
+    const r = results[i];
+    const parts = r ? agentParts(r, j.paraLang) : [];
+    if (parts.length === j.row.splitParts.length) {
+      applyParts(j.row, parts, j.subject, notes);
+    } else if ("error" in j.cut) {
+      notes.push({ subject: j.subject, level: "error", code: j.cut.error.code, detail: j.cut.error.detail });
+    } else {
+      applyParts(j.row, j.cut.parts, j.subject, notes);
     }
   }
 
