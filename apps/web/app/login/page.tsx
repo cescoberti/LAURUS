@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LoginForm } from "@/components/LoginForm";
 import { Wordmark } from "@/components/Logo";
 
@@ -13,7 +14,7 @@ export default async function LoginPage({
     error === "not-invited"
       ? {
           tone: "warn" as const,
-          text: "That account is not a LAURUS member yet. LAURUS is invite-only — ask an admin for an invite, then sign in with the same address.",
+          text: "That account is not a LAURUS member yet. LAURUS is invite-only — request access below, and an admin will approve it.",
         }
       : error === "oauth-failed"
         ? { tone: "error" as const, text: "Sign-in did not complete. Please try again." }
@@ -46,8 +47,17 @@ export default async function LoginPage({
           <LoginForm next={next ?? "/"} />
         </div>
 
-        <p className="rise rise-3 mt-10 text-center text-xs text-ink-400">
-          EP Plenary Companion · invite-only
+        <p className="rise rise-3 mt-8 text-center text-[0.8125rem] text-ink-500">
+          No account yet?{" "}
+          <Link href="/request-access" className="font-semibold text-eu-700 hover:underline">
+            Request access
+          </Link>
+        </p>
+        <p className="rise rise-3 mt-6 text-center text-xs text-ink-400">
+          EP Plenary Companion · invite-only ·{" "}
+          <Link href="/privacy" className="hover:underline">
+            Privacy
+          </Link>
         </p>
       </div>
     </div>
