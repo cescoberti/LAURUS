@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isSecondReading, splitRequestsFromNotes, subjectKey, votingSchemeFromNotes } from "./indicativeVotingList.ts";
+import {
+  isSecondReading,
+  splitRequestFor,
+  splitRequestsFromNotes,
+  subjectKey,
+  votingSchemeFromNotes,
+} from "./indicativeVotingList.ts";
 
 // Footer of the official list for A10-0218/2026 (PETROV, EMPL), FINAL VERSION.
 const NOTES = [
@@ -106,4 +112,64 @@ test("a second reading is read from the marker, or from the Service's own note",
   assert.equal(isSecondReading({ procedureType: "[***II]", notes: [] }), true);
   assert.equal(isSecondReading({ procedureType: null, notes: SECOND_READING }), true);
   assert.equal(isSecondReading({ procedureType: "[init.]", notes: NOTES }), false);
+});
+
+/** A row as the table gives it, with only the fields the matcher reads. */
+const row = (subject: string, amNo: string | null, parts = 2) => ({
+  subject,
+  amNo,
+  splitParts: Array.from({ length: parts }, (_, i) => ({ label: String(i + 1), vote: "", remarks: "" })),
+});
+const req = (group: string, subject: string, ...parts: string[]) => ({
+  group,
+  subject,
+  parts: parts.map((text, i) => ({ section: String(i + 1), text })),
+});
+
+test("the footer names the amendment, the table names what it amends", () => {
+  // A10-0216/2026: the row is "Article 9, § 4", the request "Am 68".
+  const requests = [req("PfE", "Am 68", "Text as a whole excluding the words “in writing”", "These words")];
+  assert.equal(splitRequestFor(row("Article 9, § 4", "68"), requests), requests[0]);
+  // A10-0201/2026: the subject cell carries only the block heading.
+  assert.equal(
+    splitRequestFor(row("Amendments by the committee responsible -separate and split votes", "7"), [
+      req("S&D", "Am 7", "a", "b"),
+    ])?.subject,
+    "Am 7",
+  );
+});
+
+test("one subject, two rows: each goes to its own amendment", () => {
+  // A10-0199/2026 votes § 80 twice — the text itself, and ESN's am 51 on it.
+  const requests = [req("EPP", "§ 80", "Text as a whole excluding the words “X”", "These words"), req("ESN", "am 51", "p", "q")];
+  assert.equal(splitRequestFor(row("§ 80", "§"), requests)?.group, "EPP");
+  assert.equal(splitRequestFor(row("§ 80", "51"), requests)?.group, "ESN");
+});
+
+test("the same cut asked by three groups is one vote, a different cut is not", () => {
+  // A10-0201/2026: S&D, ECR and EPP all asked for the same division of am 83,
+  // and the list votes it on the row that carries amendment 83's first part.
+  const same = ["Text as a whole excluding the line: “2905 11 00”", "This line"];
+  const requests = [req("S&D", "Am 83", ...same), req("ECR", "Am 83", ...same), req("EPP", "Am 83", ...same)];
+  assert.equal(splitRequestFor(row("Annex I, point 2, table on ‘Iron and steel’", "83cp1"), requests)?.group, "S&D");
+
+  // Two groups cutting the same amendment differently is the Tabling
+  // Service's call to merge, and without a scheme there is no answer.
+  const differ = [req("S&D", "Am 83", ...same), req("ECR", "Am 83", "Text as a whole excluding the words “methanol”", "Those words")];
+  assert.equal(splitRequestFor(row("Annex I", "83"), differ), null);
+});
+
+test("a subject the footer writes shorter, only when the parts agree", () => {
+  // A10-0257/2026: "Article 2, point 12" under the table, "Article 2, § 1,
+  // point 12" in it.
+  const requests = [req("EPP", "Article 2, point 12", "Text as a whole excluding the words “or service”", "These words")];
+  assert.equal(splitRequestFor(row("Article 2, § 1, point 12", "§", 2), requests), requests[0]);
+  // Three parts on the list against two requested: not this request.
+  assert.equal(splitRequestFor(row("Article 2, § 1, point 12", "§", 3), requests), null);
+});
+
+test("a row whose request is not there gets nothing, not the nearest thing", () => {
+  const requests = [req("EPP", "§ 27", "a", "b"), req("EPP", "Recital BK", "a", "b")];
+  assert.equal(splitRequestFor(row("§ 28", "§"), requests), null);
+  assert.equal(splitRequestFor(row("After § 110", "25"), requests), null);
 });

@@ -283,8 +283,11 @@ export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
  * group to name, so the expansion reads it the same way.
  */
 export function votingSchemeFromNotes(notes: string[]): SplitRequest[] {
-  return requestBlock(notes, /^voting scheme$/i);
+  return requestBlock(notes, VOTING_SCHEME);
 }
+
+/** The heading, printed with or without its colon depending on the list. */
+const VOTING_SCHEME = /^voting scheme\s*:?$/i;
 
 /** The subject-and-parts block under `heading`, in the order printed. */
 function requestBlock(notes: string[], heading: RegExp): SplitRequest[] {
@@ -296,7 +299,7 @@ function requestBlock(notes: string[], heading: RegExp): SplitRequest[] {
   for (const raw of notes.slice(start + 1)) {
     const line = noteText(raw);
     if (!line) continue;
-    if (/^requests? for /i.test(line) || /^voting scheme$/i.test(line)) break;
+    if (/^requests? for /i.test(line) || VOTING_SCHEME.test(line)) break;
     const part = /^(\d+)(?:st|nd|rd|th)\s+part\s*:\s*(.*)$/i.exec(line);
     if (part && current) {
       current.parts.push({ section: part[1]!, text: part[2]!.trim() });
@@ -339,7 +342,106 @@ export function subjectKey(subject: string): string {
     .replace(/\bparagraphs?\b|\bpar\.?\b/g, "§")
     .replace(/\barticle\b|\bart\.?\b/g, "article")
     .replace(/\bamendment\b|\bams?\b\.?/g, "am")
-    .replace(/[(),.;]/g, " ")
+    // "§6" and "§ 6" are the same paragraph, and the footer writes it both
+    // ways in one list (A10-0200: the scheme says "§6", the requests "§ 6:").
+    .replace(/§\s*(?=\d)/g, "§ ")
+    .replace(/\b(article|am)\s*(?=\d)/g, "$1 ")
+    .replace(/[(),.;:]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * The amendments a row or a request names: "60cp3=86=" and "Am 60cp3 and 86"
+ * both give ["60cp3", "86"]. Empty for a row that votes the text itself
+ * ("§"), which is matched on its subject instead. With `base`, the part
+ * suffix goes too, so the row "83cp1" meets the request on "Am 83".
+ */
+function amendmentTokens(text: string | null | undefined, base = false): string[] {
+  const s = (text ?? "").toLowerCase().replace(/^\s*(?:amendments?|ams?)\b\.?/, "");
+  const found = s.match(/\d+(?:\s*cp\s*\d+)?/g)?.map((t) => t.replace(/\s+/g, "")) ?? [];
+  return [...new Set(base ? found.map((t) => t.replace(/cp\d+$/, "")) : found)].sort();
+}
+
+/**
+ * The request a split row is the vote on, or null when it cannot be told.
+ *
+ * The two sides of one list name the same vote differently. The table says
+ * what is amended — "Article 9, § 4", "After recital 15", or just the block
+ * heading "Amendments by the committee responsible - separate and split
+ * votes" — and the footer says which amendment was asked to be divided,
+ * "Am 68". Matching the words alone left a quarter of the split rows in the
+ * lists LAURUS holds without a request. So the row is looked up four ways,
+ * from the most explicit down:
+ *
+ *   1. the amendment it carries, exactly ("Am 60cp3 and 86" ↔ "60cp3=86=");
+ *   2. its subject, levelled by `subjectKey`;
+ *   3. the amendment without the part suffix — amendment 83 voted in
+ *      corresponding parts is "83cp1" on the list and "Am 83" in the footer;
+ *   4. a subject the footer writes shorter than the table does
+ *      ("Article 2, point 12" for "Article 2, § 1, point 12"), and only when
+ *      the number of parts agrees.
+ *
+ * Groups often ask for the very same cut — three of them did on Am 83 of
+ * A10-0201 — and that is one vote, not three, so identical requests count as
+ * one. Requests that differ and no scheme to merge them is not a match:
+ * which cut is put is the Tabling Service's call, not ours.
+ */
+export function splitRequestFor(
+  row: Pick<AnnotatedVlRow, "subject" | "amNo" | "splitParts">,
+  requests: SplitRequest[],
+): SplitRequest | null {
+  const parts = row.splitParts.length;
+  /** One request, or none: identical cuts are one vote, and a tie is no answer. */
+  const only = (candidates: SplitRequest[]): SplitRequest | null => {
+    const distinct = (list: SplitRequest[]) => {
+      const seen = new Map<string, SplitRequest>();
+      for (const r of list) {
+        const cut = r.parts.map((p) => subjectKey(p.text)).join("|");
+        if (!seen.has(cut)) seen.set(cut, r);
+      }
+      return [...seen.values()];
+    };
+    const all = distinct(candidates);
+    if (all.length === 1) return all[0]!;
+    // Several different cuts: the one with as many parts as the row, if only one has.
+    const fitting = all.filter((r) => r.parts.length === parts);
+    return fitting.length === 1 ? fitting[0]! : null;
+  };
+
+  const names = (r: SplitRequest) => /^\s*(?:amendments?|ams?)\b/i.test(r.subject);
+  const exact = amendmentTokens(row.amNo);
+  if (exact.length) {
+    // Only a request that says so names an amendment: "§ 80" is a paragraph,
+    // not amendment 80.
+    const hit = only(requests.filter((r) => names(r) && sameTokens(amendmentTokens(r.subject), exact)));
+    if (hit) return hit;
+  }
+
+  const key = subjectKey(row.subject);
+  const bySubject = only(requests.filter((r) => subjectKey(r.subject) === key));
+  if (bySubject) return bySubject;
+
+  const base = amendmentTokens(row.amNo, true);
+  if (base.length) {
+    const hit = only(requests.filter((r) => names(r) && sameTokens(amendmentTokens(r.subject, true), base)));
+    if (hit) return hit;
+  }
+
+  // Last, the shorter spelling — never without the parts agreeing.
+  const words = key.split(" ");
+  const shorter = requests.filter((r) => parts > 0 && r.parts.length === parts && isSubsequence(subjectKey(r.subject).split(" "), words));
+  return only(shorter);
+}
+
+function sameTokens(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((t, i) => t === b[i]);
+}
+
+/** Every word of `needle`, in order, somewhere in `hay`. */
+function isSubsequence(needle: string[], hay: string[]): boolean {
+  if (needle.length === 0 || needle.length === hay.length) return false;
+  let i = 0;
+  for (const w of hay) if (w === needle[i]) i++;
+  return i === needle.length;
 }

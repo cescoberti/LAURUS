@@ -27,9 +27,10 @@
  *   RESA_NON_LETTERALE, VERSIONE_TRADOTTA_ASSENTE
  */
 import mammoth from "mammoth";
-import { subjectKey, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import { splitRequestFor, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
+import { parseMotionText, originalTextFor, type MotionText } from "@laurus/parser/report-docx";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
@@ -160,13 +161,18 @@ function epDocId(code: string): string | null {
  * OGGETTO_NON_RISOLTO, "report text not available". Which is what happened to
  * all six splits of B10-0423/2026 on the eve of the vote.
  */
-async function reportParagraphs(itemCode: string, lang: string): Promise<string[] | null> {
+async function reportParagraphs(itemCode: string, lang: string): Promise<ReportText | null> {
   const id = epDocId(itemCode);
   if (!id) return null;
   const buf = await fetchBytesWithBackoff(documentTextUrl(id, lang));
   if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;
   const { value } = await mammoth.extractRawText({ buffer: buf });
-  return value.split("\n").map((l) => norm(l)).filter(Boolean);
+  const lines = value.split("\n").map((l) => norm(l)).filter(Boolean);
+  // The motion index knows the shapes a flat line scan cannot tell apart —
+  // "§ 2, point a, indent 1", "§ 1, point au" — and it is the same index the
+  // Remarks fill uses, so a row cannot resolve one way there and another here.
+  const motion = await parseMotionText(buf).catch(() => null);
+  return { lines, motion };
 }
 
 /**
@@ -174,15 +180,25 @@ async function reportParagraphs(itemCode: string, lang: string): Promise<string[
  * report paragraphs / amendment set. Null when it cannot be pinned down to
  * exactly one run of text — never guess.
  */
+/** The report in one language: its lines, and the motion indexed by reference. */
+interface ReportText {
+  lines: string[];
+  motion: MotionText | null;
+}
+
 function resolveSubject(
-  subject: string,
-  paragraphs: string[] | null,
+  row: { subject: string; amNo: string | null },
+  report: ReportText | null,
   amendments: Map<number, string>,
   article: ((subject: string) => string | null) | null,
 ): { text: string } | { error: string } {
-  const s = subject.trim();
+  const s = row.subject.trim();
 
-  const am = /^(?:am|amendment|emendamento|em)\.?\s*(\d+)/i.exec(s);
+  // What the row votes is the amendment in its "Am No" column, whatever the
+  // subject column calls it: the table names the place ("Article 9, § 4",
+  // "After recital 15"), the text is the amendment's.
+  const amNo = /^(\d+)$/.exec((row.amNo ?? "").trim());
+  const am = amNo ?? /^(?:am|amendment|emendamento|em)\.?\s*(\d+)/i.exec(s);
   if (am) {
     const text = amendments.get(Number(am[1]));
     return text ? { text } : { error: `amendment ${am[1]} not in the ingested set` };
@@ -196,14 +212,19 @@ function resolveSubject(
     return text ? { text } : { error: `"${s}" not found in the Council position` };
   }
 
-  if (!paragraphs) return { error: "report text not available" };
+  if (!report) return { error: "report text not available" };
 
-  const para = /^§+\s*(\d+[a-z]?)/i.exec(s);
-  const recital = /^(?:recital|considerando)\s+([A-Z]+[a-z]?)\b/i.exec(s);
+  // The motion's own index first: it reads the points and indents under a
+  // paragraph, which the line scan below cannot.
+  const indexed = report.motion ? originalTextFor(s, report.motion) : null;
+  if (indexed) return { text: norm(indexed) };
+
+  const para = /^§+\s*(\d+[a-z]?)$/i.exec(s);
+  const recital = /^(?:recital|considerando)\s+([A-Z]+[a-z]?)$/i.exec(s);
   const anchor = para ? `${para[1]}.` : recital ? `${recital[1]}.` : null;
   if (!anchor) return { error: `subject notation "${s}" not supported` };
 
-  const matches = paragraphs.filter((p) => p.startsWith(anchor + " ") || p.startsWith(anchor + "\t"));
+  const matches = report.lines.filter((p) => p.startsWith(anchor + " ") || p.startsWith(anchor + "\t"));
   if (matches.length === 0) return { error: `"${s}" not found in the report text` };
   if (matches.length > 1) return { error: `"${s}" matches ${matches.length} paragraphs` };
   return { text: matches[0]! };
@@ -464,12 +485,11 @@ export async function expandSplitRows(
 
   for (const row of splitRows) {
     const subject = row.subject;
-    // The table and the footer do not always spell a subject the same way
-    // ("…, point 32, intro" against "…, point 32, introductory part"), so they
-    // are matched on what they name, not on the characters.
-    const key = subjectKey(subject);
-    const reqEn = (opts.votEn?.splitVotes ?? []).find((sv) => subjectKey(sv.subject) === key);
-    const reqLang = (opts.votLang?.splitVotes ?? []).find((sv) => subjectKey(sv.subject) === key);
+    // The table and the footer name the same vote differently — the table by
+    // what is amended, the footer by the amendment — so the row is matched to
+    // its request by `splitRequestFor`, not by the characters of the subject.
+    const reqEn = splitRequestFor(row, opts.votEn?.splitVotes ?? []);
+    const reqLang = splitRequestFor(row, opts.votLang?.splitVotes ?? []);
     if (!reqEn) {
       notes.push({ subject, level: "error", code: "OGGETTO_NON_RISOLTO", detail: "no English VOT request found for this split (splits are tabled on English)" });
       continue;
@@ -479,8 +499,8 @@ export async function expandSplitRows(
       continue;
     }
 
-    const resolvedEn = resolveSubject(subject, paraEn, amEn, articleEn);
-    const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang, articleLang);
+    const resolvedEn = resolveSubject(row, paraEn, amEn, articleEn);
+    const resolvedLang = isEnglishList ? null : resolveSubject(row, paraLang, amLang, articleLang);
     const langSubject = resolvedLang && !("error" in resolvedLang) ? resolvedLang.text : null;
     const enSubject = "error" in resolvedEn ? null : resolvedEn.text;
 
