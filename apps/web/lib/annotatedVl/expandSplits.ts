@@ -126,19 +126,30 @@ function occurrences(hay: string, needle: string): number {
 // ---------------------------------------------------------------------------
 
 /** Grammar A markers — "everything except the words …". */
-const EXCLUDING = /without the words|excluding the words|apart from the words|tranne i termini|senza i termini|ad eccezione dei termini|esclusi i termini/i;
+const EXCLUDING =
+  /(?:without|excluding|apart from|except(?:ing)?) the (?:words?|terms?)|(?:tranne|senza|esclusi?|ad eccezione dei) (?:i |il |la |le )?(?:termini?|parole?)/i;
 /** Grammar B markers — sequential cut, ambiguous by construction. */
 const SEQUENTIAL = /up to the words|until the words|fino ai termini|fino alle parole/i;
 /** "those words" back-reference used by the second part. */
-const THOSE_WORDS = /^(those|these) words$|^tali termini$|^detti termini$|^the remainder/i;
+const THOSE_WORDS =
+  /^(?:those|these|this|that) (?:words?|terms?)$|^(?:tali|tale|detti|detto|questi|questo) (?:termini?|parole?)$|^the remainder/i;
 
-/** The quoted terms of an "excluding the words" notation (normalised plane). */
-function excludedTerms(notation: string): string | null {
+/**
+ * The quoted terms of an "excluding the words" notation (normalised plane).
+ *
+ * One clause can leave out several runs — "excluding the words \u201csystemic\u201d and
+ * \u201cand gender-diverse people\u201d" is a vote in three parts, not two — so every
+ * quoted run is returned, in the order printed. A clause with no quotation
+ * marks gives its whole tail as the single run.
+ */
+function excludedTerms(notation: string): string[] {
   const m = EXCLUDING.exec(notation);
-  if (!m) return null;
+  if (!m) return [];
   const tail = notation.slice(m.index + m[0].length).replace(/^\s*[:,]?\s*/, "");
+  const quoted = [...tail.matchAll(/"([^"]+)"/g)].map((q) => q[1]!.trim()).filter(Boolean);
+  if (quoted.length) return quoted;
   const terms = stripOuterQuotes(tail);
-  return terms || null;
+  return terms ? [terms] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +258,9 @@ type Aligner = (enParagraph: string, quotesEn: string[], langParagraph: string) 
  * Cut one subject's text according to an excluding-grammar split.
  * Returns one entry per part, or an error that leaves the row untouched.
  */
+/** Stands in for a cut-out run while the paragraph is put back together. */
+const SENTINEL = "\0";
+
 async function cutParts(
   enSubject: string,
   langSubject: string | null,
@@ -260,51 +274,83 @@ async function cutParts(
     return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: "sequential-cut notation; which side keeps the quoted words is not stated" } };
   }
 
-  // Quotes to exclude: from part 1 when part 2 is a back-reference, otherwise
-  // each later part quotes its own words.
-  let quotesEn: string[];
-  const laterAreQuotes = enParts.slice(1).every((p) => !THOSE_WORDS.test(partText(p.text)));
-  if (enParts.length >= 2 && laterAreQuotes) {
-    quotesEn = enParts.slice(1).map((p) => stripOuterQuotes(partText(p.text)));
-  } else {
-    const terms = excludedTerms(first);
-    if (!terms) return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `notation "${first.slice(0, 60)}…" not recognised` } };
-    quotesEn = [terms];
-  }
-  if (quotesEn.length !== enParts.length - 1) {
-    return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `${enParts.length} parts but ${quotesEn.length} quoted blocks` } };
-  }
-
-  // EN cut, with the recomposition guarantee.
+  // Quotes to exclude: each later part quotes its own words, or part 1 says
+  // which words are left out and the later parts point back at them ("these
+  // words", "this word"). Both can be printed and disagree — § 1 of
+  // A10-0200 is excluded on "systemic" and quoted as "systematic", one of
+  // them a slip — so both are tried, the parts first, and a cut that only
+  // the notation supports carries a warning.
   const para = norm(enSubject);
-  // A long quote is often abbreviated "first words … last words": resolve it
-  // to the one literal span of the paragraph that starts and ends so.
-  for (const [i, q] of quotesEn.entries()) {
-    const span = expandEllipsis(para, q);
-    if ("error" in span) return { error: span.error };
-    quotesEn[i] = span.text;
+  const laterAreQuotes = enParts.length >= 2 && enParts.slice(1).every((p) => !THOSE_WORDS.test(partText(p.text)));
+  const candidates: Array<{ quotes: string[]; grouped: boolean }> = [];
+  if (laterAreQuotes) candidates.push({ quotes: enParts.slice(1).map((p) => stripOuterQuotes(partText(p.text))), grouped: false });
+  const terms = excludedTerms(first);
+  // Several runs left out of a two-part vote are taken out together and voted
+  // together: "excluding the words \u201cX\u201d and \u201cY\u201d" / "these words" is one
+  // second part holding both (A10-0280, Recital O).
+  if (terms.length === enParts.length - 1) candidates.push({ quotes: terms, grouped: false });
+  else if (terms.length > 1 && enParts.length === 2) candidates.push({ quotes: terms, grouped: true });
+  if (candidates.length === 0) {
+    return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `notation "${first.slice(0, 60)}\u2026" not recognised` } };
   }
-  let firstEn = para;
-  for (const q of quotesEn) {
-    const n = occurrences(firstEn, q);
-    if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${q.slice(0, 60)}…" is not in the subject text` } };
-    if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${q.slice(0, 60)}…" occurs ${n} times in the subject text` } };
-    firstEn = firstEn.replace(q, " ");
-  }
-  // Putting the quotes back must give the paragraph again, or the cut is wrong.
-  let recomposed = firstEn;
-  for (const q of quotesEn) recomposed = recomposed.replace(" ", q);
-  if (recomposed !== para) {
-    return { error: { code: "RICOMPOSIZIONE_FALLITA", detail: "re-inserting the quoted words does not give back the original paragraph" } };
-  }
-  const firstEnText = tidy(firstEn.replaceAll(" ", " "));
 
-  void firstEnText;
+  /** One quote set, resolved to literal runs of the paragraph and put back again. */
+  const cut = (quotes: string[]): { quotes: string[] } | { error: { code: string; detail: string } } => {
+    const resolved: string[] = [];
+    for (const q of quotes) {
+      // A long quote is often abbreviated "first words \u2026 last words": resolve
+      // it to the one literal span of the paragraph that starts and ends so.
+      const span = expandEllipsis(para, q);
+      if ("error" in span) return { error: span.error };
+      resolved.push(span.text);
+    }
+    let rest = para;
+    for (const q of resolved) {
+      const n = occurrences(rest, q);
+      if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${q.slice(0, 60)}\u2026" is not in the subject text` } };
+      if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${q.slice(0, 60)}\u2026" occurs ${n} times in the subject text` } };
+      rest = rest.replace(q, SENTINEL);
+    }
+    // Putting the quotes back must give the paragraph again, or the cut is wrong.
+    let recomposed = rest;
+    for (const q of resolved) recomposed = recomposed.replace(SENTINEL, q);
+    if (recomposed !== para) {
+      return { error: { code: "RICOMPOSIZIONE_FALLITA", detail: "re-inserting the quoted words does not give back the original paragraph" } };
+    }
+    return { quotes: resolved };
+  };
+
+  let quotesEn: string[] | null = null;
+  let grouped = false;
+  let disagreement: PartTexts["warning"];
+  let firstError: { code: string; detail: string } | null = null;
+  for (const [i, c] of candidates.entries()) {
+    const got = cut(c.quotes);
+    if ("error" in got) {
+      firstError ??= got.error;
+      continue;
+    }
+    quotesEn = got.quotes;
+    grouped = c.grouped;
+    if (i > 0) {
+      disagreement = {
+        code: "NOTAZIONE_DISCORDE",
+        detail:
+          "the later parts quote words the paragraph does not carry; the cut follows the words part 1 says are left out \u2014 check it against the official list",
+      };
+    }
+    break;
+  }
+  if (!quotesEn) return { error: firstError! };
 
   // Rendering, as an advisor reads an amendment: part 1 is the WHOLE
   // paragraph with the split-off words struck through, the later parts are
   // those words — so the first row shows what was taken out.
-  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn) }, ...quotesEn.map((q) => ({ main: sentenceCase(q) }))] };
+  /** The runs as the list votes them: one part each, or all in the last part. */
+  const asParts = (runs: string[]) =>
+    grouped ? [{ main: sentenceCase(runs.join(" \u2026 ")) }] : runs.map((q) => ({ main: sentenceCase(q) }));
+
+  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn), warning: disagreement }, ...asParts(quotesEn)] };
 
   const fallback = (code: string, detail: string): { parts: PartTexts[] } => ({
     parts: enParts.map((p, i) => ({
@@ -327,7 +373,7 @@ async function cutParts(
         ? langParts.slice(1).map((p) => stripOuterQuotes(partText(p.text)))
         : (() => {
             const t = excludedTerms(partText(langParts[0]?.text ?? ""));
-            return t ? [t] : null;
+            return t.length ? t : null;
           })();
     if (!langQuotes) return fallback("VERSIONE_TRADOTTA_ASSENTE", "translated notation incomplete");
   } else if (align) {
@@ -336,7 +382,7 @@ async function cutParts(
       return fallback("RESA_NON_LETTERALE", "the translated words could not be located as one contiguous run");
     }
     langQuotes = aligned.map((a) => norm(a));
-    warning = { code: "RESA_AUTOMATICA", detail: "translated words located automatically and checked verbatim against the report — review" };
+    warning = disagreement ?? { code: "RESA_AUTOMATICA", detail: "translated words located automatically and checked verbatim against the report — review" };
   } else {
     return fallback("VERSIONE_TRADOTTA_ASSENTE", "no translated request before the vote (ANTHROPIC_API_KEY not set for automatic alignment)");
   }
@@ -352,12 +398,7 @@ async function cutParts(
 
   void firstLang;
 
-  return {
-    parts: [
-      { main: struck(paraLang, langQuotes), warning },
-      ...langQuotes.map((q) => ({ main: sentenceCase(q) })),
-    ],
-  };
+  return { parts: [{ main: struck(paraLang, langQuotes), warning }, ...asParts(langQuotes)] };
 }
 
 /** The paragraph with each quoted run struck through (light HTML `<s>`). */
