@@ -5,7 +5,7 @@ import { sessionUser } from "@/lib/supabase/server";
 import { getItemByCode } from "@/lib/data";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { DOCUMENT_LANGUAGE_SET } from "@/lib/languages";
-import { amendmentBlockIds } from "@/lib/vlVerify";
+import { amendmentBlockIds } from "@/lib/epAmendments";
 import { logEvent } from "@/lib/track";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fileStem } from "@/lib/rapporteur";

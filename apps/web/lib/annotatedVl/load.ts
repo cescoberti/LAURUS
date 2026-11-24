@@ -30,6 +30,7 @@ import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { fillRemarks, type AmendmentText, type FillReport } from "@/lib/fillRemarks";
+import { amendmentTextsFromEp } from "@/lib/epAmendments";
 import { buildVlFromAmendments, type DbAmendment } from "./fromDb";
 import { getAnnotatedVl } from "./index";
 
@@ -55,6 +56,8 @@ export interface LoadedVl {
   official: OfficialVl | null;
   /** Set for a second reading: the Council position the list votes on, EN and the list's language. */
   councilPosition: LoadedCouncilPosition | null;
+  /** Amendments whose text was read off the EP's own file because the ingestion did not hold it in the list's language. */
+  fetchedTranslations: number[];
 }
 
 /**
@@ -115,6 +118,60 @@ export async function motionFor(epWorkId: string | null, lang: string): Promise<
   }
 }
 
+/**
+ * The ingested amendments, plus — for the numbers the database holds in some
+ * other language only — the EP's own text in `lang`, read off the published
+ * file now.
+ *
+ * The EP tables a report's amendments in English and publishes the
+ * translations block by block over the hours that follow, while the
+ * ingestion that stores them runs on its own clock. A list built in between
+ * quoted the English original, because quoting is the rule and re-writing is
+ * not: the right text in the wrong language, and a pass-2 verification that
+ * reads it against the Italian file and calls every row a mismatch. The
+ * Italian list for A10-0310/2026 was built at 16:28 UTC and the Italian
+ * amendments were ingested at 18:21 UTC, the evening before the vote; all
+ * eight rows came back "differ".
+ *
+ * So the file is read directly, and only for the rows that need it. The text
+ * is the EP's, verbatim; what LAURUS already holds is left alone; and nothing
+ * is written back, so the ingestion stays the only writer of
+ * `laurus.amendments`.
+ */
+async function withEpTranslations(
+  code: string,
+  amendments: DbAmendment[],
+  lang: string,
+): Promise<{ amendments: DbAmendment[]; fetchedTranslations: number[] }> {
+  const numbers = new Set(amendments.map((a) => a.number));
+  const have = new Set(amendments.filter((a) => a.language === lang).map((a) => a.number));
+  const missing = [...numbers].filter((n) => !have.has(n)).sort((a, b) => a - b);
+  if (!missing.length) return { amendments, fetchedTranslations: [] };
+
+  const fresh = await amendmentTextsFromEp(code, lang);
+  const added: DbAmendment[] = [];
+  for (const number of missing) {
+    const text = fresh.get(number);
+    if (!text || (!text.original && !text.amended)) continue;
+    // The amendment file carries the text, not the list metadata: the subject
+    // it amends, who tabled it and whether it was withdrawn stay as ingested.
+    const known =
+      amendments.find((a) => a.number === number && a.language === "en") ??
+      amendments.find((a) => a.number === number);
+    added.push({
+      number,
+      language: lang,
+      target: known?.target ?? null,
+      tabled_by: known?.tabled_by ?? null,
+      original_text: text.original ?? null,
+      amended_text: text.amended ?? null,
+      kind: known?.kind ?? text.kind,
+    });
+  }
+  if (!added.length) return { amendments, fetchedTranslations: [] };
+  return { amendments: [...amendments, ...added], fetchedTranslations: added.map((a) => a.number) };
+}
+
 export async function loadVotingList(
   supabase: LaurusClient,
   code: string,
@@ -152,7 +209,7 @@ export async function loadVotingList(
     const votByLang = new Map((votRows ?? []).map((r) => [r.language, r.payload as VotPayload]));
     const vot = votByLang.get(lang) ?? votByLang.get("it") ?? votByLang.get("en") ?? null;
     const votEn = votByLang.get("en") ?? null;
-    const amendments = (amRows ?? []) as DbAmendment[];
+    const { amendments, fetchedTranslations } = await withEpTranslations(code, (amRows ?? []) as DbAmendment[], lang);
     const itemRef = { id: item.id, code: item.code, vote_date: item.vote_date ?? null };
 
     if (official) {
@@ -189,6 +246,7 @@ export async function loadVotingList(
         vot,
         votEn,
         councilPosition,
+        fetchedTranslations,
         official: {
           versionLabel: official.version_label as string,
           sourceUrl: official.source_url as string,
@@ -201,11 +259,22 @@ export async function loadVotingList(
 
     const hasVot = !!vot && ((vot.splitVotes?.length ?? 0) > 0 || (vot.separateVotes?.length ?? 0) > 0);
     if (amendments.length > 0 || hasVot) {
-      return { vl: buildVlFromAmendments(item, amendments, vot, lang), item: itemRef, amendments, vot, votEn, official: null, councilPosition: null };
+      return {
+        vl: buildVlFromAmendments(item, amendments, vot, lang),
+        item: itemRef,
+        amendments,
+        vot,
+        votEn,
+        official: null,
+        councilPosition: null,
+        fetchedTranslations,
+      };
     }
   }
 
   const registered = getAnnotatedVl(code);
-  if (registered) return { vl: registered, item: null, amendments: [], vot: null, votEn: null, official: null, councilPosition: null };
+  if (registered) {
+    return { vl: registered, item: null, amendments: [], vot: null, votEn: null, official: null, councilPosition: null, fetchedTranslations: [] };
+  }
   return null;
 }

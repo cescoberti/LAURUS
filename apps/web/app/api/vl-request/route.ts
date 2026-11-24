@@ -136,6 +136,11 @@ export async function POST(request: Request) {
                 : loaded.official.motionRead
                   ? "original text taken from the report"
                   : "the report text could not be read — original-text rows left empty",
+              ...(loaded.fetchedTranslations.length
+                ? [
+                    `am ${loaded.fetchedTranslations.join(", ")}: ${lang.toUpperCase()} text read off the EP's amendment file, which the ingestion did not hold yet`,
+                  ]
+                : []),
               ...loaded.official.fill.anomalies.map((a) => `${a.subject}${a.amNo ? ` (am ${a.amNo})` : ""}: ${a.reason.replace(/_/g, " ")}`),
             ].join(" · "),
           }

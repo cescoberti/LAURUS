@@ -19,6 +19,10 @@ import { CONTACT_EMAIL } from "@/lib/committees";
  * without ingested amendments, a statically registered list (e.g. the STREIT
  * ground-truth capture) is served instead. Requires an authenticated advisor.
  */
+// Building the list can mean going to the EP: the report text, and the
+// amendment files for a language the ingestion does not hold yet.
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
