@@ -27,15 +27,12 @@
  *   RESA_NON_LETTERALE, VERSIONE_TRADOTTA_ASSENTE
  */
 import mammoth from "mammoth";
-import { splitRequestFor, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
-import { parseMotionText, originalTextFor, type MotionText } from "@laurus/parser/report-docx";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
-import { articleTextIn } from "./load";
-import type { LoadedCouncilPosition } from "./councilPosition";
 import { splitAgent, splitAgentAvailable, type LocatedRun, type SplitAgentResult } from "./splitAgent";
 
 const BASE = "https://data.europarl.europa.eu";
@@ -161,18 +158,13 @@ function epDocId(code: string): string | null {
  * OGGETTO_NON_RISOLTO, "report text not available". Which is what happened to
  * all six splits of B10-0423/2026 on the eve of the vote.
  */
-async function reportParagraphs(itemCode: string, lang: string): Promise<ReportText | null> {
+async function reportParagraphs(itemCode: string, lang: string): Promise<string[] | null> {
   const id = epDocId(itemCode);
   if (!id) return null;
   const buf = await fetchBytesWithBackoff(documentTextUrl(id, lang));
   if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;
   const { value } = await mammoth.extractRawText({ buffer: buf });
-  const lines = value.split("\n").map((l) => norm(l)).filter(Boolean);
-  // The motion index knows the shapes a flat line scan cannot tell apart —
-  // "§ 2, point a, indent 1", "§ 1, point au" — and it is the same index the
-  // Remarks fill uses, so a row cannot resolve one way there and another here.
-  const motion = await parseMotionText(buf).catch(() => null);
-  return { lines, motion };
+  return value.split("\n").map((l) => norm(l)).filter(Boolean);
 }
 
 /**
@@ -180,51 +172,27 @@ async function reportParagraphs(itemCode: string, lang: string): Promise<ReportT
  * report paragraphs / amendment set. Null when it cannot be pinned down to
  * exactly one run of text — never guess.
  */
-/** The report in one language: its lines, and the motion indexed by reference. */
-interface ReportText {
-  lines: string[];
-  motion: MotionText | null;
-}
-
 function resolveSubject(
-  row: { subject: string; amNo: string | null },
-  report: ReportText | null,
+  subject: string,
+  paragraphs: string[] | null,
   amendments: Map<number, string>,
-  article: ((subject: string) => string | null) | null,
 ): { text: string } | { error: string } {
-  const s = row.subject.trim();
+  const s = subject.trim();
 
-  // What the row votes is the amendment in its "Am No" column, whatever the
-  // subject column calls it: the table names the place ("Article 9, § 4",
-  // "After recital 15"), the text is the amendment's.
-  const amNo = /^(\d+)$/.exec((row.amNo ?? "").trim());
-  const am = amNo ?? /^(?:am|amendment|emendamento|em)\.?\s*(\d+)/i.exec(s);
+  const am = /^(?:am|amendment|emendamento|em)\.?\s*(\d+)/i.exec(s);
   if (am) {
     const text = amendments.get(Number(am[1]));
     return text ? { text } : { error: `amendment ${am[1]} not in the ingested set` };
   }
 
-  // A second reading's subjects are articles of the Council position, which
-  // is a document of the Council's: nothing in the report holds them.
-  if (/^article\b/i.test(s)) {
-    if (!article) return { error: "the Council position is not available in this language" };
-    const text = article(s);
-    return text ? { text } : { error: `"${s}" not found in the Council position` };
-  }
+  if (!paragraphs) return { error: "report text not available" };
 
-  if (!report) return { error: "report text not available" };
-
-  // The motion's own index first: it reads the points and indents under a
-  // paragraph, which the line scan below cannot.
-  const indexed = report.motion ? originalTextFor(s, report.motion) : null;
-  if (indexed) return { text: norm(indexed) };
-
-  const para = /^§+\s*(\d+[a-z]?)$/i.exec(s);
-  const recital = /^(?:recital|considerando)\s+([A-Z]+[a-z]?)$/i.exec(s);
+  const para = /^§+\s*(\d+[a-z]?)/i.exec(s);
+  const recital = /^(?:recital|considerando)\s+([A-Z]+[a-z]?)\b/i.exec(s);
   const anchor = para ? `${para[1]}.` : recital ? `${recital[1]}.` : null;
   if (!anchor) return { error: `subject notation "${s}" not supported` };
 
-  const matches = report.lines.filter((p) => p.startsWith(anchor + " ") || p.startsWith(anchor + "\t"));
+  const matches = paragraphs.filter((p) => p.startsWith(anchor + " ") || p.startsWith(anchor + "\t"));
   if (matches.length === 0) return { error: `"${s}" not found in the report text` };
   if (matches.length > 1) return { error: `"${s}" matches ${matches.length} paragraphs` };
   return { text: matches[0]! };
@@ -446,8 +414,6 @@ export async function expandSplitRows(
     votEn: VotPayload | null;
     votLang: VotPayload | null;
     amendments: DbAmendment[];
-    /** Set for a second reading: the act the list votes on, article by article. */
-    councilPosition?: LoadedCouncilPosition | null;
     /** Told what each model call used, by which agent made it. */
     onUsage?: (agent: "quote-aligner" | "split-agent", u: { input_tokens: number; output_tokens: number }) => void;
   },
@@ -461,9 +427,6 @@ export async function expandSplitRows(
     reportParagraphs(opts.itemCode, "en"),
     isEnglishList ? Promise.resolve(null) : reportParagraphs(opts.itemCode, opts.language),
   ]);
-
-  const articleEn = articleTextIn(opts.councilPosition ?? null, "en");
-  const articleLang = isEnglishList ? articleEn : articleTextIn(opts.councilPosition ?? null, opts.language);
 
   const amEn = new Map<number, string>();
   const amLang = new Map<number, string>();
@@ -485,11 +448,8 @@ export async function expandSplitRows(
 
   for (const row of splitRows) {
     const subject = row.subject;
-    // The table and the footer name the same vote differently — the table by
-    // what is amended, the footer by the amendment — so the row is matched to
-    // its request by `splitRequestFor`, not by the characters of the subject.
-    const reqEn = splitRequestFor(row, opts.votEn?.splitVotes ?? []);
-    const reqLang = splitRequestFor(row, opts.votLang?.splitVotes ?? []);
+    const reqEn = (opts.votEn?.splitVotes ?? []).find((sv) => norm(sv.subject) === norm(subject));
+    const reqLang = (opts.votLang?.splitVotes ?? []).find((sv) => norm(sv.subject) === norm(subject));
     if (!reqEn) {
       notes.push({ subject, level: "error", code: "OGGETTO_NON_RISOLTO", detail: "no English VOT request found for this split (splits are tabled on English)" });
       continue;
@@ -499,8 +459,8 @@ export async function expandSplitRows(
       continue;
     }
 
-    const resolvedEn = resolveSubject(row, paraEn, amEn, articleEn);
-    const resolvedLang = isEnglishList ? null : resolveSubject(row, paraLang, amLang, articleLang);
+    const resolvedEn = resolveSubject(subject, paraEn, amEn);
+    const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang);
     const langSubject = resolvedLang && !("error" in resolvedLang) ? resolvedLang.text : null;
     const enSubject = "error" in resolvedEn ? null : resolvedEn.text;
 

@@ -227,23 +227,6 @@ export async function parseIndicativeVotingList(
   };
 }
 
-/**
- * A list that puts the act itself to the vote rather than a text of
- * Parliament's: a second reading on the Council position, where the vote goes
- * article by article and there is no final vote at all.
- *
- * Two things in the document say so, and only those two: the procedure marker
- * the header prints ("[***II]") and the Tabling Service's own note under the
- * table ("N.B. There is no final vote in second reading."), which is written
- * in English whatever the file. Guessing it from the rows instead would catch
- * a report that amends the Rules of Procedure, whose subjects are articles
- * too and which does end in a final vote.
- */
-export function isSecondReading(vl: Pick<AnnotatedVotingList, "procedureType" | "notes">): boolean {
-  if (/\*{2,3}\s*II\b/i.test(vl.procedureType ?? "")) return true;
-  return vl.notes.some((n) => /\bno final vote\b/i.test(noteText(n)));
-}
-
 export interface SplitRequest {
   group: string;
   subject: string;
@@ -260,52 +243,28 @@ export interface SplitRequest {
  *   1st part: Text as a whole excluding the words “of all kinds”
  *   2nd part: These words
  *
- * A group line opens a block, a subject line ("§ 54", "Am 3", "Recital C",
- * and in a second reading "Article 5, § 1, point 31") opens a request,
- * "Nth part: …" lines are its parts. Ends at the next "Requests for …"
- * heading or at the "Voting scheme" block.
+ * A group line opens a block, a subject line ("§ 54", "Am 3", "Recital C")
+ * opens a request, "Nth part: …" lines are its parts. Ends at the next
+ * "Requests for …" heading.
  */
 export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
+  const out: SplitRequest[] = [];
   // The notes carry their markup now, so match on the words, not the HTML:
   // the heading this looks for is the underlined one.
-  return requestBlock(notes, /^requests? for split votes?/i);
-}
-
-/**
- * The "Voting scheme" block, when the Tabling Service prints one: the split
- * as it will actually be PUT, after merging the competing requests.
- *
- * Two groups asking to cut the same subject in different places do not give
- * two votes, they give one vote in more parts — A10-0297/2026 (MONTSERRAT,
- * second reading) has ECR cutting Article 5, § 1, point 31 in two and ESN
- * cutting it elsewhere, and the table votes it in three. Neither request
- * matches the row; only the scheme does. Same shape as the requests, with no
- * group to name, so the expansion reads it the same way.
- */
-export function votingSchemeFromNotes(notes: string[]): SplitRequest[] {
-  return requestBlock(notes, VOTING_SCHEME);
-}
-
-/** The heading, printed with or without its colon depending on the list. */
-const VOTING_SCHEME = /^voting scheme\s*:?$/i;
-
-/** The subject-and-parts block under `heading`, in the order printed. */
-function requestBlock(notes: string[], heading: RegExp): SplitRequest[] {
-  const out: SplitRequest[] = [];
-  const start = notes.findIndex((n) => heading.test(noteText(n)));
+  const start = notes.findIndex((n) => /^requests? for split votes?/i.test(noteText(n)));
   if (start < 0) return out;
   let group = "";
   let current: SplitRequest | null = null;
   for (const raw of notes.slice(start + 1)) {
     const line = noteText(raw);
     if (!line) continue;
-    if (/^requests? for /i.test(line) || VOTING_SCHEME.test(line)) break;
+    if (/^requests? for /i.test(line)) break;
     const part = /^(\d+)(?:st|nd|rd|th)\s+part\s*:\s*(.*)$/i.exec(line);
     if (part && current) {
       current.parts.push({ section: part[1]!, text: part[2]!.trim() });
       continue;
     }
-    if (SUBJECT_LINE.test(line)) {
+    if (/^(§|am\b|ams?\.?\s*\d|amendment|recital|citation|paragraph)/i.test(line)) {
       current = { group, subject: line, parts: [] };
       out.push(current);
       continue;
@@ -315,133 +274,4 @@ function requestBlock(notes: string[], heading: RegExp): SplitRequest[] {
     current = null;
   }
   return out.filter((r) => r.parts.length > 0);
-}
-
-/**
- * A line that names what is voted, as against the group that asked for it.
- * "Article …" is the second-reading shape: there the vote is on the articles
- * of the Council position, not on paragraphs of a motion, and a line read as
- * a group name instead cost every split of such a list its expansion.
- */
-const SUBJECT_LINE = /^(§|am\b|ams?\.?\s*\d|amendment|recital|citation|paragraph|article|annex)/i;
-
-/**
- * One subject written two ways is still one subject: the table's column says
- * "Article 5, § 1, point 32, intro", the footer "…, point 32, introductory
- * part", and the row and its request have to find each other across that.
- * Case, spacing, the paragraph sign and the EP's abbreviations are levelled;
- * nothing else is touched.
- */
-export function subjectKey(subject: string): string {
-  return subject
-    .toLowerCase()
-    .replace(/[“”„«»]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/\bintroductory part\b/g, "intro")
-    .replace(/\bsub-?point\b/g, "subpoint")
-    .replace(/\bparagraphs?\b|\bpar\.?\b/g, "§")
-    .replace(/\barticle\b|\bart\.?\b/g, "article")
-    .replace(/\bamendment\b|\bams?\b\.?/g, "am")
-    // "§6" and "§ 6" are the same paragraph, and the footer writes it both
-    // ways in one list (A10-0200: the scheme says "§6", the requests "§ 6:").
-    .replace(/§\s*(?=\d)/g, "§ ")
-    .replace(/\b(article|am)\s*(?=\d)/g, "$1 ")
-    .replace(/[(),.;:]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * The amendments a row or a request names: "60cp3=86=" and "Am 60cp3 and 86"
- * both give ["60cp3", "86"]. Empty for a row that votes the text itself
- * ("§"), which is matched on its subject instead. With `base`, the part
- * suffix goes too, so the row "83cp1" meets the request on "Am 83".
- */
-function amendmentTokens(text: string | null | undefined, base = false): string[] {
-  const s = (text ?? "").toLowerCase().replace(/^\s*(?:amendments?|ams?)\b\.?/, "");
-  const found = s.match(/\d+(?:\s*cp\s*\d+)?/g)?.map((t) => t.replace(/\s+/g, "")) ?? [];
-  return [...new Set(base ? found.map((t) => t.replace(/cp\d+$/, "")) : found)].sort();
-}
-
-/**
- * The request a split row is the vote on, or null when it cannot be told.
- *
- * The two sides of one list name the same vote differently. The table says
- * what is amended — "Article 9, § 4", "After recital 15", or just the block
- * heading "Amendments by the committee responsible - separate and split
- * votes" — and the footer says which amendment was asked to be divided,
- * "Am 68". Matching the words alone left a quarter of the split rows in the
- * lists LAURUS holds without a request. So the row is looked up four ways,
- * from the most explicit down:
- *
- *   1. the amendment it carries, exactly ("Am 60cp3 and 86" ↔ "60cp3=86=");
- *   2. its subject, levelled by `subjectKey`;
- *   3. the amendment without the part suffix — amendment 83 voted in
- *      corresponding parts is "83cp1" on the list and "Am 83" in the footer;
- *   4. a subject the footer writes shorter than the table does
- *      ("Article 2, point 12" for "Article 2, § 1, point 12"), and only when
- *      the number of parts agrees.
- *
- * Groups often ask for the very same cut — three of them did on Am 83 of
- * A10-0201 — and that is one vote, not three, so identical requests count as
- * one. Requests that differ and no scheme to merge them is not a match:
- * which cut is put is the Tabling Service's call, not ours.
- */
-export function splitRequestFor(
-  row: Pick<AnnotatedVlRow, "subject" | "amNo" | "splitParts">,
-  requests: SplitRequest[],
-): SplitRequest | null {
-  const parts = row.splitParts.length;
-  /** One request, or none: identical cuts are one vote, and a tie is no answer. */
-  const only = (candidates: SplitRequest[]): SplitRequest | null => {
-    const distinct = (list: SplitRequest[]) => {
-      const seen = new Map<string, SplitRequest>();
-      for (const r of list) {
-        const cut = r.parts.map((p) => subjectKey(p.text)).join("|");
-        if (!seen.has(cut)) seen.set(cut, r);
-      }
-      return [...seen.values()];
-    };
-    const all = distinct(candidates);
-    if (all.length === 1) return all[0]!;
-    // Several different cuts: the one with as many parts as the row, if only one has.
-    const fitting = all.filter((r) => r.parts.length === parts);
-    return fitting.length === 1 ? fitting[0]! : null;
-  };
-
-  const names = (r: SplitRequest) => /^\s*(?:amendments?|ams?)\b/i.test(r.subject);
-  const exact = amendmentTokens(row.amNo);
-  if (exact.length) {
-    // Only a request that says so names an amendment: "§ 80" is a paragraph,
-    // not amendment 80.
-    const hit = only(requests.filter((r) => names(r) && sameTokens(amendmentTokens(r.subject), exact)));
-    if (hit) return hit;
-  }
-
-  const key = subjectKey(row.subject);
-  const bySubject = only(requests.filter((r) => subjectKey(r.subject) === key));
-  if (bySubject) return bySubject;
-
-  const base = amendmentTokens(row.amNo, true);
-  if (base.length) {
-    const hit = only(requests.filter((r) => names(r) && sameTokens(amendmentTokens(r.subject, true), base)));
-    if (hit) return hit;
-  }
-
-  // Last, the shorter spelling — never without the parts agreeing.
-  const words = key.split(" ");
-  const shorter = requests.filter((r) => parts > 0 && r.parts.length === parts && isSubsequence(subjectKey(r.subject).split(" "), words));
-  return only(shorter);
-}
-
-function sameTokens(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((t, i) => t === b[i]);
-}
-
-/** Every word of `needle`, in order, somewhere in `hay`. */
-function isSubsequence(needle: string[], hay: string[]): boolean {
-  if (needle.length === 0 || needle.length === hay.length) return false;
-  let i = 0;
-  for (const w of hay) if (w === needle[i]) i++;
-  return i === needle.length;
 }

@@ -57,15 +57,10 @@ const PARAGRAPH_RE = /^(\d+)\.\s*(.+)$/;
 // Italian the same point as "a) Sostegno alla …". The voting list names it
 // "§ 15, point f" in both, since the Tabling Service drafts lists in English,
 // so only the report side differs and only the closing bracket is reliable.
-const POINT_RE = /^\(?([a-z]{1,2})\)\s*(.+)$/;
+const POINT_RE = /^\(?([a-z])\)\s*(.+)$/;
 // Lower-case roman only: a recital opens "A." / "AA." in capitals, so the two
 // never collide, and the sub-point is only read while a point is open anyway.
 const SUBPOINT_RE = /^([ivxl]+)\.\s*(.+)$/;
-/**
- * A point's label can run past z — a budget report reaches "(au)" — but two
- * letters that read as a roman numeral are a sub-point, not point number 35.
- */
-const ROMAN_LABEL = /^[ivxl]{2,}$/;
 
 export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer): Promise<MotionText | null> {
   const buf = buffer instanceof Buffer ? buffer : Buffer.from(buffer as ArrayBuffer);
@@ -86,7 +81,7 @@ export async function parseMotionText(buffer: Buffer | Uint8Array | ArrayBuffer)
         para = Number(r[1]);
         point = null;
         motion.paragraphs.set(para, text);
-      } else if (para !== null && (r = POINT_RE.exec(text)) && !ROMAN_LABEL.test(r[1]!)) {
+      } else if (para !== null && (r = POINT_RE.exec(text))) {
         point = r[1]!;
         motion.points.set(`${para}.${point}`, text);
       } else if (para !== null && point !== null && (r = SUBPOINT_RE.exec(text))) {
@@ -119,10 +114,10 @@ export function originalTextFor(subject: string, motion: MotionText): string | n
   if ((m = new RegExp(`^${P}\\s*(\\d+)$`, "i").exec(s))) return motion.paragraphs.get(Number(m[1])) ?? null;
   // "§ 22, point b, sub-point i" before "§ 15, point f": the longer shape
   // would otherwise be cut short by the shorter one.
-  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z]{1,2}),\\s*sub-?point\\s+([ivxl]+)$`, "i").exec(s))) {
+  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z]),\\s*sub-?point\\s+([ivxl]+)$`, "i").exec(s))) {
     return motion.points.get(`${Number(m[1])}.${m[2]!.toLowerCase()}.${m[3]!.toLowerCase()}`) ?? null;
   }
-  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z]{1,2})$`, "i").exec(s))) {
+  if ((m = new RegExp(`^${P}\\s*(\\d+),\\s*point\\s+([a-z])$`, "i").exec(s))) {
     return motion.points.get(`${Number(m[1])}.${m[2]!.toLowerCase()}`) ?? null;
   }
   if ((m = /^citation\s*(\d+)$/i.exec(s))) return motion.citations[Number(m[1]) - 1] ?? null;

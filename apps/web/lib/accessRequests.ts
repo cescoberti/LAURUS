@@ -33,6 +33,7 @@ export interface AccessRequest {
 export const REQUEST_COLUMNS = "id, token, email, full_name, note, status, invite_token, created_at, decided_at, decided_via";
 
 const BRAND = "#1f5138";
+const WELCOME_FROM = process.env.EMAIL_FROM_WELCOME ?? "LAURUS <welcome@laurus.the361.eu>";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export const onboardingUrl = (inviteToken: string) => `${SITE}/onboarding?token=${inviteToken}`;
@@ -130,6 +131,9 @@ export async function approveAccessRequest(id: string, by: { userId: string | nu
   if (!emailConfigured()) return { ok: true, message: `Approvata. Email non configurata: passale tu questo link.`, link };
   const sent = await sendEmail({
     to: req.email,
+    // The one mail a person gets from LAURUS before they are in comes from "welcome@".
+    // Any address on the verified domain can send; replies land in the admin's inbox.
+    from: WELCOME_FROM,
     subject: "Il tuo accesso a LAURUS è pronto · Your LAURUS access is ready",
     html: `<div style="font-family:system-ui,sans-serif;max-width:32rem;color:#1a2b22">
 <p>Ciao${req.full_name ? ` ${esc(req.full_name.split(" ")[0]!)}` : ""},</p>
