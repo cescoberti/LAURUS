@@ -18,8 +18,13 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import {
   parseIndicativeVotingList,
   splitRequestsFromNotes,
+  votingSchemeFromNotes,
+  subjectKey,
+  isSecondReading,
   type AnnotatedVotingList,
 } from "@laurus/parser/voting-list-docx";
+import { articleTextFor } from "@laurus/parser/council-position";
+import { loadCouncilPosition, type LoadedCouncilPosition } from "./councilPosition";
 import { parseMotionText, type MotionText } from "@laurus/parser/report-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
@@ -48,6 +53,8 @@ export interface LoadedVl {
   votEn: VotPayload | null;
   /** Set when the list is the EP's own, filled by LAURUS. */
   official: OfficialVl | null;
+  /** Set for a second reading: the Council position the list votes on, EN and the list's language. */
+  councilPosition: LoadedCouncilPosition | null;
 }
 
 /**
@@ -69,14 +76,32 @@ function bytesOf(hex: string): Buffer {
  *
  * The three routes that expand splits each wrote this ternary out, which is
  * three chances for the pre-vote fallback to drift from the post-vote one.
+ *
+ * Where the list prints a "Voting scheme" the scheme wins over the requests
+ * it merges: two groups cutting one subject in different places are put as a
+ * single vote in more parts, and only the scheme says how many. On
+ * A10-0297/2026 the ECR and ESN requests had two parts each and the row three.
  */
 export function votEnFor(loaded: LoadedVl): VotPayload | null {
-  return (
-    loaded.votEn ??
-    (loaded.official
-      ? { splitVotes: splitRequestsFromNotes(loaded.vl.notes), separateVotes: [], rollCalls: [] }
-      : null)
-  );
+  if (loaded.votEn) return loaded.votEn;
+  if (!loaded.official) return null;
+  const requests = splitRequestsFromNotes(loaded.vl.notes);
+  const scheme = votingSchemeFromNotes(loaded.vl.notes);
+  const scheduled = new Set(scheme.map((s) => subjectKey(s.subject)));
+  return {
+    splitVotes: [...scheme, ...requests.filter((r) => !scheduled.has(subjectKey(r.subject)))],
+    separateVotes: [],
+    rollCalls: [],
+  };
+}
+
+/** Resolve an "Article 5, § 1, point 31" subject on the position, in `lang`. */
+export function articleTextIn(
+  position: LoadedCouncilPosition | null,
+  lang: string,
+): ((subject: string) => string | null) | null {
+  const indexed = position?.byLang.get(lang.toLowerCase());
+  return indexed ? (subject: string) => articleTextFor(subject, indexed) : null;
 }
 
 export async function motionFor(epWorkId: string | null, lang: string): Promise<MotionText | null> {
@@ -149,30 +174,38 @@ export async function loadVotingList(
         parseIndicativeVotingList(bytesOf(official.docx as string)),
         motionFor(item.ep_work_id as string | null, lang),
       ]);
-      const { vl, report } = fillRemarks(parsed, byNumber, motion);
+      // A second reading votes on the Council position, not on a motion of
+      // Parliament's: its rows name articles of the act. Fetching that is two
+      // PDFs off the Council register, so it is only attempted for a list
+      // shaped like one — every other file reads exactly as before.
+      const councilPosition = isSecondReading(parsed) || parsed.rows.some((r) => /^article\b/i.test(r.subject.trim()))
+        ? await loadCouncilPosition(item.ep_work_id as string | null, code, [lang, "en"])
+        : null;
+      const { vl, report } = fillRemarks(parsed, byNumber, motion, articleTextIn(councilPosition, lang));
       return {
         vl,
         item: itemRef,
         amendments,
         vot,
         votEn,
+        councilPosition,
         official: {
           versionLabel: official.version_label as string,
           sourceUrl: official.source_url as string,
           fetchedAt: official.fetched_at as string,
           fill: report,
-          motionRead: motion !== null,
+          motionRead: motion !== null || councilPosition !== null,
         },
       };
     }
 
     const hasVot = !!vot && ((vot.splitVotes?.length ?? 0) > 0 || (vot.separateVotes?.length ?? 0) > 0);
     if (amendments.length > 0 || hasVot) {
-      return { vl: buildVlFromAmendments(item, amendments, vot, lang), item: itemRef, amendments, vot, votEn, official: null };
+      return { vl: buildVlFromAmendments(item, amendments, vot, lang), item: itemRef, amendments, vot, votEn, official: null, councilPosition: null };
     }
   }
 
   const registered = getAnnotatedVl(code);
-  if (registered) return { vl: registered, item: null, amendments: [], vot: null, votEn: null, official: null };
+  if (registered) return { vl: registered, item: null, amendments: [], vot: null, votEn: null, official: null, councilPosition: null };
   return null;
 }

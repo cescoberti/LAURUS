@@ -19,7 +19,7 @@
  * (source offline, rate-limited) yields `skipped` checks and `verified: false`
  * — an unverifiable list is reported as unverified, never as clean.
  */
-import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import { isSecondReading, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseVotXml, type VotPayload } from "@laurus/parser/vot-xml";
 import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
 import { remarksFor, amendmentBlockUrl } from "@laurus/parser";
@@ -204,12 +204,24 @@ export function verifyCompleteness(
     `${vot?.rollCalls?.length ?? 0} roll-call requests, none added as rows`,
   );
 
-  // 7. exactly one final-vote row, and it is last
+  // 7. exactly one final-vote row, and it is last — except in second reading,
+  //    where Parliament votes the Council position article by article and
+  //    there is no final vote at all. The list says so itself ("N.B. There is
+  //    no final vote in second reading."); a check that insisted on one
+  //    reported every such list as defective.
+  const noFinalVote = isSecondReading(vl);
   const finalIdx = vl.rows.map((r, i) => (r.isFinalVote ? i : -1)).filter((i) => i >= 0);
   const finalIssues: string[] = [];
-  if (finalIdx.length !== 1) finalIssues.push(`${finalIdx.length} final-vote rows`);
+  if (noFinalVote) {
+    if (finalIdx.length > 0) finalIssues.push(`${finalIdx.length} final-vote rows, and a second reading has none`);
+  } else if (finalIdx.length !== 1) finalIssues.push(`${finalIdx.length} final-vote rows`);
   else if (finalIdx[0] !== vl.rows.length - 1) finalIssues.push("the final vote is not the last row");
-  add("final-vote", "Exactly one final-vote row, at the end", finalIssues, "final vote in place");
+  add(
+    "final-vote",
+    noFinalVote ? "No final vote, as in every second reading" : "Exactly one final-vote row, at the end",
+    finalIssues,
+    noFinalVote ? "second reading: the vote is on the Council position, article by article" : "final vote in place",
+  );
 
   return checks;
 }

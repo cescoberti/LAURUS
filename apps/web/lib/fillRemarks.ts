@@ -86,6 +86,13 @@ export function fillRemarks(
   vl: AnnotatedVotingList,
   amendments: Map<number, AmendmentText>,
   motion: MotionText | null = null,
+  /**
+   * The act's own text, for a list whose subjects are articles of it rather
+   * than paragraphs of a motion — a second reading, where the vote is on the
+   * Council position. Tried after the motion, so nothing changes for the
+   * reports that have one.
+   */
+  articleText: ((subject: string) => string | null) | null = null,
 ): { vl: AnnotatedVotingList; report: FillReport } {
   const report: FillReport = { filled: 0, candidates: 0, anomalies: [] };
 
@@ -95,10 +102,10 @@ export function fillRemarks(
     const note = fallNote(row.remarks);
 
     if (isOriginalTextRow(row)) {
-      if (!motion) return row;
+      if (!motion && !articleText) return row;
       report.candidates++;
       if (row.remarks.trim() && !note) return row;
-      const text = originalTextFor(row.subject, motion);
+      const text = (motion && originalTextFor(row.subject, motion)) || articleText?.(row.subject) || null;
       if (!text) {
         report.anomalies.push({ subject: row.subject, amNo: row.amNo, reason: "original_text_not_found" });
         return row;

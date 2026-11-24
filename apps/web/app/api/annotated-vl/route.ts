@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // official list's own footer notes.
   const votEn = votEnFor(loaded);
   const { spend, onUsage } = startSplitSpend();
-  const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+  const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, councilPosition: loaded.councilPosition, onUsage });
   await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "download", notes, spend });
 
   // This is the UNVERIFIED route — the verified list goes out by email from
