@@ -32,8 +32,8 @@
  * keeps its own result.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { SPLIT_MODEL as MODEL } from "../agents";
 
-const MODEL = "claude-opus-5";
 const ATTEMPTS = 3;
 
 export function splitAgentAvailable(): boolean {
@@ -181,8 +181,10 @@ export async function splitAgent(input: SplitAgentInput): Promise<SplitAgentResu
     try {
       const response = await client.messages.create({
         model: MODEL,
-        max_tokens: 3000,
-        output_config: { effort: "medium" },
+        // Thinking is always on and counts against max_tokens: leave room for it, or a
+        // hard split would come back cut off and fall to the plain cut.
+        max_tokens: 16000,
+        output_config: { effort: "high" },
         system: SYSTEM,
         messages,
       });

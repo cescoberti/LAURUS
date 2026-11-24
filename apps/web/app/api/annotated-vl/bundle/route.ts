@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
+import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { renderAnnotatedVlBundle } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { documentLanguage } from "@/lib/languages";
-import { checkVlRateLimit, DAILY_VL_LIMIT } from "@/lib/rateLimit";
+import { checkVlRateLimit } from "@/lib/rateLimit";
 import { CONTACT_EMAIL } from "@/lib/committees";
 import { errorPage } from "@/lib/site";
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
     return errorPage(
       429,
       "Daily limit reached",
-      `You've reached the limit of ${DAILY_VL_LIMIT} voting lists for today. Come back tomorrow, or email <a href="mailto:${CONTACT_EMAIL}" style="color:#003399">${CONTACT_EMAIL}</a> if you have a specific need.`,
+      `You've reached the limit of ${limit.limit} voting lists for today. Come back tomorrow, or email <a href="mailto:${CONTACT_EMAIL}" style="color:#003399">${CONTACT_EMAIL}</a> if you have a specific need.`,
     );
   }
 
@@ -71,7 +72,9 @@ export async function GET(request: Request) {
     }
     const { vl } = loaded;
     const votEn = votEnFor(loaded);
-    await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments });
+    const { spend, onUsage } = startSplitSpend();
+    const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+    await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "bundle", notes, spend });
     lists.push(vl);
     void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, bundle: day } });
   }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LoginForm } from "@/components/LoginForm";
 import { Wordmark } from "@/components/Logo";
 
@@ -5,17 +6,20 @@ import { Wordmark } from "@/components/Logo";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; status?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, error, status } = await searchParams;
 
-  const notice =
-    error === "not-invited"
-      ? {
-          tone: "warn" as const,
-          text: "That account is not a LAURUS member yet. LAURUS is invite-only — ask an admin for an invite, then sign in with the same address.",
-        }
-      : error === "oauth-failed"
+  // Someone who is not a member tried to sign in: that attempt is already the request
+  // (see /auth/callback), so what they need is thanks, not instructions.
+  const requested = status === "requested";
+
+  const notice = requested
+    ? {
+        tone: "ok" as const,
+        text: "Thank you for your request. LAURUS is still in beta. An admin will onboard you once you're verified.",
+      }
+    : error === "oauth-failed"
         ? { tone: "error" as const, text: "Sign-in did not complete. Please try again." }
         : error === "invite-link-invalid"
           ? { tone: "error" as const, text: "This invite link is not valid or has expired. Ask an admin to re-invite you." }
@@ -33,8 +37,8 @@ export default async function LoginPage({
         {notice && (
           <div
             className={`rise rise-1 mt-12 rounded-2xl px-5 py-4 text-[0.875rem] leading-relaxed ${
-              notice.tone === "warn"
-                ? "bg-gold-200/40 text-gold-600 ring-1 ring-inset ring-gold-500/25"
+              notice.tone === "ok"
+                ? "bg-eu-50/80 text-eu-900 ring-1 ring-inset ring-eu-200/70"
                 : "bg-red-50/80 text-red-700 ring-1 ring-inset ring-red-200"
             }`}
           >
@@ -46,8 +50,17 @@ export default async function LoginPage({
           <LoginForm next={next ?? "/"} />
         </div>
 
-        <p className="rise rise-3 mt-10 text-center text-xs text-ink-400">
-          EP Plenary Companion · invite-only
+        <p className="rise rise-3 mt-8 text-center text-[0.8125rem] text-ink-500">
+          No account yet?{" "}
+          <Link href="/request-access" className="font-semibold text-eu-700 hover:underline">
+            Request access
+          </Link>
+        </p>
+        <p className="rise rise-3 mt-6 text-center text-xs text-ink-400">
+          EP Plenary Companion · invite-only ·{" "}
+          <Link href="/privacy" className="hover:underline">
+            Privacy
+          </Link>
         </p>
       </div>
     </div>

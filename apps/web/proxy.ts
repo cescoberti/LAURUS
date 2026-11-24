@@ -10,6 +10,12 @@ export async function proxy(req: NextRequest) {
     PUBLIC_PATHS.has(pathname) ||
     // Invite links are opened by not-yet-registered members.
     pathname === "/onboarding" ||
+    // Someone with no invite asks to join; an admin decides. The one-tap page
+    // behind the admin's email is gated by its own unguessable token.
+    pathname === "/request-access" ||
+    // What LAURUS keeps about people: readable by anyone, and linked from the Google sign-in screen.
+    pathname === "/privacy" ||
+    pathname.startsWith("/richiesta/") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/_next") ||

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
+import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { logEvent } from "@/lib/track";
 import { fileStem } from "@/lib/rapporteur";
@@ -48,7 +49,9 @@ export async function GET(request: Request) {
   // struck, later parts = those words. Before the vote the requests are the
   // official list's own footer notes.
   const votEn = votEnFor(loaded);
-  await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments });
+  const { spend, onUsage } = startSplitSpend();
+  const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+  await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "download", notes, spend });
 
   // This is the UNVERIFIED route — the verified list goes out by email from
   // /api/vl-request after both verification passes. On the EP's own list the

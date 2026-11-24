@@ -16,6 +16,7 @@ const NAV: Array<{ label: NavActive; href: string }> = [
 // Admin-only, and all behind one menu: six more links in the bar made the
 // ones that every advisor uses harder to find. Each says what is behind it.
 const ADMIN: Array<{ label: string; href: string; hint: string }> = [
+  { label: "Requests", href: "/admin/richieste", hint: "Who asked for access — approve or refuse" },
   { label: "Users", href: "/admin/users", hint: "Members, roles and access" },
   { label: "Inbox", href: "/admin/inbox", hint: "Email waiting for your approval" },
   { label: "Agents", href: "/admin/agenti", hint: "What the models do, and how checked" },

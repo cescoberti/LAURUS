@@ -35,6 +35,9 @@ export interface AgentInfo {
   workAt?: { label: string; href: string };
 }
 
+/** The model of the two agents that touch the voting list's text (split agent, quote aligner). */
+export const SPLIT_MODEL = "claude-opus-5-5";
+
 export const AGENTS: AgentInfo[] = [
   {
     id: "inbox-triage",
@@ -61,7 +64,7 @@ export const AGENTS: AgentInfo[] = [
     name: "Split agent",
     purpose:
       "Gives a split request its version in the list's language when the exact cut cannot finish it — a list is never left with English notation in it.",
-    model: "claude-opus-5",
+    model: SPLIT_MODEL,
     trigger: "Every voting list generated, for each split row the plain cut could not complete or would leave in English.",
     autonomy: "acts-checked",
     does: [
@@ -81,7 +84,7 @@ export const AGENTS: AgentInfo[] = [
     id: "quote-aligner",
     name: "Quote aligner",
     purpose: "Before the vote, locates the Italian words that a split's English quote refers to, so the parts can be struck in the Italian paragraph.",
-    model: "claude-opus-5",
+    model: SPLIT_MODEL,
     trigger: "Every split row the plain cut can resolve on the English side.",
     autonomy: "acts-checked",
     does: ["Returns, for each English quote, one run of the translated paragraph."],
@@ -102,10 +105,12 @@ export const TRIAGE_EVENT = "agent_triage";
 /**
  * US dollars per million tokens, from Anthropic's price list of 2026-11-03.
  * These are what the cost in the Agents panel is computed with: change them
- * here when the list or the model in use changes.
+ * here when the list or the model in use changes. An event records the model it
+ * ran on, so a row from before a change is still costed at its own price.
  */
 export const PRICES: Record<string, { in: number; out: number }> = {
   "claude-opus-5": { in: 5, out: 25 },
+  "claude-opus-5-5": { in: 4, out: 20 },
 };
 
 /** What a model call used, as the API reports it. */
@@ -138,4 +143,22 @@ export function addSpend(into: Record<SpendKey, Spend>, agent: SpendKey, u: Toke
 export function costUsd(model: string, input: number, output: number): number {
   const p = PRICES[model];
   return p ? (input * p.in + output * p.out) / 1_000_000 : 0;
+}
+
+/**
+ * What one voting list's model calls cost: the figure the event stored when it
+ * was written (priced at its own model), or, for an event without one, worked
+ * out from the tokens it recorded.
+ */
+export function eventUsd(meta: Record<string, unknown> | null | undefined): number {
+  const m = meta ?? {};
+  if (typeof m.usd === "number") return m.usd;
+  const spend = (m.spend ?? {}) as Partial<Record<SpendKey, Partial<Spend>>>;
+  let input = 0;
+  let output = 0;
+  for (const s of Object.values(spend)) {
+    input += Number(s?.input) || 0;
+    output += Number(s?.output) || 0;
+  }
+  return costUsd(typeof m.model === "string" ? m.model : "claude-opus-5", input, output);
 }

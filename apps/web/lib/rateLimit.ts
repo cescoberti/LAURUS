@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Cap on voting lists produced per user per rolling 24h (the number is in
- * lib/limits.ts). It keeps the EP's API from being hammered and it bounds the
- * model spend of the split agents: a list with splits costs real money, a few
- * cents each. Each served VL is logged in laurus.events as
- * 'vl_download'/'vl_generate', which we count here. Admins are exempt.
+ * Cap on voting lists produced per user per rolling 24h (the numbers are in
+ * lib/limits.ts: 5 for a member, 10 for an admin). It keeps the EP's API from
+ * being hammered and it bounds the model spend of the split agents: a list with
+ * splits costs real money, a few cents each. Each served VL is logged in
+ * laurus.events as 'vl_download'/'vl_generate', which we count here.
  * Enforced server-side in the VL route handlers.
  */
-import { DAILY_VL_LIMIT } from "@/lib/limits";
+import { DAILY_VL_LIMIT, dailyLimitFor } from "@/lib/limits";
 
 export { DAILY_VL_LIMIT };
 
@@ -23,9 +23,8 @@ export async function checkVlRateLimit(userId: string): Promise<RateLimitResult>
   const supabase = await createClient();
 
   const { data: profile } = await supabase.from("users").select("role").eq("id", userId).single();
-  if (profile?.role === "admin") {
-    return { allowed: true, used: 0, limit: DAILY_VL_LIMIT, isAdmin: true };
-  }
+  const isAdmin = profile?.role === "admin";
+  const limit = dailyLimitFor(isAdmin);
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count } = await supabase
@@ -36,5 +35,5 @@ export async function checkVlRateLimit(userId: string): Promise<RateLimitResult>
     .gte("created_at", since);
 
   const used = count ?? 0;
-  return { allowed: used < DAILY_VL_LIMIT, used, limit: DAILY_VL_LIMIT, isAdmin: false };
+  return { allowed: used < limit, used, limit, isAdmin };
 }
