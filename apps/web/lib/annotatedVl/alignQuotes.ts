@@ -17,8 +17,8 @@
  * caller falls back.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { SPLIT_MODEL as MODEL } from "../agents";
 
-const MODEL = "claude-opus-5";
 
 const SYSTEM = `You align split-vote requests of the European Parliament across languages.
 You are given a paragraph in English, one or more runs of words quoted from it, and the official translation of the same paragraph in another language.
@@ -55,8 +55,9 @@ export async function alignQuotes(
   try {
     const response = await client.messages.create({
       model: MODEL,
-      max_tokens: 2000,
-      output_config: { effort: "low" },
+      // Thinking counts against max_tokens: leave room for it.
+      max_tokens: 16000,
+      output_config: { effort: "high" },
       system: SYSTEM,
       messages: [
         {

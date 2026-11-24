@@ -8,7 +8,7 @@ import { verifyVotingList, votingListFingerprint, type VlVerificationReport, typ
 import { sendVlEmail } from "@/lib/notify/vlEmail";
 import { emailConfigured } from "@/lib/notify/email";
 import { logEvent } from "@/lib/track";
-import { SPLIT_EVENT, addSpend, costUsd, emptySpend } from "@/lib/agents";
+import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import { fileStem } from "@/lib/rapporteur";
 import { documentLanguage } from "@/lib/languages";
 import { checkVlRateLimit } from "@/lib/rateLimit";
@@ -99,35 +99,17 @@ export async function POST(request: Request) {
       // Before the vote the split requests are only in the official list's
       // footer notes (English); after it, in the VOT.
       const votEn = votEnFor(loaded);
-      const spend = emptySpend();
+      const { spend, onUsage } = startSplitSpend();
       const expansionNotes = await expandSplitRows(loaded.vl, {
         itemCode: code,
         language: lang,
         votEn,
         votLang: loaded.vot,
         amendments: loaded.amendments,
-        onUsage: (agent, u) => addSpend(spend, agent, u),
+        onUsage,
       });
-      // What the agents did on this list, for the admin's Agents panel.
-      const calls = spend["quote-aligner"].calls + spend["split-agent"].calls;
-      if (expansionNotes.length || calls) {
-        const n = (c: string) => expansionNotes.filter((x) => x.code === c).length;
-        void logEvent(SPLIT_EVENT, {
-          userId: user.id,
-          itemCode: code,
-          meta: {
-            language: lang,
-            aligned: n("RESA_AUTOMATICA"),
-            agent: n("SPLIT_AGENTE"),
-            repeated: n("SPLIT_AGENTE_OCCORRENZA"),
-            translated: n("SPLIT_TRADOTTO"),
-            errors: expansionNotes.filter((x) => x.level === "error").length,
-            // What the model calls of this list used and cost: the Agents panel adds it up.
-            spend,
-            usd: costUsd("claude-opus-5", spend["quote-aligner"].input + spend["split-agent"].input, spend["quote-aligner"].output + spend["split-agent"].output),
-          },
-        });
-      }
+      // What the agents did on this list, and what it cost, for the Agents and Usage pages.
+      await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "email", notes: expansionNotes, spend });
       const expansionCheck: VlCheck = {
         id: "split-expansion",
         pass: 2,

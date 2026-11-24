@@ -50,13 +50,18 @@ export default async function AgentsPage() {
     let calls = 0;
     let input = 0;
     let output = 0;
+    let dollars = 0;
     for (const r of rows) {
       const s = pick(r.meta ?? {});
+      const i = Number(s?.input) || 0;
+      const o = Number(s?.output) || 0;
       calls += Number(s?.calls) || 0;
-      input += Number(s?.input) || 0;
-      output += Number(s?.output) || 0;
+      input += i;
+      output += o;
+      // Each event is costed at the price of the model it ran on; rows from before the model was recorded ran on Opus 5.
+      dollars += costUsd(typeof r.meta?.model === "string" ? r.meta.model : "claude-opus-5", i, o);
     }
-    return { calls, input, output, usd: costUsd("claude-opus-5", input, output) };
+    return { calls, input, output, usd: dollars };
   };
 
   const keyConfigured = !!process.env.ANTHROPIC_API_KEY;
@@ -99,7 +104,7 @@ export default async function AgentsPage() {
   const triageSpend = sumSpend((triageEvents ?? []) as Array<{ meta: Record<string, unknown> }>, (m) => m as SpendMeta);
   triageActivity.stats.push(["Calls (30 d)", triageSpend.calls], ["Cost (30 d)", usd(triageSpend.usd)]);
 
-  type SplitMeta = { aligned?: number; agent?: number; repeated?: number; translated?: number; errors?: number; language?: string };
+  type SplitMeta = { usd?: number; aligned?: number; agent?: number; repeated?: number; translated?: number; errors?: number; language?: string };
   const ev = (splitEvents ?? []) as Array<{ item_code: string | null; created_at: string; meta: SplitMeta }>;
   const sum = (k: keyof SplitMeta) => ev.reduce((n, e) => n + (Number(e.meta?.[k]) || 0), 0);
   const describe = (m: SplitMeta) =>
@@ -116,7 +121,8 @@ export default async function AgentsPage() {
     key: `${e.item_code}-${i}`,
     when: when(e.created_at),
     what: e.item_code ?? "—",
-    outcome: describe(e.meta ?? {}),
+    // What this list cost to generate: the quote aligner and the split agent together.
+    outcome: `${describe(e.meta ?? {})}${e.meta?.usd != null ? ` · ${usd(Number(e.meta.usd))}` : ""}`,
     href: e.item_code ? `/items/${encodeURIComponent(e.item_code)}` : undefined,
   }));
   const splitRows = ev as unknown as Array<{ meta: Record<string, unknown> }>;
