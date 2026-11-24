@@ -711,7 +711,16 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
   let listed = 0;
   let fetched = 0;
   let unchanged = 0;
+  // The EP's WAF sometimes answers every download with its JavaScript
+  // challenge (HTTP 202) for a stretch. Each refusal costs ~16 s, so trying
+  // all the lists stretched a tick from 5 minutes to 15-28. Two refusals in a
+  // row mean the stretch is on: stop and let the next tick ask again.
+  let challenged = 0;
   for (const e of entries) {
+    if (challenged >= 2) {
+      console.warn("  vl: the EP is challenging downloads — leaving the rest for the next tick");
+      break;
+    }
     const item = resolve(e);
     if (!item) continue; // a file this session does not track (e.g. a C document)
     listed++;
@@ -756,9 +765,11 @@ async function syncVotingLists(s: Session): Promise<{ listed: number; fetched: n
     }
     if (res.status !== 200 || res.body.length < 4 || res.body[0] !== 0x50 || res.body[1] !== 0x4b) {
       console.warn(`  vl ${e.code}: HTTP ${res.status} (${res.body.length} B) — not a DOCX, skipped this tick`);
+      if (res.status === 202) challenged++;
       await sleep(1000);
       continue;
     }
+    challenged = 0;
     const sha256 = createHash("sha256").update(res.body).digest("hex");
     if (have?.sha256 === sha256) {
       await supabase.from("voting_lists").update({ checked_at: new Date().toISOString(), version_label: label }).eq("item_id", item.id).eq("sha256", sha256);
