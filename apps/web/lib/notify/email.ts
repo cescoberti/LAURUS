@@ -19,6 +19,8 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
+  /** A different sender for this message, on a domain verified in Resend. Default: EMAIL_FROM. */
+  from?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { ok: false, error: "RESEND_API_KEY not set" };
@@ -27,7 +29,7 @@ export async function sendEmail(opts: {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? "LAURUS <onboarding@resend.dev>",
+      from: opts.from ?? process.env.EMAIL_FROM ?? "LAURUS <onboarding@resend.dev>",
       to: [opts.to],
       subject: opts.subject,
       html: opts.html,
