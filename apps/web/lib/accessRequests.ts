@@ -38,6 +38,44 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export const onboardingUrl = (inviteToken: string) => `${SITE}/onboarding?token=${inviteToken}`;
 export const decisionUrl = (token: string) => `${SITE}/richiesta/${token}`;
 
+export type RequestOutcome = "created" | "member" | "already-waiting" | "throttled" | "failed";
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** More than this many requests in an hour is a flood, not people: stop before it reaches the admins' inbox. */
+const HOURLY_CAP = 20;
+
+/**
+ * Record that someone asks to join, and tell the admins once. Used by the form
+ * and by a sign-in attempt from a person who is not a member yet, so both
+ * doors behave the same: a member is not asked again, a request already
+ * waiting is not announced twice, and a flood is stopped.
+ */
+export async function createAccessRequest(input: { email: string; fullName?: string | null; note?: string | null }): Promise<RequestOutcome> {
+  const email = input.email.trim().toLowerCase().slice(0, 200);
+  if (!EMAIL_SHAPE.test(email)) return "failed";
+  const admin = createAdminClient();
+
+  const { data: member } = await admin.from("users").select("id").eq("email", email).maybeSingle();
+  if (member) return "member";
+
+  const { data: waiting } = await admin.from("access_requests").select("id").eq("status", "pending").ilike("email", email).limit(1);
+  if (waiting?.length) return "already-waiting";
+
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await admin.from("access_requests").select("id", { count: "exact", head: true }).gte("created_at", since);
+  if ((count ?? 0) >= HOURLY_CAP) return "throttled";
+
+  const { data: row, error } = await admin
+    .from("access_requests")
+    .insert({ email, full_name: input.fullName?.trim().slice(0, 120) || null, note: input.note?.trim().slice(0, 500) || null })
+    .select(REQUEST_COLUMNS)
+    .single();
+  if (error || !row) return "failed";
+
+  await notifyAdminsOfRequest(row as AccessRequest);
+  return "created";
+}
+
 /** Email to every admin: who asked, and one button to decide. Best effort — the request is saved either way. */
 export async function notifyAdminsOfRequest(req: AccessRequest): Promise<void> {
   if (!emailConfigured()) return;
@@ -95,11 +133,11 @@ export async function approveAccessRequest(id: string, by: { userId: string | nu
     subject: "Il tuo accesso a LAURUS è pronto · Your LAURUS access is ready",
     html: `<div style="font-family:system-ui,sans-serif;max-width:32rem;color:#1a2b22">
 <p>Ciao${req.full_name ? ` ${esc(req.full_name.split(" ")[0]!)}` : ""},</p>
-<p>la tua richiesta è stata approvata. Apri il link, scegli una password (almeno 8 caratteri) e sei dentro:</p>
+<p>la tua richiesta è stata approvata. Apri il link e scegli come entrare: una password (almeno 8 caratteri) oppure il tuo account Google, con questo stesso indirizzo.</p>
 <p style="margin:20px 0"><a href="${link}" style="background:${BRAND};color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;display:inline-block">Entra in LAURUS</a></p>
 <p style="color:#6b7a72;font-size:13px">Il link è personale, vale 30 giorni e funziona una volta sola.</p>
 <hr style="border:none;border-top:1px solid #e2e8e4;margin:24px 0">
-<p>Your request has been approved. Open the link, choose a password (at least 8 characters) and you are in. The link is personal, valid for 30 days and works once.</p>
+<p>Your request has been approved. Open the link and choose how to sign in: a password (at least 8 characters) or your Google account with this same address. The link is personal, valid for 30 days and works once.</p>
 <p style="color:#8a9a92;font-size:12px">LAURUS · Less paperwork. More wins.</p>
 </div>`,
   });

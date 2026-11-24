@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createAccessRequest } from "@/lib/accessRequests";
 
 /**
  * Where Google and the magic-link email come back to.
@@ -9,7 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * arriving here gets in only if they already have a LAURUS profile, or if
  * they are carrying a valid invite (the token cookie set before the redirect,
  * or an open invite addressed to the email Google vouched for). Anyone else
- * is signed straight back out — the identity is real, the membership is not.
+ * is signed straight back out — the identity is real, the membership is not —
+ * and their attempt is recorded as an access request for an admin to decide.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
@@ -61,9 +63,20 @@ export async function GET(request: NextRequest) {
     (!invite.email || invite.email.toLowerCase() === email);
 
   if (!usable) {
+    // Not a member and no invite: the attempt itself is the request. The identity
+    // is real (Google vouched for the address), so an admin is told who tried, and
+    // the person is thanked instead of being told to go and find an invite.
+    if (email) {
+      const fullName = (user.user_metadata?.full_name ?? user.user_metadata?.name) as string | undefined;
+      await createAccessRequest({ email, fullName: fullName ?? null, note: "Tried to sign in with Google" });
+    }
     await supabase.auth.signOut();
+    // Signing in made an account with no profile behind it. Remove it, so that when
+    // the admin approves, the person can create theirs (a leftover one would answer
+    // "already exists" to the password sign-up).
+    await admin.auth.admin.deleteUser(user.id);
     const url = new URL(`${origin}/login`);
-    url.searchParams.set("error", "not-invited");
+    url.searchParams.set("status", "requested");
     const res = NextResponse.redirect(url);
     res.cookies.delete("laurus_invite");
     return res;
