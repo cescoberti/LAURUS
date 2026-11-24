@@ -11,6 +11,12 @@
  *     stands if re-composing the parts gives back the original character for
  *     character — otherwise the row is NOT expanded and keeps its notation,
  *     marked with an error code;
+ *   - the quoted words are the Tabling Service's transcription of the report
+ *     and can differ from it by a word ("plain packages requirements" where
+ *     the report writes "plain packaging requirements"): such a quote is
+ *     located as the ONE span of the paragraph that fits, what is shown is
+ *     the report's own words, and the row says which words differ
+ *     (CITAZIONE_DIFFORME);
  *   - the rendering is the advisor's: the parent row is emptied, part 1 is
  *     the whole paragraph in the list's language with the split-off words
  *     struck through, the later parts are those words;
@@ -24,10 +30,11 @@
  *   OGGETTO_NON_RISOLTO, TERMINI_NON_TROVATI, TERMINI_AMBIGUI,
  *   RICOMPOSIZIONE_FALLITA, GRAMMATICA_NON_SUPPORTATA
  * Warning codes (row expanded, flagged):
- *   RESA_NON_LETTERALE, VERSIONE_TRADOTTA_ASSENTE
+ *   RESA_NON_LETTERALE, VERSIONE_TRADOTTA_ASSENTE, CITAZIONE_DIFFORME
  */
 import mammoth from "mammoth";
 import { splitRequestFor, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import { locateQuote, occurrences, type QuoteDiff } from "@laurus/parser/quote-locate";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
 import { parseMotionText, originalTextFor, type MotionText } from "@laurus/parser/report-docx";
@@ -86,41 +93,6 @@ function stripOuterQuotes(s: string): string {
   return s.replace(/^["']\s*/, "").replace(/\s*["']$/, "").trim();
 }
 
-/**
- * "emphasises that unpaid … labour market policies," → the literal span of
- * `hay` from the first fragment to the end of the last one. Each fragment
- * must occur exactly once, in order; a quote without an ellipsis is returned
- * as it is.
- */
-function expandEllipsis(hay: string, quote: string): { text: string } | { error: { code: string; detail: string } } {
-  const pieces = quote.split(/\s*(?:…|\.\.\.)\s*/).map((p) => p.trim()).filter(Boolean);
-  if (pieces.length < 2) return { text: quote };
-  let from = -1;
-  let to = -1;
-  for (let piece of pieces) {
-    // The request quotes the words with its own closing punctuation ("…
-    // policies,") where the paragraph has another ("… policies;"): the words
-    // are what is voted, so drop a trailing comma/semicolon that is not there.
-    if (occurrences(hay, piece) === 0 && /[,;.]$/.test(piece) && occurrences(hay, piece.slice(0, -1)) === 1) piece = piece.slice(0, -1);
-    const n = occurrences(hay, piece);
-    if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${piece.slice(0, 60)}…" is not in the subject text` } };
-    if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${piece.slice(0, 60)}…" occurs ${n} times in the subject text` } };
-    const at = hay.indexOf(piece);
-    if (at < to) return { error: { code: "TERMINI_NON_TROVATI", detail: `the abbreviated quote's fragments are not in order in the subject text` } };
-    if (from < 0) from = at;
-    to = at + piece.length;
-  }
-  return { text: hay.slice(from, to) };
-}
-
-/** Count non-overlapping occurrences of `needle` in `hay`. */
-function occurrences(hay: string, needle: string): number {
-  if (!needle) return 0;
-  let n = 0;
-  for (let i = hay.indexOf(needle); i !== -1; i = hay.indexOf(needle, i + needle.length)) n++;
-  return n;
-}
-
 // ---------------------------------------------------------------------------
 // Notation grammar
 // ---------------------------------------------------------------------------
@@ -137,8 +109,8 @@ const THOSE_WORDS =
 /**
  * The quoted terms of an "excluding the words" notation (normalised plane).
  *
- * One clause can leave out several runs — "excluding the words \u201csystemic\u201d and
- * \u201cand gender-diverse people\u201d" is a vote in three parts, not two — so every
+ * One clause can leave out several runs — "excluding the words “systemic” and
+ * “and gender-diverse people”" is a vote in three parts, not two — so every
  * quoted run is returned, in the order printed. A clause with no quotation
  * marks gives its whole tail as the single run.
  */
@@ -245,10 +217,31 @@ function resolveSubject(
 // The expansion itself
 // ---------------------------------------------------------------------------
 
+interface PartWarning {
+  code: string;
+  detail: string;
+  level?: "error" | "warning";
+}
+
 interface PartTexts {
   /** Rendering in the list's language (light HTML: `<s>` marks the split-off words). */
   main: string;
-  warning?: { code: string; detail: string; level?: "error" | "warning" };
+  warning?: PartWarning;
+  /** Further notes on the same row (a tolerantly located quote, say). */
+  more?: PartWarning[];
+}
+
+/** What a tolerantly located quote does not share with the report, in words. */
+function difformDetail(diffs: QuoteDiff[]): string {
+  const said = diffs.map((d) =>
+    d.quoted && d.report
+      ? `the request quotes "${d.quoted}" where the report writes "${d.report}"`
+      : d.report
+        ? `the report has "${d.report}" where the request has nothing`
+        : `the request has "${d.quoted}" where the report has nothing`,
+  );
+  const which = said.length ? said.join("; ") : "the quote differs from the report only in punctuation or capitals";
+  return `${which} — the words shown are the report's own, located as the one span of the paragraph that fits; check it against the official list`;
 }
 
 /** Locates the translated runs for English quotes (see alignQuotes.ts). */
@@ -286,29 +279,34 @@ async function cutParts(
   if (laterAreQuotes) candidates.push({ quotes: enParts.slice(1).map((p) => stripOuterQuotes(partText(p.text))), grouped: false });
   const terms = excludedTerms(first);
   // Several runs left out of a two-part vote are taken out together and voted
-  // together: "excluding the words \u201cX\u201d and \u201cY\u201d" / "these words" is one
+  // together: "excluding the words “X” and “Y”" / "these words" is one
   // second part holding both (A10-0280, Recital O).
   if (terms.length === enParts.length - 1) candidates.push({ quotes: terms, grouped: false });
   else if (terms.length > 1 && enParts.length === 2) candidates.push({ quotes: terms, grouped: true });
   if (candidates.length === 0) {
-    return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `notation "${first.slice(0, 60)}\u2026" not recognised` } };
+    return { error: { code: "GRAMMATICA_NON_SUPPORTATA", detail: `notation "${first.slice(0, 60)}…" not recognised` } };
   }
 
   /** One quote set, resolved to literal runs of the paragraph and put back again. */
-  const cut = (quotes: string[]): { quotes: string[] } | { error: { code: string; detail: string } } => {
+  const cut = (
+    quotes: string[],
+    tolerant: boolean,
+  ): { quotes: string[]; diffs: QuoteDiff[] } | { error: { code: string; detail: string } } => {
     const resolved: string[] = [];
+    const diffs: QuoteDiff[] = [];
     for (const q of quotes) {
-      // A long quote is often abbreviated "first words \u2026 last words": resolve
+      // A long quote is often abbreviated "first words … last words": resolve
       // it to the one literal span of the paragraph that starts and ends so.
-      const span = expandEllipsis(para, q);
+      const span = locateQuote(para, q, tolerant);
       if ("error" in span) return { error: span.error };
       resolved.push(span.text);
+      diffs.push(...span.diffs);
     }
     let rest = para;
     for (const q of resolved) {
       const n = occurrences(rest, q);
-      if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${q.slice(0, 60)}\u2026" is not in the subject text` } };
-      if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${q.slice(0, 60)}\u2026" occurs ${n} times in the subject text` } };
+      if (n === 0) return { error: { code: "TERMINI_NON_TROVATI", detail: `"${q.slice(0, 60)}…" is not in the subject text` } };
+      if (n > 1) return { error: { code: "TERMINI_AMBIGUI", detail: `"${q.slice(0, 60)}…" occurs ${n} times in the subject text` } };
       rest = rest.replace(q, SENTINEL);
     }
     // Putting the quotes back must give the paragraph again, or the cut is wrong.
@@ -317,45 +315,57 @@ async function cutParts(
     if (recomposed !== para) {
       return { error: { code: "RICOMPOSIZIONE_FALLITA", detail: "re-inserting the quoted words does not give back the original paragraph" } };
     }
-    return { quotes: resolved };
+    return { quotes: resolved, diffs };
   };
 
   let quotesEn: string[] | null = null;
   let grouped = false;
-  let disagreement: PartTexts["warning"];
+  let disagreement: PartWarning | undefined;
+  let difform: PartWarning | undefined;
   let firstError: { code: string; detail: string } | null = null;
-  for (const [i, c] of candidates.entries()) {
-    const got = cut(c.quotes);
-    if ("error" in got) {
-      firstError ??= got.error;
-      continue;
+  // A notation that matches the report word for word always wins: the
+  // tolerant location is only for a quote that no notation resolves exactly.
+  search: for (const tolerant of [false, true]) {
+    for (const [i, c] of candidates.entries()) {
+      const got = cut(c.quotes, tolerant);
+      if ("error" in got) {
+        if (!tolerant) firstError ??= got.error;
+        continue;
+      }
+      quotesEn = got.quotes;
+      grouped = c.grouped;
+      if (i > 0) {
+        disagreement = {
+          code: "NOTAZIONE_DISCORDE",
+          detail:
+            "the later parts quote words the paragraph does not carry; the cut follows the words part 1 says are left out — check it against the official list",
+        };
+      }
+      if (got.diffs.length) difform = { code: "CITAZIONE_DIFFORME", detail: difformDetail(got.diffs) };
+      break search;
     }
-    quotesEn = got.quotes;
-    grouped = c.grouped;
-    if (i > 0) {
-      disagreement = {
-        code: "NOTAZIONE_DISCORDE",
-        detail:
-          "the later parts quote words the paragraph does not carry; the cut follows the words part 1 says are left out \u2014 check it against the official list",
-      };
-    }
-    break;
   }
   if (!quotesEn) return { error: firstError! };
+
+  /** The row's notes: what the rendering says first, then the quote's spelling. */
+  const flag = (w?: PartWarning): Pick<PartTexts, "warning" | "more"> => {
+    const all = [w, difform].filter((x): x is PartWarning => !!x);
+    return { warning: all[0], more: all.slice(1) };
+  };
 
   // Rendering, as an advisor reads an amendment: part 1 is the WHOLE
   // paragraph with the split-off words struck through, the later parts are
   // those words — so the first row shows what was taken out.
   /** The runs as the list votes them: one part each, or all in the last part. */
   const asParts = (runs: string[]) =>
-    grouped ? [{ main: sentenceCase(runs.join(" \u2026 ")) }] : runs.map((q) => ({ main: sentenceCase(q) }));
+    grouped ? [{ main: sentenceCase(runs.join(" … ")) }] : runs.map((q) => ({ main: sentenceCase(q) }));
 
-  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn), warning: disagreement }, ...asParts(quotesEn)] };
+  if (isEnglishList) return { parts: [{ main: struck(para, quotesEn), ...flag(disagreement) }, ...asParts(quotesEn)] };
 
   const fallback = (code: string, detail: string): { parts: PartTexts[] } => ({
     parts: enParts.map((p, i) => ({
       main: norm(langParts[i]?.text ?? p.text),
-      warning: i === 0 ? { code, detail } : undefined,
+      ...(i === 0 ? flag({ code, detail }) : {}),
     })),
   });
   if (!langSubject) return fallback("VERSIONE_TRADOTTA_ASSENTE", "translated report not available");
@@ -366,7 +376,7 @@ async function cutParts(
   // paragraph by the aligner and checked verbatim; else the official
   // notation stands, flagged.
   let langQuotes: string[] | null = null;
-  let warning: PartTexts["warning"];
+  let warning: PartWarning | undefined;
   if (langParts.length === enParts.length && langParts.length > 0) {
     langQuotes =
       langParts.length >= 2 && langParts.slice(1).every((p) => !THOSE_WORDS.test(partText(p.text)))
@@ -398,7 +408,7 @@ async function cutParts(
 
   void firstLang;
 
-  return { parts: [{ main: struck(paraLang, langQuotes), warning }, ...asParts(langQuotes)] };
+  return { parts: [{ main: struck(paraLang, langQuotes), ...flag(warning) }, ...asParts(langQuotes)] };
 }
 
 /** The paragraph with each quoted run struck through (light HTML `<s>`). */
@@ -427,8 +437,10 @@ function applyParts(row: AnnotatedVotingList["rows"][number], parts: PartTexts[]
     const target = row.splitParts[i]!;
     target.notation ??= target.remarks;
     target.remarks = part.main;
-    if (part.warning && i === 0) {
-      notes.push({ subject, level: part.warning.level ?? "warning", code: part.warning.code, detail: part.warning.detail });
+    if (i === 0) {
+      for (const w of [part.warning, ...(part.more ?? [])]) {
+        if (w) notes.push({ subject, level: w.level ?? "warning", code: w.code, detail: w.detail });
+      }
     }
   }
 }

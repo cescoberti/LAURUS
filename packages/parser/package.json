@@ -15,7 +15,8 @@
     "./texts-tabled": "./src/textsTabled.ts",
     "./tabled-report-api": "./src/tabledReportApi.ts",
     "./rapporteur-name": "./src/rapporteurName.ts",
-    "./council-position": "./src/councilPosition.ts"
+    "./council-position": "./src/councilPosition.ts",
+    "./quote-locate": "./src/quoteLocate.ts"
   },
   "scripts": {
     "build": "tsc -b",
