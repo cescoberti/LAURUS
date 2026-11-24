@@ -1,5 +1,5 @@
 import type { AnnotatedVotingList, AnnotatedVlRow } from "@laurus/parser/voting-list-docx";
-import { remarksFor } from "@laurus/parser";
+import { remarksIn, type RemarksStyle } from "@laurus/parser";
 import { rapporteurLabel } from "@/lib/rapporteur";
 
 /**
@@ -23,6 +23,15 @@ export interface DbAmendment {
   tabled_by: string | null;
   original_text: string | null;
   amended_text: string | null;
+  /**
+   * The EP's own runs and column headings (migration 0019). Null on a row
+   * ingested before it: the quote then falls back to the plain text with the
+   * bold derived from the word diff.
+   */
+  original_rich?: string | null;
+  amended_rich?: string | null;
+  original_header?: string | null;
+  amended_header?: string | null;
   kind: string;
 }
 
@@ -63,6 +72,7 @@ export function buildVlFromAmendments(
   amendments: DbAmendment[],
   vot: VlVotPayload | null = null,
   lang = "it",
+  style: RemarksStyle = "columns",
 ): AnnotatedVotingList {
   // One entry per number in the requested language; EN then IT as fallbacks
   // (later assignments win, so the requested language is applied last).
@@ -79,8 +89,15 @@ export function buildVlFromAmendments(
       author: a.tabled_by && !NON_AUTHOR.test(a.tabled_by) ? a.tabled_by : null,
       voteType: null,
       vote: null,
-      // Advisor convention: added text bold, deleted text struck through.
-      remarks: remarksFor(a.original_text, a.amended_text),
+      // The published amendment, quoted in the style the member asked for.
+      remarks: remarksIn(style, {
+        originalText: a.original_text,
+        amendedText: a.amended_text,
+        originalRich: a.original_rich,
+        amendedRich: a.amended_rich,
+        originalHeader: a.original_header,
+        amendedHeader: a.amended_header,
+      }),
       splitParts: [],
     }));
 

@@ -45,14 +45,15 @@ function tabbed(piece: string): Array<string | Tab> {
   return out;
 }
 
-function runs(value: string | null, opts: { bold?: boolean; italics?: boolean; size?: number } = {}): TextRun[] {
-  const out: TextRun[] = [];
+/** One piece of a light-HTML value: a line break, or text with its marks on. */
+type Piece = { kind: "break" } | { kind: "text"; text: string; b: boolean; i: boolean; s: boolean; u: boolean };
+
+function* pieces(value: string | null): Generator<Piece> {
   const state = { b: false, i: false, s: false, u: false };
-  let pendingBreaks = 0;
   for (const piece of (value ?? "").split(/(<\/?[bisu]>|\n)/)) {
     if (!piece) continue;
     if (piece === "\n") {
-      pendingBreaks++;
+      yield { kind: "break" };
       continue;
     }
     const tag = /^<(\/?)([bisu])>$/.exec(piece);
@@ -60,21 +61,69 @@ function runs(value: string | null, opts: { bold?: boolean; italics?: boolean; s
       state[tag[2] as "b" | "i" | "s" | "u"] = tag[1] !== "/";
       continue;
     }
-    out.push(
-      new TextRun({
-        children: tabbed(piece),
-        bold: opts.bold || state.b,
-        italics: opts.italics || state.i,
-        strike: state.s,
-        underline: state.u ? {} : undefined,
-        size: opts.size ?? 18,
-        color: "000000",
-        break: pendingBreaks || undefined,
-      }),
-    );
-    pendingBreaks = 0;
+    yield { kind: "text", text: piece, ...state };
+  }
+}
+
+function textRun(piece: Extract<Piece, { kind: "text" }>, opts: { bold?: boolean; italics?: boolean; size?: number }): TextRun {
+  return new TextRun({
+    children: tabbed(piece.text),
+    bold: opts.bold || piece.b,
+    italics: opts.italics || piece.i,
+    strike: piece.s,
+    underline: piece.u ? {} : undefined,
+    size: opts.size ?? 18,
+    color: "000000",
+  });
+}
+
+function runs(value: string | null, opts: { bold?: boolean; italics?: boolean; size?: number } = {}): TextRun[] {
+  const out: TextRun[] = [];
+  let pendingBreaks = 0;
+  for (const piece of pieces(value)) {
+    if (piece.kind === "break") {
+      pendingBreaks++;
+      continue;
+    }
+    // The breaks go in a run of their own: hung on the next run instead, they
+    // end up inside its formatting — the blank line before an underlined
+    // heading came out underlined.
+    if (pendingBreaks) {
+      out.push(new TextRun({ text: "", size: opts.size ?? 18, color: "000000", break: pendingBreaks }));
+      pendingBreaks = 0;
+    }
+    out.push(textRun(piece, opts));
   }
   if (out.length === 0) out.push(new TextRun({ text: "", size: opts.size ?? 18, color: "000000" }));
+  return out;
+}
+
+/**
+ * The same value as one paragraph per line, instead of one paragraph with
+ * breaks inside it.
+ *
+ * Word justifies every line of a justified paragraph except its last, and a
+ * line that ends in a manual break is not the last one: in a Remarks cell
+ * built with breaks, "Proposta di risoluzione" came out stretched across the
+ * whole column, one word at each margin. A real paragraph per line is also
+ * what the cell is — a heading, a text, a heading, a text.
+ */
+function paragraphs(
+  value: string | null,
+  align: (typeof AlignmentType)[keyof typeof AlignmentType],
+  opts: { bold?: boolean; italics?: boolean; size?: number } = {},
+): Paragraph[] {
+  const out: Paragraph[] = [];
+  let line: TextRun[] = [];
+  const flush = () => {
+    out.push(new Paragraph({ alignment: align, children: line.length ? line : [new TextRun({ text: "", size: opts.size ?? 18, color: "000000" })] }));
+    line = [];
+  };
+  for (const piece of pieces(value)) {
+    if (piece.kind === "break") flush();
+    else line.push(textRun(piece, opts));
+  }
+  flush();
   return out;
 }
 
@@ -124,7 +173,7 @@ function dataRows(row: AnnotatedVlRow): TableRow[] {
         cell(COL_W[2]!, [para(row.author, C)]),
         cell(COL_W[3]!, [para(row.voteType, C)]),
         cell(COL_W[4]!, [para(row.vote, C, { bold: true })]),
-        cell(COL_W[5]!, [para(row.remarks, J, { italics: true })], { valign: VerticalAlign.TOP }),
+        cell(COL_W[5]!, paragraphs(row.remarks, J, { italics: true }), { valign: VerticalAlign.TOP }),
       ],
     }),
   );
@@ -136,7 +185,7 @@ function dataRows(row: AnnotatedVlRow): TableRow[] {
         children: [
           cell(COL_W[0]! + COL_W[1]! + COL_W[2]! + COL_W[3]!, [para(part.label, C)], { span: 4 }),
           cell(COL_W[4]!, [para(part.vote, C, { bold: true })]),
-          cell(COL_W[5]!, [para(part.remarks, J, { italics: true })], { valign: VerticalAlign.TOP }),
+          cell(COL_W[5]!, paragraphs(part.remarks, J, { italics: true }), { valign: VerticalAlign.TOP }),
         ],
       }),
     );

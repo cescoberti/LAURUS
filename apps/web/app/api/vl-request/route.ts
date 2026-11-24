@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { verifyVotingList, votingListFingerprint, type VlVerificationReport, type VlCheck } from "@/lib/vlVerify";
@@ -85,7 +86,8 @@ export async function POST(request: Request) {
         : Promise.resolve();
 
     try {
-      const loaded = await loadVotingList(admin, code, lang);
+      const remarksStyle = await remarksStyleFor(admin, user.id);
+      const loaded = await loadVotingList(admin, code, lang, remarksStyle);
       if (!loaded) {
         await finish({ status: "failed", error: "No amendments or vote requests ingested for this report yet." });
         return;
@@ -106,6 +108,7 @@ export async function POST(request: Request) {
         votEn,
         votLang: loaded.vot,
         amendments: loaded.amendments,
+        councilPosition: loaded.councilPosition,
         onUsage,
       });
       // What the agents did on this list, and what it cost, for the Agents and Usage pages.
@@ -130,7 +133,16 @@ export async function POST(request: Request) {
             status: loaded.official.fill.anomalies.length ? "issue" : "ok",
             detail: [
               `${loaded.official.fill.filled}/${loaded.official.fill.candidates} Remarks filled`,
-              loaded.official.motionRead ? "original text taken from the report" : "the report text could not be read — original-text rows left empty",
+              loaded.councilPosition
+                ? `original text taken from the Council position (ST-${loaded.councilPosition.ref.number}/${loaded.councilPosition.ref.year}${loaded.councilPosition.ref.revision ? ` REV ${loaded.councilPosition.ref.revision}` : ""})`
+                : loaded.official.motionRead
+                  ? "original text taken from the report"
+                  : "the report text could not be read — original-text rows left empty",
+              ...(loaded.fetchedTranslations.length
+                ? [
+                    `am ${loaded.fetchedTranslations.join(", ")}: ${lang.toUpperCase()} text read off the EP's amendment file, which the ingestion did not hold yet`,
+                  ]
+                : []),
               ...loaded.official.fill.anomalies.map((a) => `${a.subject}${a.amNo ? ` (am ${a.amNo})` : ""}: ${a.reason.replace(/_/g, " ")}`),
             ].join(" · "),
           }
@@ -182,6 +194,7 @@ export async function POST(request: Request) {
           amendments: loaded.amendments,
           vot: loaded.vot,
           official: loaded.official !== null,
+          remarksStyle,
           amendmentIndex: indexFresh,
           onIndexFetched: (ids) => {
             freshIndex = ids;

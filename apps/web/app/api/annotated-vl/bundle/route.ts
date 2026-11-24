@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
@@ -64,8 +65,9 @@ export async function GET(request: Request) {
 
   const lists: AnnotatedVotingList[] = [];
   const missing: string[] = [];
+  const remarksStyle = await remarksStyleFor(supabase, user.id);
   for (const code of codes) {
-    const loaded = await loadVotingList(supabase, code, lang);
+    const loaded = await loadVotingList(supabase, code, lang, remarksStyle);
     if (!loaded) {
       missing.push(code);
       continue;
@@ -73,7 +75,7 @@ export async function GET(request: Request) {
     const { vl } = loaded;
     const votEn = votEnFor(loaded);
     const { spend, onUsage } = startSplitSpend();
-    const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+    const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, councilPosition: loaded.councilPosition, onUsage });
     await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "bundle", notes, spend });
     lists.push(vl);
     void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, bundle: day } });

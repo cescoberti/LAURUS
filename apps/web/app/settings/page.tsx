@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DOCUMENT_LANGUAGES, DEFAULT_LANGUAGES } from "@/lib/languages";
 import { COMMITTEES } from "@/lib/committees";
 import { saveSettingsAction } from "./actions";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export default async function SettingsPage() {
   const { data: autoRow } = await supabase.from("users").select("auto_follow_committees").eq("id", user!.id).single();
   const autoFollow = new Set<string>((autoRow?.auto_follow_committees as string[] | null) ?? []);
   const defaultLang = profile?.vl_language ?? "it";
+  // Read on its own for the same reason as the line above: migration 0019.
+  const remarksStyle = await remarksStyleFor(supabase, user!.id);
 
   return (
     <div className="min-h-screen">
@@ -82,6 +85,42 @@ export default async function SettingsPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <p className="text-[1.0625rem] font-bold tracking-[-0.01em] text-ink-900">How an amendment is written</p>
+            <p className="mb-4 mt-1.5 text-[0.8125rem] text-ink-500">What goes in the Remarks column of every list.</p>
+            <div className="space-y-2">
+              {[
+                {
+                  value: "columns",
+                  label: "The amendment as the EP prints it",
+                  hint: "The two columns one under the other — the present text, then the amendment — each under its own heading, copied word for word.",
+                },
+                {
+                  value: "diff",
+                  label: "The two columns merged",
+                  hint: "A single text where what the amendment removes is struck through and what it adds is in bold.",
+                },
+              ].map((o) => (
+                <label
+                  key={o.value}
+                  className="press flex items-start gap-3.5 rounded-2xl border border-slate-200 px-4 py-3 text-[0.9375rem] text-ink-900 hover:bg-ink-900/[0.025]"
+                >
+                  <input
+                    type="radio"
+                    name="vl_remarks_style"
+                    value={o.value}
+                    defaultChecked={remarksStyle === o.value}
+                    className="mt-0.5 accent-eu-700"
+                  />
+                  <span>
+                    <span className="font-semibold">{o.label}</span>
+                    <span className="mt-1 block text-[0.8125rem] leading-relaxed text-ink-500">{o.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <hr className="hairline" />

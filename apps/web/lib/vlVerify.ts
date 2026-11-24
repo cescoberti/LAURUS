@@ -19,12 +19,12 @@
  * (source offline, rate-limited) yields `skipped` checks and `verified: false`
  * — an unverifiable list is reported as unverified, never as clean.
  */
-import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import { isSecondReading, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseVotXml, type VotPayload } from "@laurus/parser/vot-xml";
-import { parseAmendmentsDocx } from "@laurus/parser/amendments-docx";
-import { remarksFor, amendmentBlockUrl } from "@laurus/parser";
+import { remarksIn, type RemarksStyle } from "@laurus/parser";
 import { createHash } from "node:crypto";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
+import { amendmentBlockIds, readAmendmentBlocks, type FreshAmendment } from "@/lib/epAmendments";
 import type { DbAmendment } from "@/lib/annotatedVl/fromDb";
 import { splitFallNote } from "@/lib/fillRemarks";
 
@@ -78,6 +78,30 @@ function norm(s: string | null | undefined): string {
 }
 
 const same = (a: string | null | undefined, b: string | null | undefined) => norm(a) === norm(b);
+
+/**
+ * Where a Remark and the published amendment part company, in words. A bare
+ * "differs" leaves the advisor to re-read a whole paragraph against a DOCX;
+ * the first words that disagree say at a glance whether it is a stale
+ * ingestion, the wrong amendment or a translation.
+ */
+function firstDifference(written: string, published: string): string {
+  const words = (t: string) =>
+    t
+      .replace(/<[^>]+>/g, " ")
+      .replace(/[‘’‛]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .filter(Boolean);
+  const a = words(written);
+  const b = words(published);
+  let i = 0;
+  while (i < a.length && i < b.length && a[i]!.toLowerCase() === b[i]!.toLowerCase()) i++;
+  const from = (w: string[]) => short(w.slice(Math.max(0, i - 3), i + 7).join(" "), 70) || "(nothing)";
+  return `the list reads “${from(a)}”, the file “${from(b)}”`;
+}
 
 function short(s: string, max = 90): string {
   const t = (s ?? "").replace(/\s+/g, " ").trim();
@@ -204,12 +228,24 @@ export function verifyCompleteness(
     `${vot?.rollCalls?.length ?? 0} roll-call requests, none added as rows`,
   );
 
-  // 7. exactly one final-vote row, and it is last
+  // 7. exactly one final-vote row, and it is last — except in second reading,
+  //    where Parliament votes the Council position article by article and
+  //    there is no final vote at all. The list says so itself ("N.B. There is
+  //    no final vote in second reading."); a check that insisted on one
+  //    reported every such list as defective.
+  const noFinalVote = isSecondReading(vl);
   const finalIdx = vl.rows.map((r, i) => (r.isFinalVote ? i : -1)).filter((i) => i >= 0);
   const finalIssues: string[] = [];
-  if (finalIdx.length !== 1) finalIssues.push(`${finalIdx.length} final-vote rows`);
+  if (noFinalVote) {
+    if (finalIdx.length > 0) finalIssues.push(`${finalIdx.length} final-vote rows, and a second reading has none`);
+  } else if (finalIdx.length !== 1) finalIssues.push(`${finalIdx.length} final-vote rows`);
   else if (finalIdx[0] !== vl.rows.length - 1) finalIssues.push("the final vote is not the last row");
-  add("final-vote", "Exactly one final-vote row, at the end", finalIssues, "final vote in place");
+  add(
+    "final-vote",
+    noFinalVote ? "No final vote, as in every second reading" : "Exactly one final-vote row, at the end",
+    finalIssues,
+    noFinalVote ? "second reading: the vote is on the Council position, article by article" : "final vote in place",
+  );
 
   return checks;
 }
@@ -218,63 +254,28 @@ export function verifyCompleteness(
 // Pass 2 — correctness against the official sources, re-downloaded now
 // ---------------------------------------------------------------------------
 
-/** 'A10-0163/2026' → 'A-10-2026-0163' (the EP document identifier). */
-function epDocId(code: string): string | null {
-  const m = code.match(/^([A-Z]+)(\d+)-(\d+)\/(\d{4})$/);
-  if (!m) return null;
-  const [, prefix, term, num, year] = m;
-  return `${prefix}-${term}-${year}-${num.padStart(4, "0")}`;
+/** The Remarks this amendment should carry, re-derived from the published file. */
+function quoted(fresh: FreshAmendment, style: RemarksStyle, headings = true): string {
+  return remarksIn(style, {
+    originalText: fresh.original ?? null,
+    amendedText: fresh.amended ?? null,
+    originalRich: fresh.originalRich ?? null,
+    amendedRich: fresh.amendedRich ?? null,
+    originalHeader: headings ? fresh.originalHeader ?? null : null,
+    amendedHeader: headings ? fresh.amendedHeader ?? null : null,
+  });
 }
 
 /**
- * Amendment blocks published for a report, e.g. 'A-10-2026-0170-AM-006-010'.
+ * Does the cell quote this amendment?
  *
- * The EP API has no per-report filter, so this means paging the year's whole
- * AMENDMENT_LIST index. That index is the same for every report, so the caller
- * can hand in a cached copy (`index`) and get zero network calls; when it has
- * to be fetched, the fresh index comes back so the caller can store it.
+ * The same text is accepted without the EP's column headings: a list built
+ * before the ingestion kept them (migration 0019) names neither column, and
+ * what is voted is the text, not the label over it. Everything else — a word
+ * out of place, the other language, another amendment — still fails.
  */
-export async function amendmentBlockIds(
-  code: string,
-  year: number,
-  index: string[] | null,
-): Promise<{ blocks: string[] | null; freshIndex: string[] | null }> {
-  const docId = epDocId(code);
-  if (!docId) return { blocks: null, freshIndex: null };
-  const wanted = `${docId}-AM-`;
-
-  if (index?.length) {
-    return { blocks: index.filter((id) => id.startsWith(wanted)), freshIndex: null };
-  }
-
-  const all: string[] = [];
-  for (let offset = 0; offset < 4000; offset += 500) {
-    const url =
-      `${BASE}/api/v2/documents?year=${year}&work-type=AMENDMENT_LIST` +
-      `&limit=500&offset=${offset}&format=application%2Fld%2Bjson`;
-    const body = await fetchBytesWithBackoff(url);
-    if (!body) break;
-    const rows = (JSON.parse(body.toString("utf8")) as { data?: Array<{ identifier: string }> }).data ?? [];
-    for (const r of rows) if (r.identifier) all.push(r.identifier);
-    if (rows.length < 500) break;
-  }
-  if (!all.length) return { blocks: null, freshIndex: null };
-  return { blocks: all.filter((id) => id.startsWith(wanted)), freshIndex: all };
-}
-
-/** Run `fn` over `items` with at most `limit` in flight. */
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const i = next++;
-        out[i] = await fn(items[i]!);
-      }
-    }),
-  );
-  return out;
+function quotes(written: string, fresh: FreshAmendment, style: RemarksStyle): boolean {
+  return same(quoted(fresh, style), written) || same(quoted(fresh, style, false), written);
 }
 
 export async function verifyAgainstSource(
@@ -287,10 +288,13 @@ export async function verifyAgainstSource(
     amendmentIndex?: string[] | null;
     /** Called with a freshly fetched index so the caller can cache it. */
     onIndexFetched?: (identifiers: string[]) => void;
+    /** How the list quotes an amendment — the Remarks are re-derived the same way. */
+    remarksStyle?: RemarksStyle;
   },
 ): Promise<VlCheck[]> {
   const checks: VlCheck[] = [];
   const { itemCode, voteDate, language } = opts;
+  const style = opts.remarksStyle ?? "columns";
 
   // --- 2a. vote requests, re-derived from the official VOT XML --------------
   if (!voteDate) {
@@ -411,26 +415,8 @@ export async function verifyAgainstSource(
     return checks;
   }
 
-  // A report has a handful of blocks, so a little concurrency is safe here —
-  // the EP rate limiter only bites on bulk ingestion of the whole year.
-  const freshByNumber = new Map<number, { original?: string; amended?: string }>();
-  let blocksRead = 0;
-  const parsedBlocks = await mapLimit(blocks, 3, async (id) => {
-    const url = amendmentBlockUrl(id, language);
-    try {
-      const buf = await fetchBytesWithBackoff(url);
-      if (!buf || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return null;
-      return await parseAmendmentsDocx(buf, language);
-    } catch (err) {
-      amError ??= (err as Error).message;
-      return null;
-    }
-  });
-  for (const parsed of parsedBlocks) {
-    if (!parsed) continue;
-    for (const a of parsed) freshByNumber.set(a.number, { original: a.originalText, amended: a.amendedText });
-    blocksRead++;
-  }
+  const { byNumber: freshByNumber, blocksRead, error: readError } = await readAmendmentBlocks(blocks, language);
+  amError ??= readError;
 
   if (amError && freshByNumber.size === 0) {
     checks.push({
@@ -443,32 +429,70 @@ export async function verifyAgainstSource(
     return checks;
   }
 
+  // A Remark quotes the amendment in the language the EP had published when
+  // the list was built: until the translation is out, the fill falls back to
+  // the English original rather than re-write anything. So a cell that does
+  // not match the file in the list's language is read against the English one
+  // before it is called a mismatch — a list built one ingestion too early
+  // otherwise comes back as every row corrupted, which is not what happened.
+  // The English files are only fetched if a row actually needs them.
+  let englishByNumber: Map<number, FreshAmendment> | null = null;
+  const inEnglish = async (n: number): Promise<FreshAmendment | undefined> => {
+    if (language === "en") return undefined;
+    englishByNumber ??= (await readAmendmentBlocks(blocks, "en")).byNumber;
+    return englishByNumber.get(n);
+  };
+
   const issues: string[] = [];
+  /** Quoted in English although the EP has published the translation. */
+  const stale: string[] = [];
+  /** Quoted in English because there is nothing else published yet. */
+  const untranslated: string[] = [];
   let compared = 0;
   for (const r of amRows) {
-    const fresh = freshByNumber.get(Number(r.amNo));
+    const number = Number(r.amNo);
+    const fresh = freshByNumber.get(number);
+    // The cell may open with the EP's own "adoption 112 = 69 falls"; the
+    // amendment file has no such line, so compare what sits under it.
+    const { text: written } = splitFallNote(r.remarks);
+    const expected = fresh ? quoted(fresh, style) : null;
+    if (fresh) {
+      compared++;
+      if (quotes(written, fresh, style)) continue;
+    }
+
+    const en = await inEnglish(number);
+    if (en && quotes(written, en, style)) {
+      (fresh ? stale : untranslated).push(`am ${r.amNo}`);
+      continue;
+    }
     if (!fresh) {
       issues.push(`am ${r.amNo}: not found in the published amendment files, so its Remarks could not be confirmed`);
       continue;
     }
-    compared++;
-    const expected = remarksFor(fresh.original ?? null, fresh.amended ?? null);
-    // The cell may open with the EP's own "adoption 112 = 69 falls"; the
-    // amendment file has no such line, so compare what sits under it.
-    const { text: written } = splitFallNote(r.remarks);
-    if (!same(expected, written)) {
-      issues.push(`am ${r.amNo}: Remarks differ from the published text`);
-    }
+    issues.push(`am ${r.amNo}: Remarks differ from the published text — ${firstDifference(written, expected ?? "")}`);
   }
+
+  const lang = language.toUpperCase();
+  const detail = [
+    issues.length ? issues.join(" · ") : null,
+    stale.length
+      ? `${stale.join(", ")}: the Remarks quote the published English text, but the ${lang} amendment is published too — build the list again to quote it`
+      : null,
+    untranslated.length
+      ? `${untranslated.join(", ")}: quoted from the English original, the only language the EP has published them in`
+      : null,
+    issues.length || stale.length || compared === 0
+      ? null
+      : `${compared} Remarks match the amendment files re-downloaded now (${blocksRead} blocks read)`,
+  ].filter(Boolean);
 
   checks.push({
     id: "am-source",
     pass: 2,
     label: "Remarks re-checked against the published amendments",
-    status: issues.length ? "issue" : "ok",
-    detail: issues.length
-      ? issues.join(" · ")
-      : `${compared} Remarks match the amendment files re-downloaded now (${blocksRead} blocks read)`,
+    status: issues.length || stale.length ? "issue" : "ok",
+    detail: detail.join(" · "),
   });
 
   return checks;
@@ -507,6 +531,8 @@ export async function verifyVotingList(
     amendmentIndex?: string[] | null;
     onIndexFetched?: (identifiers: string[]) => void;
     official?: boolean;
+    /** How the list quotes an amendment, so pass 2 re-derives it the same way. */
+    remarksStyle?: RemarksStyle;
   },
 ): Promise<VlVerificationReport> {
   const pass1 = verifyCompleteness(vl, ctx.amendments, ctx.vot, ctx.language, ctx.official ?? false);
@@ -519,6 +545,7 @@ export async function verifyVotingList(
       language: ctx.language,
       amendmentIndex: ctx.amendmentIndex,
       onIndexFetched: ctx.onIndexFetched,
+      remarksStyle: ctx.remarksStyle,
     });
   } catch (err) {
     pass2 = [

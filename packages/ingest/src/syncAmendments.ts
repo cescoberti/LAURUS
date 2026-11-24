@@ -3,6 +3,9 @@
  *
  *   npm run sync-amendments -- 2026            # it + en (default)
  *   npm run sync-amendments -- 2026 it,en,fr   # explicit language set
+ *   npm run sync-amendments -- 2026 it --refresh A10-0310/2026
+ *                                              # read those reports again,
+ *                                              # even though they are ingested
  *
  * Plenary amendments are published per report in AMENDMENT_LIST blocks
  * ("A-10-2026-0170-AM-006-010" = Am 6–10). We enumerate them from
@@ -24,8 +27,19 @@ import { amendmentBlockUrl } from "@laurus/parser";
 import { fetchBytes } from "./httpFetch.ts";
 import { makeAdminClient, sleep, upsertAmendments } from "./epShared.ts";
 
-const YEAR = Number(process.argv[2] ?? new Date().getFullYear());
-const LANGS_ARG = (process.argv[3] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const ARGS = process.argv.slice(2).filter((a) => a !== "--refresh");
+const YEAR = Number(ARGS[0] ?? new Date().getFullYear());
+const LANGS_ARG = (ARGS[1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+/**
+ * Read a report's blocks again although its amendments are already in. An
+ * ingested item is normally skipped, which is right for a rerun after a
+ * throttle abort and wrong the day a column is added to the table: the text
+ * is there, the new field is not, and nothing would ever fill it. Named
+ * reports only — never the whole year by accident.
+ */
+const REFRESH = new Set(
+  process.argv.includes("--refresh") ? ARGS.slice(2).filter((a) => /^[A-Z]+\d+-\d+\/\d{4}$/.test(a)) : [],
+);
 const BASE = "https://data.europarl.europa.eu";
 
 const supabase = makeAdminClient();
@@ -154,7 +168,7 @@ async function main() {
     for (const [code, blocks] of blocksByCode) {
       const itemId = itemIdByCode.get(code);
       if (!itemId) continue; // report not on any synced session (different year / not voted)
-      if (alreadyDone.has(itemId)) continue;
+      if (alreadyDone.has(itemId) && !REFRESH.has(code)) continue;
 
       const numbersSeen = new Set<number>();
       const amRows: Array<Record<string, unknown>> = [];
@@ -180,6 +194,12 @@ async function main() {
               tabled_group: a.tabledGroup ?? null,
               original_text: a.originalText ?? null,
               amended_text: a.amendedText ?? null,
+              // The EP's own runs and column headings: what the voting list
+              // quotes, so that quoting an amendment is copying it.
+              original_rich: a.originalRich ?? null,
+              amended_rich: a.amendedRich ?? null,
+              original_header: a.originalHeader ?? null,
+              amended_header: a.amendedHeader ?? null,
               kind: a.kind,
             });
           }

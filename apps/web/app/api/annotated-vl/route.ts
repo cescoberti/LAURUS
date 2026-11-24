@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
@@ -19,6 +20,10 @@ import { CONTACT_EMAIL } from "@/lib/committees";
  * without ingested amendments, a statically registered list (e.g. the STREIT
  * ground-truth capture) is served instead. Requires an authenticated advisor.
  */
+// Building the list can mean going to the EP: the report text, and the
+// amendment files for a language the ingestion does not hold yet.
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const { supabase, user } = await sessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -41,7 +46,7 @@ export async function GET(request: Request) {
   const langParam = (url.searchParams.get("lang") ?? "it").toLowerCase();
   const lang = documentLanguage(langParam);
 
-  const loaded = await loadVotingList(supabase, code, lang);
+  const loaded = await loadVotingList(supabase, code, lang, await remarksStyleFor(supabase, user.id));
   if (!loaded) return NextResponse.json({ error: "no amendments ingested for this item yet" }, { status: 404 });
   const { vl } = loaded;
 
@@ -50,7 +55,7 @@ export async function GET(request: Request) {
   // official list's own footer notes.
   const votEn = votEnFor(loaded);
   const { spend, onUsage } = startSplitSpend();
-  const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+  const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, councilPosition: loaded.councilPosition, onUsage });
   await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "download", notes, spend });
 
   // This is the UNVERIFIED route — the verified list goes out by email from

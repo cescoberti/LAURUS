@@ -91,6 +91,11 @@ export async function completeOnboardingAction(_prev: OnboardingState | undefine
     .eq("id", user.id);
   if (error) return { error: error.message };
 
+  // On its own, so that a database without migration 0019 (no such column)
+  // still completes the onboarding instead of refusing the whole wizard.
+  const style = formData.get("vl_remarks_style") === "diff" ? "diff" : "columns";
+  await supabase.from("users").update({ vl_remarks_style: style }).eq("id", user.id);
+
   // Mark the invite used, if this onboarding came from one.
   const token = String(formData.get("token") ?? "");
   if (token) {
