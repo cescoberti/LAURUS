@@ -1,6 +1,6 @@
 import type { AnnotatedVotingList, AnnotatedVlRow } from "@laurus/parser/voting-list-docx";
 import { originalTextFor, type MotionText } from "@laurus/parser/report-docx";
-import { remarksFor } from "@laurus/parser";
+import { remarksIn, type RemarksStyle } from "@laurus/parser";
 
 /**
  * Fill the Remarks column of an indicative voting list with the published
@@ -22,6 +22,11 @@ export interface AmendmentText {
   number: number;
   amendedText?: string;
   originalText?: string;
+  /** The EP's own runs and column headings, when the ingestion kept them. */
+  amendedRich?: string;
+  originalRich?: string;
+  originalHeader?: string;
+  amendedHeader?: string;
   kind: string;
 }
 
@@ -93,6 +98,8 @@ export function fillRemarks(
    * reports that have one.
    */
   articleText: ((subject: string) => string | null) | null = null,
+  /** How the Remarks quote the amendment — the member's choice. */
+  style: RemarksStyle = "columns",
 ): { vl: AnnotatedVotingList; report: FillReport } {
   const report: FillReport = { filled: 0, candidates: 0, anomalies: [] };
 
@@ -131,9 +138,9 @@ export function fillRemarks(
       report.anomalies.push({ subject: row.subject, amNo: row.amNo, reason: am.kind });
       return row;
     }
-    // Advisor convention: added text bold, deleted text struck through
-    // (word-level diff of the published present/amended columns).
-    const text = remarksFor(am.originalText, am.amendedText);
+    // The published amendment, quoted in the style the member asked for:
+    // the two columns one under the other, or the merged diff.
+    const text = remarksIn(style, am);
     if (!text) {
       report.anomalies.push({ subject: row.subject, amNo: row.amNo, reason: "no_text" });
       return row;
@@ -158,7 +165,12 @@ export function fillRemarks(
           splitParts: row.splitParts.map((p, i) =>
             p.remarks.trim()
               ? p
-              : { ...p, remarks: remarksFor(origParas[i] ?? null, amendParas[i] ?? null) },
+              : {
+                  ...p,
+                  // One paragraph of a pure addition or deletion: a single
+                  // column, so no heading to repeat over every part.
+                  remarks: remarksIn(style, { originalText: origParas[i] ?? null, amendedText: amendParas[i] ?? null }),
+                },
           ),
         };
       }

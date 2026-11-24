@@ -135,6 +135,8 @@ interface Columns {
   amendedText?: string;
   originalRich?: string;
   amendedRich?: string;
+  originalHeader?: string;
+  amendedHeader?: string;
 }
 
 /** The two columns of a block's amendment table, header row detected and skipped. */
@@ -143,6 +145,8 @@ function columnsOf(block: string): Columns {
   // Row 0 is the colspan spacer, row 1 the language-specific header; content
   // starts at row 2. Guard for templates without the spacer row.
   let headerText = "";
+  let originalHeader: string | undefined;
+  let amendedHeader: string | undefined;
   let contentStart = 0;
   for (let i = 0; i < rows.length && i < 3; i++) {
     const row = rows[i];
@@ -153,6 +157,8 @@ function columnsOf(block: string): Columns {
     // A header row has short labels in BOTH columns and no long body text.
     if (rt && lt && lt.length < 60 && rt.length < 40 && contentStart === i) {
       headerText = `${lt} | ${rt}`;
+      originalHeader = lt;
+      amendedHeader = rt;
       contentStart = i + 1;
     } else if (!lt && !rt && contentStart === i) {
       contentStart = i + 1; // spacer row
@@ -184,6 +190,8 @@ function columnsOf(block: string): Columns {
 
   return {
     headerText,
+    originalHeader,
+    amendedHeader,
     originalText: originalParts.join("\n") || undefined,
     amendedText: amendedParts.join("\n") || undefined,
     originalRich: originalRichParts.join("\n") || undefined,

@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { renderAnnotatedVlDocx } from "@/lib/annotatedVlDocx";
 import { verifyVotingList, votingListFingerprint, type VlVerificationReport, type VlCheck } from "@/lib/vlVerify";
@@ -85,7 +86,8 @@ export async function POST(request: Request) {
         : Promise.resolve();
 
     try {
-      const loaded = await loadVotingList(admin, code, lang);
+      const remarksStyle = await remarksStyleFor(admin, user.id);
+      const loaded = await loadVotingList(admin, code, lang, remarksStyle);
       if (!loaded) {
         await finish({ status: "failed", error: "No amendments or vote requests ingested for this report yet." });
         return;
@@ -192,6 +194,7 @@ export async function POST(request: Request) {
           amendments: loaded.amendments,
           vot: loaded.vot,
           official: loaded.official !== null,
+          remarksStyle,
           amendmentIndex: indexFresh,
           onIndexFetched: (ids) => {
             freshIndex = ids;

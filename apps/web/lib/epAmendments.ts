@@ -16,10 +16,15 @@ const BASE = "https://data.europarl.europa.eu";
 /** How long the year's block index is reused before it is paged again. */
 const INDEX_MAX_AGE_MS = 3 * 3_600_000;
 
-/** One amendment as the published DOCX has it. */
+/** One amendment as the published DOCX has it, text and formatting. */
 export interface FreshAmendment {
   original?: string;
   amended?: string;
+  /** The two columns with the EP's own runs, and the headings over them. */
+  originalRich?: string;
+  amendedRich?: string;
+  originalHeader?: string;
+  amendedHeader?: string;
   kind: string;
 }
 
@@ -125,7 +130,17 @@ export async function readAmendmentBlocks(
   });
   for (const parsed of parsedBlocks) {
     if (!parsed) continue;
-    for (const a of parsed) byNumber.set(a.number, { original: a.originalText, amended: a.amendedText, kind: a.kind });
+    for (const a of parsed) {
+      byNumber.set(a.number, {
+        original: a.originalText,
+        amended: a.amendedText,
+        originalRich: a.originalRich,
+        amendedRich: a.amendedRich,
+        originalHeader: a.originalHeader,
+        amendedHeader: a.amendedHeader,
+        kind: a.kind,
+      });
+    }
     blocksRead++;
   }
   return { byNumber, blocksRead, error };

@@ -21,7 +21,7 @@
  */
 import { isSecondReading, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import { parseVotXml, type VotPayload } from "@laurus/parser/vot-xml";
-import { remarksFor } from "@laurus/parser";
+import { remarksIn, type RemarksStyle } from "@laurus/parser";
 import { createHash } from "node:crypto";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import { amendmentBlockIds, readAmendmentBlocks, type FreshAmendment } from "@/lib/epAmendments";
@@ -254,6 +254,30 @@ export function verifyCompleteness(
 // Pass 2 — correctness against the official sources, re-downloaded now
 // ---------------------------------------------------------------------------
 
+/** The Remarks this amendment should carry, re-derived from the published file. */
+function quoted(fresh: FreshAmendment, style: RemarksStyle, headings = true): string {
+  return remarksIn(style, {
+    originalText: fresh.original ?? null,
+    amendedText: fresh.amended ?? null,
+    originalRich: fresh.originalRich ?? null,
+    amendedRich: fresh.amendedRich ?? null,
+    originalHeader: headings ? fresh.originalHeader ?? null : null,
+    amendedHeader: headings ? fresh.amendedHeader ?? null : null,
+  });
+}
+
+/**
+ * Does the cell quote this amendment?
+ *
+ * The same text is accepted without the EP's column headings: a list built
+ * before the ingestion kept them (migration 0019) names neither column, and
+ * what is voted is the text, not the label over it. Everything else — a word
+ * out of place, the other language, another amendment — still fails.
+ */
+function quotes(written: string, fresh: FreshAmendment, style: RemarksStyle): boolean {
+  return same(quoted(fresh, style), written) || same(quoted(fresh, style, false), written);
+}
+
 export async function verifyAgainstSource(
   vl: AnnotatedVotingList,
   opts: {
@@ -264,10 +288,13 @@ export async function verifyAgainstSource(
     amendmentIndex?: string[] | null;
     /** Called with a freshly fetched index so the caller can cache it. */
     onIndexFetched?: (identifiers: string[]) => void;
+    /** How the list quotes an amendment — the Remarks are re-derived the same way. */
+    remarksStyle?: RemarksStyle;
   },
 ): Promise<VlCheck[]> {
   const checks: VlCheck[] = [];
   const { itemCode, voteDate, language } = opts;
+  const style = opts.remarksStyle ?? "columns";
 
   // --- 2a. vote requests, re-derived from the official VOT XML --------------
   if (!voteDate) {
@@ -428,14 +455,14 @@ export async function verifyAgainstSource(
     // The cell may open with the EP's own "adoption 112 = 69 falls"; the
     // amendment file has no such line, so compare what sits under it.
     const { text: written } = splitFallNote(r.remarks);
-    const expected = fresh ? remarksFor(fresh.original ?? null, fresh.amended ?? null) : null;
+    const expected = fresh ? quoted(fresh, style) : null;
     if (fresh) {
       compared++;
-      if (same(expected, written)) continue;
+      if (quotes(written, fresh, style)) continue;
     }
 
     const en = await inEnglish(number);
-    if (en && same(remarksFor(en.original ?? null, en.amended ?? null), written)) {
+    if (en && quotes(written, en, style)) {
       (fresh ? stale : untranslated).push(`am ${r.amNo}`);
       continue;
     }
@@ -504,6 +531,8 @@ export async function verifyVotingList(
     amendmentIndex?: string[] | null;
     onIndexFetched?: (identifiers: string[]) => void;
     official?: boolean;
+    /** How the list quotes an amendment, so pass 2 re-derives it the same way. */
+    remarksStyle?: RemarksStyle;
   },
 ): Promise<VlVerificationReport> {
   const pass1 = verifyCompleteness(vl, ctx.amendments, ctx.vot, ctx.language, ctx.official ?? false);
@@ -516,6 +545,7 @@ export async function verifyVotingList(
       language: ctx.language,
       amendmentIndex: ctx.amendmentIndex,
       onIndexFetched: ctx.onIndexFetched,
+      remarksStyle: ctx.remarksStyle,
     });
   } catch (err) {
     pass2 = [

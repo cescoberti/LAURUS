@@ -9,7 +9,21 @@ import { completeOnboardingAction } from "@/app/onboarding/actions";
 
 const LANG_ORDER = DOCUMENT_LANGUAGES;
 
-const STEPS = ["Welcome", "Committees", "Language", "Fair use", "Contact"];
+/** How the Remarks column quotes an amendment. Same wording as /settings. */
+const REMARKS_STYLES = [
+  {
+    value: "columns" as const,
+    label: "The amendment as the EP prints it",
+    hint: "The two columns one under the other — the present text, then the amendment — each under its own heading, copied word for word.",
+  },
+  {
+    value: "diff" as const,
+    label: "The two columns merged",
+    hint: "A single text where what the amendment removes is struck through and what it adds is in bold.",
+  },
+];
+
+const STEPS = ["Welcome", "Committees", "Voting lists", "Fair use", "Contact"];
 
 export function OnboardingWizard({
   token,
@@ -24,6 +38,7 @@ export function OnboardingWizard({
   const [step, setStep] = useState(0);
   const [committees, setCommittees] = useState<string[]>(initialCommittees);
   const [language, setLanguage] = useState(initialLanguage);
+  const [remarksStyle, setRemarksStyle] = useState<"columns" | "diff">("columns");
   const [understood, setUnderstood] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +55,7 @@ export function OnboardingWizard({
     const fd = new FormData();
     fd.set("token", token);
     fd.set("vl_language", language);
+    fd.set("vl_remarks_style", remarksStyle);
     for (const c of committees) fd.append("committees", c);
     const res = await completeOnboardingAction(undefined, fd);
     if (res.error) {
@@ -120,6 +136,28 @@ export function OnboardingWizard({
                   }`}
                 >
                   <span className="font-mono text-xs uppercase text-ink-300">{l.code}</span> {l.label}
+                </button>
+              ))}
+            </div>
+
+            <h3 className="display mt-8 text-[1.0625rem] font-bold text-ink-900">And how should an amendment be written?</h3>
+            <p className="mt-1.5 text-[0.8125rem] text-ink-500">
+              What goes in the Remarks column of every list. You can change it anytime.
+            </p>
+            <div className="mt-3 space-y-2">
+              {REMARKS_STYLES.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setRemarksStyle(o.value)}
+                  className={`block w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                    remarksStyle === o.value ? "border-eu-600 bg-eu-50" : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className={`block text-sm font-semibold ${remarksStyle === o.value ? "text-eu-900" : "text-ink-900"}`}>
+                    {o.label}
+                  </span>
+                  <span className="mt-1 block text-[0.8125rem] leading-relaxed text-ink-500">{o.hint}</span>
                 </button>
               ))}
             </div>

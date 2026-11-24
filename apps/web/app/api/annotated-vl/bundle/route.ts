@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/supabase/server";
 import { loadVotingList, votEnFor } from "@/lib/annotatedVl/load";
+import { remarksStyleFor } from "@/lib/remarksStyle";
 import { expandSplitRows } from "@/lib/annotatedVl/expandSplits";
 import { recordSplitRun, startSplitSpend } from "@/lib/annotatedVl/splitSpend";
 import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
@@ -64,8 +65,9 @@ export async function GET(request: Request) {
 
   const lists: AnnotatedVotingList[] = [];
   const missing: string[] = [];
+  const remarksStyle = await remarksStyleFor(supabase, user.id);
   for (const code of codes) {
-    const loaded = await loadVotingList(supabase, code, lang);
+    const loaded = await loadVotingList(supabase, code, lang, remarksStyle);
     if (!loaded) {
       missing.push(code);
       continue;

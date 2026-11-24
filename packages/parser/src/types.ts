@@ -15,6 +15,14 @@ export interface ParsedAmendment {
    */
   originalRich?: string;
   amendedRich?: string;
+  /**
+   * The EP's own headings over the two columns, in the document's language —
+   * "Proposta di risoluzione" / "Emendamento", "Testo della Commissione" /
+   * "Emendamento", and so on. Quoting a column means quoting what it is
+   * called, and only the file knows that.
+   */
+  originalHeader?: string;
+  amendedHeader?: string;
   language: string;
   kind: "standard" | "oral" | "compromise_cam" | "withdrawn";
 }

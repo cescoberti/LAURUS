@@ -43,6 +43,13 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     })
     .eq("id", user.id);
 
+  // How the Remarks quote an amendment. On its own for the same reason as
+  // below: migration 0019 may not have run on this database.
+  await supabase
+    .from("users")
+    .update({ vl_remarks_style: formData.get("vl_remarks_style") === "diff" ? "diff" : "columns" })
+    .eq("id", user.id);
+
   // On its own, so that a database without migration 0017 (no such column) still
   // saves everything above instead of refusing the whole form.
   const { error: autoErr } = await supabase.from("users").update({ auto_follow_committees: autoFollow }).eq("id", user.id);
