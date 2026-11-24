@@ -227,6 +227,23 @@ export async function parseIndicativeVotingList(
   };
 }
 
+/**
+ * A list that puts the act itself to the vote rather than a text of
+ * Parliament's: a second reading on the Council position, where the vote goes
+ * article by article and there is no final vote at all.
+ *
+ * Two things in the document say so, and only those two: the procedure marker
+ * the header prints ("[***II]") and the Tabling Service's own note under the
+ * table ("N.B. There is no final vote in second reading."), which is written
+ * in English whatever the file. Guessing it from the rows instead would catch
+ * a report that amends the Rules of Procedure, whose subjects are articles
+ * too and which does end in a final vote.
+ */
+export function isSecondReading(vl: Pick<AnnotatedVotingList, "procedureType" | "notes">): boolean {
+  if (/\*{2,3}\s*II\b/i.test(vl.procedureType ?? "")) return true;
+  return vl.notes.some((n) => /\bno final vote\b/i.test(noteText(n)));
+}
+
 export interface SplitRequest {
   group: string;
   subject: string;
@@ -243,28 +260,49 @@ export interface SplitRequest {
  *   1st part: Text as a whole excluding the words “of all kinds”
  *   2nd part: These words
  *
- * A group line opens a block, a subject line ("§ 54", "Am 3", "Recital C")
- * opens a request, "Nth part: …" lines are its parts. Ends at the next
- * "Requests for …" heading.
+ * A group line opens a block, a subject line ("§ 54", "Am 3", "Recital C",
+ * and in a second reading "Article 5, § 1, point 31") opens a request,
+ * "Nth part: …" lines are its parts. Ends at the next "Requests for …"
+ * heading or at the "Voting scheme" block.
  */
 export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
-  const out: SplitRequest[] = [];
   // The notes carry their markup now, so match on the words, not the HTML:
   // the heading this looks for is the underlined one.
-  const start = notes.findIndex((n) => /^requests? for split votes?/i.test(noteText(n)));
+  return requestBlock(notes, /^requests? for split votes?/i);
+}
+
+/**
+ * The "Voting scheme" block, when the Tabling Service prints one: the split
+ * as it will actually be PUT, after merging the competing requests.
+ *
+ * Two groups asking to cut the same subject in different places do not give
+ * two votes, they give one vote in more parts — A10-0297/2026 (MONTSERRAT,
+ * second reading) has ECR cutting Article 5, § 1, point 31 in two and ESN
+ * cutting it elsewhere, and the table votes it in three. Neither request
+ * matches the row; only the scheme does. Same shape as the requests, with no
+ * group to name, so the expansion reads it the same way.
+ */
+export function votingSchemeFromNotes(notes: string[]): SplitRequest[] {
+  return requestBlock(notes, /^voting scheme$/i);
+}
+
+/** The subject-and-parts block under `heading`, in the order printed. */
+function requestBlock(notes: string[], heading: RegExp): SplitRequest[] {
+  const out: SplitRequest[] = [];
+  const start = notes.findIndex((n) => heading.test(noteText(n)));
   if (start < 0) return out;
   let group = "";
   let current: SplitRequest | null = null;
   for (const raw of notes.slice(start + 1)) {
     const line = noteText(raw);
     if (!line) continue;
-    if (/^requests? for /i.test(line)) break;
+    if (/^requests? for /i.test(line) || /^voting scheme$/i.test(line)) break;
     const part = /^(\d+)(?:st|nd|rd|th)\s+part\s*:\s*(.*)$/i.exec(line);
     if (part && current) {
       current.parts.push({ section: part[1]!, text: part[2]!.trim() });
       continue;
     }
-    if (/^(§|am\b|ams?\.?\s*\d|amendment|recital|citation|paragraph)/i.test(line)) {
+    if (SUBJECT_LINE.test(line)) {
       current = { group, subject: line, parts: [] };
       out.push(current);
       continue;
@@ -274,4 +312,34 @@ export function splitRequestsFromNotes(notes: string[]): SplitRequest[] {
     current = null;
   }
   return out.filter((r) => r.parts.length > 0);
+}
+
+/**
+ * A line that names what is voted, as against the group that asked for it.
+ * "Article …" is the second-reading shape: there the vote is on the articles
+ * of the Council position, not on paragraphs of a motion, and a line read as
+ * a group name instead cost every split of such a list its expansion.
+ */
+const SUBJECT_LINE = /^(§|am\b|ams?\.?\s*\d|amendment|recital|citation|paragraph|article|annex)/i;
+
+/**
+ * One subject written two ways is still one subject: the table's column says
+ * "Article 5, § 1, point 32, intro", the footer "…, point 32, introductory
+ * part", and the row and its request have to find each other across that.
+ * Case, spacing, the paragraph sign and the EP's abbreviations are levelled;
+ * nothing else is touched.
+ */
+export function subjectKey(subject: string): string {
+  return subject
+    .toLowerCase()
+    .replace(/[“”„«»]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\bintroductory part\b/g, "intro")
+    .replace(/\bsub-?point\b/g, "subpoint")
+    .replace(/\bparagraphs?\b|\bpar\.?\b/g, "§")
+    .replace(/\barticle\b|\bart\.?\b/g, "article")
+    .replace(/\bamendment\b|\bams?\b\.?/g, "am")
+    .replace(/[(),.;]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

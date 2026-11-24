@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     const { vl } = loaded;
     const votEn = votEnFor(loaded);
     const { spend, onUsage } = startSplitSpend();
-    const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, onUsage });
+    const notes = await expandSplitRows(vl, { itemCode: code, language: lang, votEn, votLang: loaded.vot, amendments: loaded.amendments, councilPosition: loaded.councilPosition, onUsage });
     await recordSplitRun({ userId: user.id, itemCode: code, language: lang, via: "bundle", notes, spend });
     lists.push(vl);
     void logEvent("vl_download", { userId: user.id, itemCode: code, meta: { lang, bundle: day } });

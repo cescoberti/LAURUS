@@ -106,6 +106,7 @@ export async function POST(request: Request) {
         votEn,
         votLang: loaded.vot,
         amendments: loaded.amendments,
+        councilPosition: loaded.councilPosition,
         onUsage,
       });
       // What the agents did on this list, and what it cost, for the Agents and Usage pages.
@@ -130,7 +131,11 @@ export async function POST(request: Request) {
             status: loaded.official.fill.anomalies.length ? "issue" : "ok",
             detail: [
               `${loaded.official.fill.filled}/${loaded.official.fill.candidates} Remarks filled`,
-              loaded.official.motionRead ? "original text taken from the report" : "the report text could not be read — original-text rows left empty",
+              loaded.councilPosition
+                ? `original text taken from the Council position (ST-${loaded.councilPosition.ref.number}/${loaded.councilPosition.ref.year}${loaded.councilPosition.ref.revision ? ` REV ${loaded.councilPosition.ref.revision}` : ""})`
+                : loaded.official.motionRead
+                  ? "original text taken from the report"
+                  : "the report text could not be read — original-text rows left empty",
               ...loaded.official.fill.anomalies.map((a) => `${a.subject}${a.amNo ? ` (am ${a.amNo})` : ""}: ${a.reason.replace(/_/g, " ")}`),
             ].join(" · "),
           }

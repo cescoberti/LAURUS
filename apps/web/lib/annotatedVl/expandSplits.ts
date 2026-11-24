@@ -27,12 +27,14 @@
  *   RESA_NON_LETTERALE, VERSIONE_TRADOTTA_ASSENTE
  */
 import mammoth from "mammoth";
-import type { AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
+import { subjectKey, type AnnotatedVotingList } from "@laurus/parser/voting-list-docx";
 import type { VotPayload } from "@laurus/parser/vot-xml";
 import { documentTextUrl } from "@laurus/parser";
 import { fetchBytesWithBackoff } from "@/lib/epFetch";
 import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
+import { articleTextIn } from "./load";
+import type { LoadedCouncilPosition } from "./councilPosition";
 import { splitAgent, splitAgentAvailable, type LocatedRun, type SplitAgentResult } from "./splitAgent";
 
 const BASE = "https://data.europarl.europa.eu";
@@ -176,6 +178,7 @@ function resolveSubject(
   subject: string,
   paragraphs: string[] | null,
   amendments: Map<number, string>,
+  article: ((subject: string) => string | null) | null,
 ): { text: string } | { error: string } {
   const s = subject.trim();
 
@@ -183,6 +186,14 @@ function resolveSubject(
   if (am) {
     const text = amendments.get(Number(am[1]));
     return text ? { text } : { error: `amendment ${am[1]} not in the ingested set` };
+  }
+
+  // A second reading's subjects are articles of the Council position, which
+  // is a document of the Council's: nothing in the report holds them.
+  if (/^article\b/i.test(s)) {
+    if (!article) return { error: "the Council position is not available in this language" };
+    const text = article(s);
+    return text ? { text } : { error: `"${s}" not found in the Council position` };
   }
 
   if (!paragraphs) return { error: "report text not available" };
@@ -414,6 +425,8 @@ export async function expandSplitRows(
     votEn: VotPayload | null;
     votLang: VotPayload | null;
     amendments: DbAmendment[];
+    /** Set for a second reading: the act the list votes on, article by article. */
+    councilPosition?: LoadedCouncilPosition | null;
     /** Told what each model call used, by which agent made it. */
     onUsage?: (agent: "quote-aligner" | "split-agent", u: { input_tokens: number; output_tokens: number }) => void;
   },
@@ -427,6 +440,9 @@ export async function expandSplitRows(
     reportParagraphs(opts.itemCode, "en"),
     isEnglishList ? Promise.resolve(null) : reportParagraphs(opts.itemCode, opts.language),
   ]);
+
+  const articleEn = articleTextIn(opts.councilPosition ?? null, "en");
+  const articleLang = isEnglishList ? articleEn : articleTextIn(opts.councilPosition ?? null, opts.language);
 
   const amEn = new Map<number, string>();
   const amLang = new Map<number, string>();
@@ -448,8 +464,12 @@ export async function expandSplitRows(
 
   for (const row of splitRows) {
     const subject = row.subject;
-    const reqEn = (opts.votEn?.splitVotes ?? []).find((sv) => norm(sv.subject) === norm(subject));
-    const reqLang = (opts.votLang?.splitVotes ?? []).find((sv) => norm(sv.subject) === norm(subject));
+    // The table and the footer do not always spell a subject the same way
+    // ("…, point 32, intro" against "…, point 32, introductory part"), so they
+    // are matched on what they name, not on the characters.
+    const key = subjectKey(subject);
+    const reqEn = (opts.votEn?.splitVotes ?? []).find((sv) => subjectKey(sv.subject) === key);
+    const reqLang = (opts.votLang?.splitVotes ?? []).find((sv) => subjectKey(sv.subject) === key);
     if (!reqEn) {
       notes.push({ subject, level: "error", code: "OGGETTO_NON_RISOLTO", detail: "no English VOT request found for this split (splits are tabled on English)" });
       continue;
@@ -459,8 +479,8 @@ export async function expandSplitRows(
       continue;
     }
 
-    const resolvedEn = resolveSubject(subject, paraEn, amEn);
-    const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang);
+    const resolvedEn = resolveSubject(subject, paraEn, amEn, articleEn);
+    const resolvedLang = isEnglishList ? null : resolveSubject(subject, paraLang, amLang, articleLang);
     const langSubject = resolvedLang && !("error" in resolvedLang) ? resolvedLang.text : null;
     const enSubject = "error" in resolvedEn ? null : resolvedEn.text;
 
