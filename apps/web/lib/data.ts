@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { parseIndicativeVotingList } from "@laurus/parser/voting-list-docx";
+import { votPayloadFromNotes } from "@/lib/annotatedVl/load";
 import {
   consolidateAmendments,
   type ConsolidatedAmendment,
@@ -136,6 +138,26 @@ export async function getItemVotRequests(itemId: string): Promise<Record<string,
   const out: Record<string, VotPayload> = {};
   for (const r of (data as Array<{ language: string; payload: VotPayload }> | null) ?? []) {
     out[r.language] = r.payload;
+  }
+  if (Object.keys(out).length > 0) return out;
+
+  // No VOT yet — it is published after the vote. The official list already
+  // prints the split requests under its table, so read them from there.
+  const { data: vl } = await supabase
+    .from("voting_lists")
+    .select("docx")
+    .eq("item_id", itemId)
+    .order("fetched_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!vl?.docx) return out;
+  const hex = vl.docx as string;
+  try {
+    const parsed = await parseIndicativeVotingList(Buffer.from(hex.startsWith("\\x") ? hex.slice(2) : hex, "hex"));
+    const payload = votPayloadFromNotes(parsed.notes);
+    if (payload.splitVotes.length > 0) out.en = payload;
+  } catch {
+    // an unreadable list simply leaves the tab empty, as before
   }
   return out;
 }

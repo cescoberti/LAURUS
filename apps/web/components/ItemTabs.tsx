@@ -310,8 +310,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
   if (!payload || rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center text-sm text-ink-300">
-        No vote requests recorded for this report — they appear once the official VOT for the
-        voting day is published.
+        No split requests printed on the official voting list for this report.
       </div>
     );
   }
@@ -337,7 +336,7 @@ function SplitSeparateView({ votRequests }: { votRequests: Record<string, VotPay
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm text-ink-500">
           <span className="font-semibold text-ink-900">{rows.length}</span> split &amp; separate requests
-          from the official VOT — full text in the CSV export and on hover.
+          from the official voting list — full text in the CSV export and on hover.
         </p>
         <div className="flex items-center gap-2">
           {langs.length > 1 && (

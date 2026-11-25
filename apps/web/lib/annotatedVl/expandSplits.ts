@@ -43,6 +43,7 @@ import type { DbAmendment } from "./fromDb";
 import { alignQuotes, quoteAlignmentAvailable } from "./alignQuotes";
 import { articleTextIn } from "./load";
 import type { LoadedCouncilPosition } from "./councilPosition";
+import { fillOralAmendments } from "./oralAmendments";
 import { splitAgent, splitAgentAvailable, type LocatedRun, type SplitAgentResult } from "./splitAgent";
 
 const BASE = "https://data.europarl.europa.eu";
@@ -505,7 +506,9 @@ export async function expandSplitRows(
     onUsage?: (agent: "quote-aligner" | "split-agent", u: { input_tokens: number; output_tokens: number }) => void;
   },
 ): Promise<SplitExpansionNote[]> {
-  const notes: SplitExpansionNote[] = [];
+  // Oral amendments come first: they are rows too, and every route that
+  // expands splits already carries the language and the spend recording.
+  const notes: SplitExpansionNote[] = await fillOralAmendments(vl, { language: opts.language, onUsage: opts.onUsage });
   const splitRows = vl.rows.filter((r) => r.voteType === "split" && r.splitParts.length > 0);
   if (splitRows.length === 0) return notes;
 

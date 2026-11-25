@@ -88,8 +88,17 @@ function bytesOf(hex: string): Buffer {
 export function votEnFor(loaded: LoadedVl): VotPayload | null {
   if (loaded.votEn) return loaded.votEn;
   if (!loaded.official) return null;
-  const requests = splitRequestsFromNotes(loaded.vl.notes);
-  const scheme = votingSchemeFromNotes(loaded.vl.notes);
+  return votPayloadFromNotes(loaded.vl.notes);
+}
+
+/**
+ * The requests as the list's own footer prints them, shaped like the VOT
+ * payload. Also what the file page shows under Split & Separate before the
+ * VOT exists: the list is out the day before the vote, the VOT after it.
+ */
+export function votPayloadFromNotes(notes: string[]): VotPayload {
+  const requests = splitRequestsFromNotes(notes);
+  const scheme = votingSchemeFromNotes(notes);
   const scheduled = new Set(scheme.map((s) => subjectKey(s.subject)));
   return {
     splitVotes: [...scheme, ...requests.filter((r) => !scheduled.has(subjectKey(r.subject)))],
